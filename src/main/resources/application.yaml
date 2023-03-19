@@ -1,0 +1,31 @@
+server:
+    port: 8888
+
+# http://localhost:8888/actuator/metrics/spring.cloud.gateway.requests
+management:
+    endpoints:
+        web:
+            exposure:
+                include: health,gateway,metrics
+    endpoint:
+        gateway:
+            enabled: true
+spring:
+    cloud:
+        gateway:
+            httpclient:
+                wiretap: false
+            metrics:
+                tags:
+                    path:
+                        enabled: true
+                enabled: true
+            routes:
+                -   id: http-bin-get
+                    uri: ${rewrite.backend.uri:http://localhost/get}
+                    predicates:
+                        - Path=/get
+                -   id: wallpaper
+                    uri: ${rewrite.backend.uri:https://upload.wikimedia.org/wikipedia/commons/c/cc/ESC_large_ISS022_ISS022-E-11387-edit_01.JPG}
+                    predicates:
+                        - Path=/wall
