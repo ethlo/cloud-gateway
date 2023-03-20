@@ -7,5 +7,5 @@ import org.springframework.http.server.reactive.ServerHttpResponse;
 
 public interface HttpLogger
 {
-    void terminated(final ServerHttpRequest request, final ServerHttpResponse response, final InputStream inputStream, final InputStream stream);
+    void completed(final ServerHttpRequest request, final ServerHttpResponse response, final InputStream inputStream, final InputStream stream);
 }

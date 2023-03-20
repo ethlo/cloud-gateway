@@ -1,5 +1,8 @@
 package com.ethlo.http.netty;
 
+import static java.nio.file.Files.delete;
+
+import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -25,6 +28,20 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
     {
         this.basePath = basePath;
         this.pool = new ConcurrentHashMap<>();
+    }
+
+    @Override
+    public void cleanup(final String requestId)
+    {
+        try
+        {
+            delete(getFilename(Operation.REQUEST, requestId));
+            delete(getFilename(Operation.RESPONSE, requestId));
+        }
+        catch (IOException e)
+        {
+            throw new UncheckedIOException(e);
+        }
     }
 
     @Override
@@ -72,11 +89,11 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
     }
 
     @Override
-    public InputStream get(final Operation operation, final String id)
+    public BufferedInputStream get(final Operation operation, final String id)
     {
         try
         {
-            return Files.newInputStream(getFilename(operation, id));
+            return new BufferedInputStream(Files.newInputStream(getFilename(operation, id)));
         }
         catch (IOException e)
         {

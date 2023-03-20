@@ -1,9 +1,12 @@
 package com.ethlo.http.netty;
 
+import java.io.BufferedInputStream;
 import java.io.InputStream;
 
 public interface DataBufferRepository
 {
+    void cleanup(String requestId);
+
     enum Operation
     {
         REQUEST, RESPONSE;
@@ -13,5 +16,5 @@ public interface DataBufferRepository
 
     void finished(String requestId);
 
-    InputStream get(final Operation operation, final String id);
+    BufferedInputStream get(final Operation operation, final String id);
 }

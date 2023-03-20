@@ -8,7 +8,7 @@ payload-logging:
         includes:
             - uris:
                 - path: /get
-                - path: /.*
+                - path: /vg
               methods:
                 - GET
         excludes:
@@ -22,14 +22,9 @@ management:
         web:
             exposure:
                 include: health,gateway,metrics
-    endpoint:
-        gateway:
-            enabled: true
 spring:
     cloud:
         gateway:
-            httpclient:
-                wiretap: false
             metrics:
                 tags:
                     path:
@@ -46,9 +41,8 @@ spring:
                         - Path=/vg
                     filters:
                         - StripPrefix=1
+                        - RewritePath=/(?<segment>.*), /$\{segment}
                 -   id: wallpaper
-                    uri: ${rewrite.backend.uri:https://upload.wikimedia.org/wikipedia/commons/c/cc/ESC_large_ISS022_ISS022-E-11387-edit_01.JPG}
+                    uri: https://upload.wikimedia.org/wikipedia/commons/c/cc/ESC_large_ISS022_ISS022-E-11387-edit_01.JPG
                     predicates:
                         - Path=/wall
-                    filters:
-                        - StripPrefix=1

@@ -26,14 +26,15 @@ public class JsonHttpLogger implements HttpLogger
     }
 
     @Override
-    public void terminated(final ServerHttpRequest request, final ServerHttpResponse response, final InputStream requestData, final InputStream responseData)
+    public void completed(final ServerHttpRequest request, final ServerHttpResponse response, final InputStream requestData, final InputStream responseData)
     {
         try
         {
-            System.out.println(objectMapper.writeValueAsString(request.getHeaders()));
-            System.out.println(objectMapper.writeValueAsString(response.getHeaders()));
-            System.out.println(new String(StreamUtils.copyToByteArray(requestData)));
-            System.out.println(new String(StreamUtils.copyToByteArray(responseData)));
+            System.out.println("RequestHeaders=" + objectMapper.writeValueAsString(request.getHeaders()));
+            System.out.println("RequestBody=" + new String(StreamUtils.copyToByteArray(requestData)));
+            
+            System.out.println("ResponseHeaders=" + objectMapper.writeValueAsString(response.getHeaders()));
+            System.out.println("ResponseBody=" + new String(StreamUtils.copyToByteArray(responseData)));
         }
         catch (IOException e)
         {
