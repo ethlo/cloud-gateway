@@ -13,12 +13,19 @@ import reactor.netty.http.client.HttpClientConfig;
 @Component
 public class LoggerHttpClientCustomizer implements HttpClientCustomizer
 {
+    private final DataBufferRepository dataBufferRepository;
+
+    public LoggerHttpClientCustomizer(final DataBufferRepository dataBufferRepository)
+    {
+        this.dataBufferRepository = dataBufferRepository;
+    }
+
     @Override
     public HttpClient customize(final HttpClient httpClient)
     {
         final Field field = Objects.requireNonNull(ReflectionUtils.findField(HttpClientConfig.class, "loggingHandler"));
         ReflectionUtils.makeAccessible(field);
-        ReflectionUtils.setField(field, httpClient.configuration(), new HttpRequestResponseLogger());
+        ReflectionUtils.setField(field, httpClient.configuration(), new HttpRequestResponseLogger(dataBufferRepository));
         return httpClient;
     }
 }

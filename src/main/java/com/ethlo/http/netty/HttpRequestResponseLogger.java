@@ -1,12 +1,5 @@
 package com.ethlo.http.netty;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
-
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.ChannelHandlerContext;
@@ -20,29 +13,12 @@ import reactor.util.context.Context;
 
 public class HttpRequestResponseLogger extends LoggingHandler
 {
-    private final Path basePath = Paths.get("/tmp");
+    private final DataBufferRepository dataBufferRepository;
 
-    private Path writeContentsToFile(final String operation, final String id, final byte[] content)
-    {
-        try
-        {
-            final Path file = basePath.resolve(operation + "_" + id);
-            Files.write(
-                    file,
-                    content,
-                    Files.exists(file) ? StandardOpenOption.APPEND : StandardOpenOption.CREATE
-            );
-            return file;
-        }
-        catch (IOException e)
-        {
-            throw new UncheckedIOException(e);
-        }
-    }
-
-    public HttpRequestResponseLogger()
+    public HttpRequestResponseLogger(final DataBufferRepository dataBufferRepository)
     {
         super(LogLevel.TRACE, ByteBufFormat.HEX_DUMP);
+        this.dataBufferRepository = dataBufferRepository;
     }
 
     @Override
@@ -72,8 +48,8 @@ public class HttpRequestResponseLogger extends LoggingHandler
     private String format(ChannelHandlerContext ctx, String eventName, ByteBuf msg)
     {
         final String requestId = getRequestId(ctx);
-        final Path file = writeContentsToFile(eventName.toLowerCase(), requestId, getBytes(msg));
-        return file.toString();
+        dataBufferRepository.save("write".equalsIgnoreCase(eventName) ? DataBufferRepository.Operation.REQUEST : DataBufferRepository.Operation.RESPONSE, requestId, getBytes(msg));
+        return requestId;
     }
 
     private static String getRequestId(ChannelHandlerContext ctx)

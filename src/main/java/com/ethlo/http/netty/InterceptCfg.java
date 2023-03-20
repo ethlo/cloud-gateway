@@ -6,7 +6,7 @@ import org.springframework.stereotype.Component;
 
 import reactor.netty.http.server.logging.AccessLog;
 
-@Component
+//@Component
 public class InterceptCfg implements WebServerFactoryCustomizer<NettyReactiveWebServerFactory>
 {
     @Override

@@ -32,7 +32,7 @@ public class RequestPattern
     {
         final HttpMethod method = request.getMethod();
         final boolean matchesMethod = getMethods().isEmpty() || getMethods().contains(method);
-        final boolean matchesUri = uris.isEmpty() || getUris().stream().anyMatch(uri -> uri.matches(request.getURI()));
+        final boolean matchesUri = uris == null || uris.isEmpty() || getUris().stream().anyMatch(uri -> uri.matches(request.getURI()));
         return matchesMethod && matchesUri;
     }
 }
