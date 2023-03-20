@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.stereotype.Component;
@@ -14,6 +16,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @Component
 public class JsonHttpLogger implements HttpLogger
 {
+    private static final Logger logger = LoggerFactory.getLogger(JsonHttpLogger.class);
+
     private final ObjectMapper objectMapper;
 
     public JsonHttpLogger(final ObjectMapper objectMapper)
@@ -26,11 +30,13 @@ public class JsonHttpLogger implements HttpLogger
     {
         try
         {
-            System.out.println("RequestHeaders=" + objectMapper.writeValueAsString(request.getHeaders()));
-            System.out.println("RequestBody=" + new String(StreamUtils.copyToByteArray(requestData)));
-
-            System.out.println("ResponseHeaders=" + objectMapper.writeValueAsString(response.getHeaders()));
-            System.out.println("ResponseBody=" + new String(StreamUtils.copyToByteArray(responseData)));
+            if (logger.isInfoEnabled())
+            {
+                logger.info("RequestHeaders={}", objectMapper.writeValueAsString(request.getHeaders()));
+                logger.info("RequestBody={}", new String(StreamUtils.copyToByteArray(requestData)));
+                logger.info("ResponseHeaders={}", objectMapper.writeValueAsString(response.getHeaders()));
+                logger.info("ResponseBody={}", new String(StreamUtils.copyToByteArray(responseData)));
+            }
         }
         catch (IOException e)
         {

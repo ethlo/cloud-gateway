@@ -1,5 +1,7 @@
 package com.ethlo.http.netty;
 
+import java.util.Optional;
+
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.ChannelHandlerContext;
@@ -21,11 +23,11 @@ public class HttpRequestResponseLogger extends LoggingHandler
         this.dataBufferRepository = dataBufferRepository;
     }
 
-    private static String getRequestId(ChannelHandlerContext ctx)
+    private static Optional<String> getRequestId(ChannelHandlerContext ctx)
     {
         final Attribute<?> context = ctx.channel().attr(AttributeKey.valueOf("$CONTEXT_VIEW"));
         final Context gatewayCtx = (Context) context.get();
-        return gatewayCtx.get(TagRequestIdGlobalFilter.REQUEST_ID_ATTRIBUTE_NAME);
+        return gatewayCtx.hasKey(TagRequestIdGlobalFilter.REQUEST_ID_ATTRIBUTE_NAME) ? Optional.of(gatewayCtx.get(TagRequestIdGlobalFilter.REQUEST_ID_ATTRIBUTE_NAME)) : Optional.empty();
     }
 
     @Override
@@ -54,9 +56,12 @@ public class HttpRequestResponseLogger extends LoggingHandler
 
     private String format(ChannelHandlerContext ctx, String eventName, ByteBuf msg)
     {
-        final String requestId = getRequestId(ctx);
-        dataBufferRepository.save("write".equalsIgnoreCase(eventName) ? DataBufferRepository.Operation.REQUEST : DataBufferRepository.Operation.RESPONSE, requestId, getBytes(msg));
-        return requestId;
+        return getRequestId(ctx).map(requestId ->
+        {
+            final DataBufferRepository.Operation operation = "write".equalsIgnoreCase(eventName) ? DataBufferRepository.Operation.REQUEST : DataBufferRepository.Operation.RESPONSE;
+            dataBufferRepository.save(operation, requestId, getBytes(msg));
+            return requestId;
+        }).orElse(null);
     }
 
     private byte[] getBytes(ByteBuf buf)
