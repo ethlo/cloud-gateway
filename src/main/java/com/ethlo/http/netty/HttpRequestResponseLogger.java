@@ -21,6 +21,13 @@ public class HttpRequestResponseLogger extends LoggingHandler
         this.dataBufferRepository = dataBufferRepository;
     }
 
+    private static String getRequestId(ChannelHandlerContext ctx)
+    {
+        final Attribute<?> context = ctx.channel().attr(AttributeKey.valueOf("$CONTEXT_VIEW"));
+        final Context gatewayCtx = (Context) context.get();
+        return gatewayCtx.get(TagRequestIdGlobalFilter.REQUEST_ID_ATTRIBUTE_NAME);
+    }
+
     @Override
     public void write(final ChannelHandlerContext ctx, final Object msg, final ChannelPromise promise)
     {
@@ -50,13 +57,6 @@ public class HttpRequestResponseLogger extends LoggingHandler
         final String requestId = getRequestId(ctx);
         dataBufferRepository.save("write".equalsIgnoreCase(eventName) ? DataBufferRepository.Operation.REQUEST : DataBufferRepository.Operation.RESPONSE, requestId, getBytes(msg));
         return requestId;
-    }
-
-    private static String getRequestId(ChannelHandlerContext ctx)
-    {
-        final Attribute<?> context = ctx.channel().attr(AttributeKey.valueOf("$CONTEXT_VIEW"));
-        final Context gatewayCtx = (Context) context.get();
-        return gatewayCtx.get(TagRequestIdGlobalFilter.REQUEST_ID_ATTRIBUTE_NAME);
     }
 
     private byte[] getBytes(ByteBuf buf)

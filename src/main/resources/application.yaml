@@ -6,14 +6,14 @@ payload-logging:
     tmp-path: /tmp
     filter:
         includes:
-            - uris:
-                - path: /get
-                - path: /vg
-              methods:
-                - GET
+            -   uris:
+                    -   path: /get
+                    -   path: /vg
+                methods:
+                    - GET
         excludes:
-            - uris:
-                  - path: .*/foo$
+            -   uris:
+                    -   path: .*/foo$
 
 
 # http://localhost:8888/actuator/metrics/spring.cloud.gateway.requests

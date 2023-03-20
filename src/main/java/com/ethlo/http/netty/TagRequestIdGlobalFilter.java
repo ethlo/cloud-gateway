@@ -21,11 +21,10 @@ import reactor.core.scheduler.Schedulers;
 public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
 {
     public static final String REQUEST_ID_ATTRIBUTE_NAME = "gateway-request-id";
-
+    private static final Logger logger = LoggerFactory.getLogger(TagRequestIdGlobalFilter.class);
     private final HttpLogger httpLogger;
     private final DataBufferRepository dataBufferRepository;
     private final RequestMatchingConfiguration requestMatchingConfiguration;
-    private static final Logger logger = LoggerFactory.getLogger(TagRequestIdGlobalFilter.class);
 
     public TagRequestIdGlobalFilter(final HttpLogger httpLogger, final DataBufferRepository dataBufferRepository, final RequestMatchingConfiguration requestMatchingConfiguration)
     {

@@ -2,7 +2,6 @@ package com.ethlo.http;
 
 import org.springframework.boot.web.embedded.netty.NettyReactiveWebServerFactory;
 import org.springframework.boot.web.server.WebServerFactoryCustomizer;
-
 import org.springframework.context.annotation.Configuration;
 
 import reactor.netty.http.server.logging.AccessLog;
