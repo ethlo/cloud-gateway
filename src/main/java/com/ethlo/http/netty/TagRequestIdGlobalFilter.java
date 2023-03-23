@@ -1,6 +1,6 @@
 package com.ethlo.http.netty;
 
-import static com.ethlo.http.netty.HttpMessageUtil.findBodyPositionInStream;
+import static com.ethlo.http.util.HttpMessageUtil.findBodyPositionInStream;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;

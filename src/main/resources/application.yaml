@@ -28,6 +28,8 @@ management:
             exposure:
                 include: health,gateway,metrics
 spring:
+#    codec:
+#        max-in-memory-size: 100KB
     cloud:
         circuitbreaker:
             resilience4j:

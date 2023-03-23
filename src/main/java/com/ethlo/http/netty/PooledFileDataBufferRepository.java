@@ -1,9 +1,8 @@
 package com.ethlo.http.netty;
 
 import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
@@ -19,6 +18,8 @@ import org.springframework.stereotype.Repository;
 import org.springframework.util.unit.DataSize;
 
 import ch.qos.logback.core.util.CloseUtil;
+import com.ethlo.http.util.InspectableBufferedOutputStream;
+import com.ethlo.http.util.LazyFileOutputStream;
 
 @Repository
 public class PooledFileDataBufferRepository implements DataBufferRepository
@@ -26,7 +27,7 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
     private static final Logger logger = LoggerFactory.getLogger(PooledFileDataBufferRepository.class);
     private final DataSize bufferSize;
     private final Path basePath;
-    private final ConcurrentMap<Path, OutputStream> pool;
+    private final ConcurrentMap<Path, InspectableBufferedOutputStream> pool;
 
     public PooledFileDataBufferRepository(@Value("${payload-logging.in-mem-buffer-size}") final DataSize bufferSize, @Value("${payload-logging.tmp-path}") final Path basePath)
     {
@@ -39,27 +40,30 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
     public void cleanup(final String requestId)
     {
         logger.debug("Deleting buffer files for {}", requestId);
+        cleanup(getFilename(Operation.REQUEST, requestId));
+        cleanup(getFilename(Operation.RESPONSE, requestId));
+    }
+
+    private void cleanup(Path file)
+    {
+        Optional.ofNullable(pool.remove(file)).ifPresent(requestBuffer ->
+        {
+            if (requestBuffer.isFlushedToUnderlyingStream())
+            {
+                deleteSilently(file);
+            }
+        });
+    }
+
+    private void deleteSilently(Path requestFile)
+    {
         try
         {
-            final Path requestFile = getFilename(Operation.REQUEST, requestId);
-            final Path responseFile = getFilename(Operation.RESPONSE, requestId);
-            if (pool.remove(requestFile) != null)
-            {
-                Files.delete(requestFile);
-            }
-
-            if (pool.remove(responseFile) != null)
-            {
-                Files.delete(responseFile);
-            }
-        }
-        catch (NoSuchFileException exc)
-        {
-            logger.debug("File not found when attempting to delete: {}", exc.getFile());
+            Files.deleteIfExists(requestFile);
         }
         catch (IOException e)
         {
-            throw new UncheckedIOException(e);
+            logger.warn(e.getMessage(), e);
         }
     }
 
@@ -67,11 +71,11 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
     public void save(final Operation operation, final String requestId, final byte[] data)
     {
         final Path file = getFilename(operation, requestId);
-        final OutputStream out = pool.compute(file, (f, outputStream) ->
+        final InspectableBufferedOutputStream out = pool.compute(file, (f, outputStream) ->
         {
             if (outputStream == null)
             {
-                outputStream = new BufferedOutputStream(new LazyFileOutputStream(f), Math.toIntExact(bufferSize.toBytes()));
+                outputStream = new InspectableBufferedOutputStream(new LazyFileOutputStream(f), Math.toIntExact(bufferSize.toBytes()));
                 logger.debug("Opened buffer file for {} for {}", operation, requestId);
             }
             return outputStream;
@@ -103,17 +107,39 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
     @Override
     public BufferedInputStream get(final Operation operation, final String id)
     {
-        try
-        {
-            return new BufferedInputStream(Files.newInputStream(getFilename(operation, id)));
-        }
-        catch (NoSuchFileException exc)
-        {
-            return null;
-        }
-        catch (IOException e)
-        {
-            throw new UncheckedIOException(e);
-        }
+        return Optional.ofNullable(pool.get(getFilename(operation, id)))
+                .map(stream ->
+                {
+                    if (!stream.isFlushedToUnderlyingStream())
+                    {
+                        final byte[] data = stream.getBuffer();
+                        logger.debug("Using data directly from memory for {} {} with size {} bytes", operation, id, data.length);
+                        return new BufferedInputStream(new ByteArrayInputStream(data));
+                    }
+                    stream.forceFlush();
+                    stream.forceClose();
+                    return null;
+                }).orElseGet(
+                        () ->
+                        {
+                            try
+                            {
+                                final Path file = getFilename(operation, id);
+                                if (logger.isDebugEnabled())
+                                {
+                                    logger.debug("Size of file {} {}", file, Files.size(file));
+                                }
+                                return new BufferedInputStream(Files.newInputStream(file));
+                            }
+                            catch (NoSuchFileException exc)
+                            {
+                                return null;
+                            }
+                            catch (IOException e)
+                            {
+                                throw new UncheckedIOException(e);
+                            }
+                        }
+                );
     }
 }

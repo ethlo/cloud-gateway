@@ -1,4 +1,4 @@
-package com.ethlo.http.netty;
+package com.ethlo.http.util;
 
 import java.io.IOException;
 import java.io.OutputStream;

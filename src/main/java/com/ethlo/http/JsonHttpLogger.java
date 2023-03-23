@@ -31,7 +31,7 @@ public class JsonHttpLogger implements HttpLogger
 
         try
         {
-            if (logger.isInfoEnabled())
+            if (logger.isTraceEnabled())
             {
                 logger.info("RequestHeaders={}", objectMapper.writeValueAsString(request.getHeaders()));
                 logger.info("RequestBody={}", new String(StreamUtils.copyToByteArray(requestData)));
