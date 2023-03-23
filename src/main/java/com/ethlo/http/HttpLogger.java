@@ -2,10 +2,12 @@ package com.ethlo.http;
 
 import java.io.InputStream;
 
+import jakarta.annotation.Nullable;
+
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 
 public interface HttpLogger
 {
-    void completed(final ServerHttpRequest request, final ServerHttpResponse response, final InputStream inputStream, final InputStream stream);
+    void completed(final ServerHttpRequest request, final ServerHttpResponse response, @Nullable final InputStream inputStream, @Nullable final InputStream stream);
 }

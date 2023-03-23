@@ -1,6 +1,7 @@
 package com.ethlo.http.match;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.http.server.reactive.ServerHttpRequest;
@@ -29,22 +30,27 @@ public class RequestMatchingConfiguration
         return excludes;
     }
 
-    public boolean matches(ServerHttpRequest request)
+    public Optional<RequestPattern> matches(ServerHttpRequest request)
     {
-        final boolean matchesInclude = includes.isEmpty() || matches(includes, request);
-        final boolean matchesExclude = !excludes.isEmpty() && matches(excludes, request);
-        return matchesInclude && !matchesExclude;
+        final Optional<RequestPattern> matchInclude = matches(includes, request);
+        final boolean matchesInclude = includes.isEmpty() || matchInclude.isPresent();
+        final boolean matchesExclude = !excludes.isEmpty() && matches(excludes, request).isPresent();
+        if (matchesInclude && !matchesExclude)
+        {
+            return matchInclude;
+        }
+        return Optional.empty();
     }
 
-    private boolean matches(List<RequestPattern> requestPatterns, ServerHttpRequest request)
+    private Optional<RequestPattern> matches(List<RequestPattern> requestPatterns, ServerHttpRequest request)
     {
         for (final RequestPattern requestPattern : requestPatterns)
         {
             if (requestPattern.matches(request))
             {
-                return true;
+                return Optional.of(requestPattern);
             }
         }
-        return false;
+        return Optional.empty();
     }
 }

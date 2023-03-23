@@ -28,6 +28,7 @@ public class JsonHttpLogger implements HttpLogger
     @Override
     public void completed(final ServerHttpRequest request, final ServerHttpResponse response, final InputStream requestData, final InputStream responseData)
     {
+
         try
         {
             if (logger.isInfoEnabled())

@@ -1,17 +1,18 @@
 package com.ethlo.http.netty;
 
-import static java.nio.file.Files.delete;
-
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
 
@@ -20,6 +21,7 @@ import ch.qos.logback.core.util.CloseUtil;
 @Repository
 public class PooledFileDataBufferRepository implements DataBufferRepository
 {
+    private static final Logger logger = LoggerFactory.getLogger(PooledFileDataBufferRepository.class);
     private final Path basePath;
     private final ConcurrentMap<Path, OutputStream> pool;
 
@@ -32,10 +34,24 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
     @Override
     public void cleanup(final String requestId)
     {
+        logger.debug("Deleting buffer files for {}", requestId);
         try
         {
-            delete(getFilename(Operation.REQUEST, requestId));
-            delete(getFilename(Operation.RESPONSE, requestId));
+            final Path requestFile = getFilename(Operation.REQUEST, requestId);
+            final Path responseFile = getFilename(Operation.RESPONSE, requestId);
+            if (pool.remove(requestFile) != null)
+            {
+                Files.delete(requestFile);
+            }
+
+            if (pool.remove(responseFile) != null)
+            {
+                Files.delete(responseFile);
+            }
+        }
+        catch (NoSuchFileException exc)
+        {
+            logger.debug("File not found when attempting to delete: {}", exc.getFile());
         }
         catch (IOException e)
         {
@@ -44,9 +60,9 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
     }
 
     @Override
-    public void save(final Operation operation, final String id, final byte[] data)
+    public void save(final Operation operation, final String requestId, final byte[] data)
     {
-        final Path file = getFilename(operation, id);
+        final Path file = getFilename(operation, requestId);
         final OutputStream out = pool.compute(file, (f, outputStream) ->
         {
             if (outputStream == null)
@@ -54,6 +70,7 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
                 try
                 {
                     outputStream = Files.newOutputStream(f);
+                    logger.debug("Opened buffer file for {} for {}", operation, requestId);
                 }
                 catch (IOException e)
                 {
@@ -65,6 +82,7 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
         try
         {
             out.write(data);
+            logger.trace("Wrote {} bytes to buffer file for {} {}", data.length, operation, requestId);
         }
         catch (IOException e)
         {
@@ -80,11 +98,9 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
     @Override
     public void finished(final String requestId)
     {
-        final Path fileRequest = getFilename(Operation.REQUEST, requestId);
-        Optional.ofNullable(pool.remove(fileRequest)).ifPresent(CloseUtil::closeQuietly);
-
-        final Path fileResponse = getFilename(Operation.RESPONSE, requestId);
-        Optional.ofNullable(pool.remove(fileResponse)).ifPresent(CloseUtil::closeQuietly);
+        logger.debug("Closing buffer files for request {}", requestId);
+        Optional.ofNullable(pool.get(getFilename(Operation.REQUEST, requestId))).ifPresent(CloseUtil::closeQuietly);
+        Optional.ofNullable(pool.get(getFilename(Operation.RESPONSE, requestId))).ifPresent(CloseUtil::closeQuietly);
     }
 
     @Override
@@ -93,6 +109,10 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
         try
         {
             return new BufferedInputStream(Files.newInputStream(getFilename(operation, id)));
+        }
+        catch (NoSuchFileException exc)
+        {
+            return null;
         }
         catch (IOException e)
         {

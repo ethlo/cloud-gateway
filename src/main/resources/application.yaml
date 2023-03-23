@@ -1,16 +1,20 @@
 server:
     port: 8888
 
-
 payload-logging:
     tmp-path: /tmp
     filter:
         includes:
-            -   uris:
-                    -   path: /get
-                    -   path: /vg
+            -   log-request-body: true
+                log-response-body: false
+                uris:
+                    - path: /get
+                    - path: /vg.*
+                    - path: /wall.*
                 methods:
                     - GET
+                    - POST
+
         excludes:
             -   uris:
                     -   path: .*/foo$
@@ -24,6 +28,9 @@ management:
                 include: health,gateway,metrics
 spring:
     cloud:
+        circuitbreaker:
+            resilience4j:
+                enabled: true
         gateway:
             metrics:
                 tags:
@@ -35,6 +42,11 @@ spring:
                     uri: ${rewrite.backend.uri:http://localhost/get}
                     predicates:
                         - Path=/get
+                    filters:
+                        - name: CircuitBreaker
+                          args:
+                            name: upstream-down
+                            fallbackUri: forward:/upstream-down
                 -   id: vg-front
                     uri: ${rewrite.backend.uri:https://www.vg.no/}
                     predicates:

@@ -2,6 +2,7 @@ package com.ethlo.http.netty;
 
 import java.util.Optional;
 
+import com.ethlo.http.match.RequestPattern;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.ChannelHandlerContext;
@@ -25,9 +26,14 @@ public class HttpRequestResponseLogger extends LoggingHandler
 
     private static Optional<String> getRequestId(ChannelHandlerContext ctx)
     {
-        final Attribute<?> context = ctx.channel().attr(AttributeKey.valueOf("$CONTEXT_VIEW"));
-        final Context gatewayCtx = (Context) context.get();
+        final Context gatewayCtx = getContext(ctx);
         return gatewayCtx.hasKey(TagRequestIdGlobalFilter.REQUEST_ID_ATTRIBUTE_NAME) ? Optional.of(gatewayCtx.get(TagRequestIdGlobalFilter.REQUEST_ID_ATTRIBUTE_NAME)) : Optional.empty();
+    }
+
+    private static Context getContext(ChannelHandlerContext ctx)
+    {
+        final Attribute<?> context = ctx.channel().attr(AttributeKey.valueOf("$CONTEXT_VIEW"));
+        return (Context) context.get();
     }
 
     @Override
@@ -59,9 +65,24 @@ public class HttpRequestResponseLogger extends LoggingHandler
         return getRequestId(ctx).map(requestId ->
         {
             final DataBufferRepository.Operation operation = "write".equalsIgnoreCase(eventName) ? DataBufferRepository.Operation.REQUEST : DataBufferRepository.Operation.RESPONSE;
-            dataBufferRepository.save(operation, requestId, getBytes(msg));
+            final RequestPattern pattern = getRequestPattern(ctx).orElseThrow();
+            if (pattern.isLogRequestBody() && operation == DataBufferRepository.Operation.REQUEST
+                    || pattern.isLogResponseBody() && operation == DataBufferRepository.Operation.RESPONSE)
+            {
+                final byte[] data = getBytes(msg);
+                if (data.length > 0)
+                {
+                    dataBufferRepository.save(operation, requestId, data);
+                }
+            }
             return requestId;
         }).orElse(null);
+    }
+
+    private Optional<RequestPattern> getRequestPattern(ChannelHandlerContext ctx)
+    {
+        final Context gatewayCtx = getContext(ctx);
+        return gatewayCtx.hasKey(TagRequestIdGlobalFilter.LOG_CAPTURE_CONFIG_ATTRIBUTE_NAME) ? Optional.of(gatewayCtx.get(TagRequestIdGlobalFilter.LOG_CAPTURE_CONFIG_ATTRIBUTE_NAME)) : Optional.empty();
     }
 
     private byte[] getBytes(ByteBuf buf)

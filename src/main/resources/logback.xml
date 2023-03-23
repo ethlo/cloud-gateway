@@ -1,13 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration debug="false">
 
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
     <appender name="console" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>%d %5p [%t] [%c:%L] - %m%n%ex
+            <pattern>%clr(%d){blue} %clr(%5p){faint} %clr([%t]){yellow} [%c:%L] - %m%n%ex
             </pattern>
         </encoder>
     </appender>
 
+    <!--
     <appender name="access-file" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>${java.io.tmpdir}/reverse-proxy-access.log.json</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
@@ -24,7 +27,8 @@
             </providers>
         </encoder>
     </appender>
-
+-->
+    <logger name="com.ethlo.http.netty.PooledFileDataBufferRepository" level="TRACE" />
     <logger name="com.ethlo.http.netty.HttpRequestResponseLogger" level="INFO"/>
 
     <root level="INFO">
