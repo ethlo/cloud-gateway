@@ -8,9 +8,9 @@ payload-logging:
             -   log-request-body: true
                 log-response-body: false
                 uris:
-                    - path: /get
-                    - path: /vg.*
-                    - path: /wall.*
+                    -   path: /get
+                    -   path: /vg.*
+                    -   path: /wall.*
                 methods:
                     - GET
                     - POST
@@ -43,10 +43,10 @@ spring:
                     predicates:
                         - Path=/get
                     filters:
-                        - name: CircuitBreaker
-                          args:
-                            name: upstream-down
-                            fallbackUri: forward:/upstream-down
+                        -   name: CircuitBreaker
+                            args:
+                                name: upstream-down
+                                fallbackUri: forward:/upstream-down
                 -   id: vg-front
                     uri: ${rewrite.backend.uri:https://www.vg.no/}
                     predicates:

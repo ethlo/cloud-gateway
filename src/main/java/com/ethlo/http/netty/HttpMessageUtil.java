@@ -6,15 +6,12 @@ import java.io.IOException;
 public class HttpMessageUtil
 {
     public static final int MAX_HEADER_SIZE = 65_535;
-
-
-    private HttpMessageUtil()
-    {
-    }
-
     public static final int CR = 13;
     public static final int LF = 10;
     public static final byte[] BODY_SEPARATOR = new byte[]{CR, LF, CR, LF};
+    private HttpMessageUtil()
+    {
+    }
 
     public static long findBodyPositionInStream(BufferedInputStream data) throws IOException
     {

@@ -28,7 +28,7 @@
         </encoder>
     </appender>
 -->
-    <logger name="com.ethlo.http.netty.PooledFileDataBufferRepository" level="TRACE" />
+    <logger name="com.ethlo.http.netty.PooledFileDataBufferRepository" level="TRACE"/>
     <logger name="com.ethlo.http.netty.HttpRequestResponseLogger" level="INFO"/>
 
     <root level="INFO">

@@ -2,8 +2,6 @@ package com.ethlo.http;
 
 import java.io.IOException;
 
-import com.ethlo.http.netty.HttpMessageUtil;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.buffer.DataBuffer;
@@ -16,14 +14,15 @@ import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
 
 import com.ethlo.http.netty.DataBufferRepository;
+import com.ethlo.http.netty.HttpMessageUtil;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 @Component
 public class CircuitBreakerHandler implements HandlerFunction<ServerResponse>
 {
-    private final DataBufferRepository dataBufferRepository;
     private static final Logger logger = LoggerFactory.getLogger(CircuitBreakerHandler.class);
+    private final DataBufferRepository dataBufferRepository;
 
     public CircuitBreakerHandler(final DataBufferRepository dataBufferRepository)
     {
