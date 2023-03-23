@@ -1,6 +1,7 @@
 package com.ethlo.http.netty;
 
 import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
@@ -15,6 +16,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
+import org.springframework.util.unit.DataSize;
 
 import ch.qos.logback.core.util.CloseUtil;
 
@@ -22,11 +24,13 @@ import ch.qos.logback.core.util.CloseUtil;
 public class PooledFileDataBufferRepository implements DataBufferRepository
 {
     private static final Logger logger = LoggerFactory.getLogger(PooledFileDataBufferRepository.class);
+    private final DataSize bufferSize;
     private final Path basePath;
     private final ConcurrentMap<Path, OutputStream> pool;
 
-    public PooledFileDataBufferRepository(@Value("${payload-logging.tmp-path}") final Path basePath)
+    public PooledFileDataBufferRepository(@Value("${payload-logging.in-mem-buffer-size}") final DataSize bufferSize, @Value("${payload-logging.tmp-path}") final Path basePath)
     {
+        this.bufferSize = bufferSize;
         this.basePath = basePath;
         this.pool = new ConcurrentHashMap<>();
     }
@@ -67,15 +71,8 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
         {
             if (outputStream == null)
             {
-                try
-                {
-                    outputStream = Files.newOutputStream(f);
-                    logger.debug("Opened buffer file for {} for {}", operation, requestId);
-                }
-                catch (IOException e)
-                {
-                    throw new UncheckedIOException(e);
-                }
+                outputStream = new BufferedOutputStream(new LazyFileOutputStream(f), Math.toIntExact(bufferSize.toBytes()));
+                logger.debug("Opened buffer file for {} for {}", operation, requestId);
             }
             return outputStream;
         });

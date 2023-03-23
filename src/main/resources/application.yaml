@@ -3,6 +3,7 @@ server:
 
 payload-logging:
     tmp-path: /tmp
+    in-mem-buffer-size: 1MB
     filter:
         includes:
             -   log-request-body: true

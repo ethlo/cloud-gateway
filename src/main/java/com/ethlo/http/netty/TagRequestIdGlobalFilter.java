@@ -75,11 +75,11 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
     private void handleCompletedRequest(ServerWebExchange exchange, String requestId)
     {
         logger.debug("Completed request {}", requestId);
+        dataBufferRepository.finished(requestId);
+
         try (final BufferedInputStream requestData = dataBufferRepository.get(DataBufferRepository.Operation.REQUEST, requestId);
              final BufferedInputStream responseData = dataBufferRepository.get(DataBufferRepository.Operation.RESPONSE, requestId))
         {
-            dataBufferRepository.finished(requestId);
-
             if (requestData != null)
             {
                 findBodyPositionInStream(requestData);
