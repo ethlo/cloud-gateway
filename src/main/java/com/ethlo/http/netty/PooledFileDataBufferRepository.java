@@ -11,6 +11,8 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+import io.pebbletemplates.pebble.extension.core.NumberFormatFilter;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -76,14 +78,14 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
             if (outputStream == null)
             {
                 outputStream = new InspectableBufferedOutputStream(new LazyFileOutputStream(f), Math.toIntExact(bufferSize.toBytes()));
-                logger.debug("Opened buffer file for {} for {}", operation, requestId);
+                logger.debug("Opened buffer for {} for {}", operation, requestId);
             }
             return outputStream;
         });
         try
         {
             out.write(data);
-            logger.trace("Wrote {} bytes to buffer file for {} {}", data.length, operation, requestId);
+            logger.trace("Wrote {} bytes to buffer for {} {}", data.length, operation, requestId);
         }
         catch (IOException e)
         {
@@ -99,7 +101,6 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
     @Override
     public void finished(final String requestId)
     {
-        logger.debug("Closing buffer files for request {}", requestId);
         Optional.ofNullable(pool.get(getFilename(Operation.REQUEST, requestId))).ifPresent(CloseUtil::closeQuietly);
         Optional.ofNullable(pool.get(getFilename(Operation.RESPONSE, requestId))).ifPresent(CloseUtil::closeQuietly);
     }
@@ -127,7 +128,7 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
                                 final Path file = getFilename(operation, id);
                                 if (logger.isDebugEnabled())
                                 {
-                                    logger.debug("Size of file {} {}", file, Files.size(file));
+                                    logger.debug("Size of file {} is {} bytes", file, Files.size(file));
                                 }
                                 return new BufferedInputStream(Files.newInputStream(file));
                             }

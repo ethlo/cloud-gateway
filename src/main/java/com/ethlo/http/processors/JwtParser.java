@@ -1,4 +1,4 @@
-package com.ethlo.http;
+package com.ethlo.http.processors;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;

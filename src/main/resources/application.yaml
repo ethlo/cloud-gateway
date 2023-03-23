@@ -1,13 +1,29 @@
 server:
     port: 8888
 
+access-log.pattern: '{{gateway_request_id}} {{method}} {{path}} {{request_headers["Content-Length"][0]}} {{status}}'
+logging:
+    filter:
+        headers:
+            request:
+                excludes:
+                    - host
+                    - user-agent
+            response:
+                excludes:
+                    - content-security-policy
+                    - link
+                    - server
+                    - date
+                    - content-length
+                    - content-type
 payload-logging:
     tmp-path: /tmp
     in-mem-buffer-size: 1MB
     filter:
         includes:
             -   log-request-body: true
-                log-response-body: false
+                log-response-body: true
                 uris:
                     -   path: /get
                     -   path: /vg.*
@@ -28,12 +44,10 @@ management:
             exposure:
                 include: health,gateway,metrics
 spring:
-#    codec:
-#        max-in-memory-size: 100KB
+    datasource:
+        url: jdbc:ch://localhost:8123/access?compress=0
+        driver-class-name: com.clickhouse.jdbc.ClickHouseDriver
     cloud:
-        circuitbreaker:
-            resilience4j:
-                enabled: true
         gateway:
             metrics:
                 tags:

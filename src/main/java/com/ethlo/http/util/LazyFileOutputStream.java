@@ -6,8 +6,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class LazyFileOutputStream extends OutputStream
 {
+    private static final Logger logger = LoggerFactory.getLogger(LazyFileOutputStream.class);
+
     private final Path file;
 
     private OutputStream outputStream;
@@ -62,6 +67,7 @@ public class LazyFileOutputStream extends OutputStream
         {
             outputStream = Files.newOutputStream(file, StandardOpenOption.CREATE);
             opened = true;
+            logger.debug("Opened file output stream for {}", file);
         }
     }
 }

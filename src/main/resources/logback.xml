@@ -10,13 +10,17 @@
         </encoder>
     </appender>
 
-    <!--
     <appender name="access-file" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>${java.io.tmpdir}/reverse-proxy-access.log.json</file>
+        <file>${java.io.tmpdir}/reverse-proxy-access.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <fileNamePattern>${java.io.tmpdir}/reverse-proxy-access.%d{yyyy-MM-dd}.log.json</fileNamePattern>
+            <fileNamePattern>${java.io.tmpdir}/reverse-proxy-access.%d{yyyy-MM-dd}.log</fileNamePattern>
             <maxHistory>100</maxHistory>
         </rollingPolicy>
+        <encoder>
+            <pattern>%d - %m%n%ex
+            </pattern>
+        </encoder>
+        <!--
         <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
             <providers>
                 <timestamp/>
@@ -26,10 +30,14 @@
                 </pattern>
             </providers>
         </encoder>
+        -->
     </appender>
--->
-    <logger name="com.ethlo.http.netty.PooledFileDataBufferRepository" level="DEBUG"/>
-    <logger name="com.ethlo.http.netty.HttpRequestResponseLogger" level="INFO"/>
+
+    <logger name="access-log" additivity="false">
+        <appender-ref ref="access-file" />
+    </logger>
+
+    <logger name="com.ethlo.http" level="INFO"/>
 
     <root level="INFO">
         <appender-ref ref="console"/>

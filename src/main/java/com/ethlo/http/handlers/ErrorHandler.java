@@ -1,4 +1,4 @@
-package com.ethlo.http;
+package com.ethlo.http.handlers;
 
 import java.util.AbstractMap;
 import java.util.Map;
