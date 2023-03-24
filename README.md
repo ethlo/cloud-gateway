@@ -19,3 +19,6 @@ Experimental reverse proxy built on top of Spring Cloud Gateway with full reques
 
 * [Using Spring Cloud Gateway](https://github.com/spring-cloud-samples/spring-cloud-gateway-sample)
 * [Client-side load-balancing with Spring Cloud LoadBalancer](https://spring.io/guides/gs/spring-cloud-loadbalancer/)
+
+# Special features
+If an upstream server is down, the request can still be captured by configuring a fallback for the route.
