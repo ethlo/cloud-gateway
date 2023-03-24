@@ -27,7 +27,6 @@ payload-logging:
                 uris:
                     -   path: /get
                     -   path: /vg.*
-                    -   path: /wall.*
                 methods:
                     - GET
                     - POST
@@ -44,7 +43,7 @@ management:
                 include: health,gateway,metrics
 spring:
     datasource:
-        url: jdbc:ch://clickhouse-cloud-gateway:8123/default?compress=0'
+        url: jdbc:ch://clickhouse-cloud-gateway:8123/default?compress=0;async_insert=1,wait_for_async_insert=0
         driver-class-name: com.clickhouse.jdbc.ClickHouseDriver
     cloud:
         gateway:

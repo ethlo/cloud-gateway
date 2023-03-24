@@ -16,6 +16,7 @@ services:
         container_name: cloud-gateway
         image: ethlocom/cloud-gateway
         environment:
+            - 'JAVA_OPTS="-XX:MaxDirectMemorySize=200M"'
             - 'SPRING_CONFIG_LOCATION=/config/application.yaml'
         volumes:
             - ./config:/config
