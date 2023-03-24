@@ -2,6 +2,12 @@
 
 Experimental reverse proxy built on top of Spring Cloud Gateway with full request/response header and body logging.
 
+### Logging support
+* File - log to file via template pattern for ease of setup.
+* ClickHouse - Log to a clickhouse table for powerful and easy analysis.
+* JSON - log to JSON files for supporting easy-to-ingest data into 3rd-party storage.
+
+
 ### References
 
 * [Gateway](https://docs.spring.io/spring-cloud-gateway/docs/current/reference/html/)
