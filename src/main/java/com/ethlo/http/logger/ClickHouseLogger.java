@@ -1,17 +1,12 @@
 package com.ethlo.http.logger;
 
-import org.springframework.http.HttpHeaders;
+import java.io.InputStream;
+import java.util.Map;
+
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Component;
-
-import java.io.InputStream;
-import java.time.OffsetDateTime;
-import java.util.HashMap;
-import java.util.Map;
-
-import static org.apache.logging.log4j.util.Strings.repeat;
 
 @Component
 public class ClickHouseLogger implements HttpLogger

@@ -1,0 +1,23 @@
+version: '3'
+
+services:
+    clickhouse-cloud-gateway:
+        image: yandex/clickhouse-server
+        hostname: clickhouse-cloud-gateway
+        container_name: clickhouse-cloud-gateway
+        ports:
+            - '18123:8123'
+        ulimits:
+            nofile:
+                soft: 262144
+                hard: 262144
+    cloud-gateway:
+        hostname: cloud-gateway
+        container_name: cloud-gateway
+        image: ethlocom/cloud-gateway
+        environment:
+            - 'SPRING_CONFIG_LOCATION=/config/application.yaml'
+        volumes:
+            - ./config:/config
+        ports:
+            - '6464:8888'

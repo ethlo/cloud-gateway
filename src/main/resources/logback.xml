@@ -37,6 +37,8 @@
         <appender-ref ref="access-file" />
     </logger>
 
+    <logger name="org.springframework.boot.context.config" level="TRACE" />
+
     <logger name="com.ethlo.http" level="INFO"/>
 
     <root level="INFO">
