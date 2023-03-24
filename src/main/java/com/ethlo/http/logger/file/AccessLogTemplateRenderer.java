@@ -1,4 +1,4 @@
-package com.ethlo.http.accesslog;
+package com.ethlo.http.logger.file;
 
 import java.util.Map;
 

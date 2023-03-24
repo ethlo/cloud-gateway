@@ -1,4 +1,4 @@
-package com.ethlo.http.logger;
+package com.ethlo.http.logger.clickhouse;
 
 import org.springframework.data.relational.core.dialect.AnsiDialect;
 import org.springframework.data.relational.core.dialect.LimitClause;

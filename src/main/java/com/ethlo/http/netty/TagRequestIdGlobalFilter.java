@@ -12,8 +12,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
-import com.ethlo.http.processors.HeaderFilterConfiguration;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
@@ -27,6 +25,7 @@ import org.springframework.web.server.ServerWebExchange;
 import com.ethlo.http.logger.HttpLogger;
 import com.ethlo.http.match.RequestMatchingConfiguration;
 import com.ethlo.http.match.RequestPattern;
+import com.ethlo.http.processors.HeaderFilterConfiguration;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.SignalType;
 import reactor.core.scheduler.Schedulers;
@@ -61,9 +60,8 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
             final long started = System.nanoTime();
             final String requestId = exchange.getRequest().getId();
             logger.debug("Tagging request: {}", requestId);
-            final ServerHttpRequest requestWithHeaders = exchange.getRequest().mutate().header(REQUEST_ID_ATTRIBUTE_NAME, requestId).build();
-            return chain.filter(exchange.mutate()
-                            .request(requestWithHeaders).build())
+
+            return chain.filter(exchange)
                     .contextWrite(ctx ->
                             ctx.put(REQUEST_ID_ATTRIBUTE_NAME, requestId)
                                     .put(LOG_CAPTURE_CONFIG_ATTRIBUTE_NAME, match.get()))
@@ -101,8 +99,7 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
                 findBodyPositionInStream(responseData);
             }
 
-            httpLogger.accessLog(createAccessLogEntryData(exchange, duration));
-            httpLogger.completed(exchange.getRequest(), exchange.getResponse(), requestData, responseData);
+            httpLogger.accessLog(createAccessLogEntryData(exchange, duration), requestData, responseData);
 
             // NOT in finally, as we do not want to delete data if it has not been properly processed
             dataBufferRepository.cleanup(requestId);
