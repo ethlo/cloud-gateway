@@ -20,5 +20,33 @@ Experimental reverse proxy built on top of Spring Cloud Gateway with full reques
 * [Using Spring Cloud Gateway](https://github.com/spring-cloud-samples/spring-cloud-gateway-sample)
 * [Client-side load-balancing with Spring Cloud LoadBalancer](https://spring.io/guides/gs/spring-cloud-loadbalancer/)
 
-# Special features
+### Configure logging provider(s)
+```yaml
+logging:
+  provider:
+    file:
+      enabled: true
+      pattern: '{{gateway_request_id}} {{method}} {{path}} {{request_headers["Content-Length"][0]}} {{status}}'
+    clickhouse:
+      enabled: true
+      url: jdbc:ch://localhost:18123/default?compress=0;async_insert=1,wait_for_async_insert=0
+```
+
+### Special features
 If an upstream server is down, the request can still be captured by configuring a fallback for the route.
+
+```yaml
+spring:
+  cloud:
+      gateway:
+        routes:
+        - id: my-upstream-is-down
+          uri: ${rewrite.backend.uri:http://localhost/get}
+          predicates:
+            - Path=/get
+          filters:
+           - name: CircuitBreaker
+             args:
+             name: upstream-down
+             fallbackUri: forward:/upstream-down
+```
