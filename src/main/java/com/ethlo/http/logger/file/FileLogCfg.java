@@ -4,7 +4,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-@ConditionalOnProperty("logging.providers.file.enabled")
+@ConditionalOnProperty("http-logging.providers.file.enabled")
 @Configuration
 public class FileLogCfg
 {

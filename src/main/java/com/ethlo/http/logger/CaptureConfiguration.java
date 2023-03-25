@@ -1,11 +1,11 @@
 package com.ethlo.http.logger;
 
+import java.nio.file.Path;
+
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.util.unit.DataSize;
 
-import java.nio.file.Path;
-
-@ConfigurationProperties("logging.capture")
+@ConfigurationProperties("http-logging.capture")
 public class CaptureConfiguration
 {
     private final Path tempDirectory;

@@ -1,10 +1,10 @@
 package com.ethlo.http.logger.clickhouse;
 
-import com.ethlo.http.logger.BaseProviderConfig;
-
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-@ConfigurationProperties("logging.providers.clickhouse")
+import com.ethlo.http.logger.BaseProviderConfig;
+
+@ConfigurationProperties("http-logging.providers.clickhouse")
 public class ClickHouseProviderConfig extends BaseProviderConfig
 {
     private final String url;

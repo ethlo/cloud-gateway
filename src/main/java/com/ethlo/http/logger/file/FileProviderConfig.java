@@ -4,7 +4,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import com.ethlo.http.logger.BaseProviderConfig;
 
-@ConfigurationProperties("logging.providers.file")
+@ConfigurationProperties("http-logging.providers.file")
 public class FileProviderConfig extends BaseProviderConfig
 {
     private final String pattern;

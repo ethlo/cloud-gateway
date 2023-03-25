@@ -1,8 +1,8 @@
 package com.ethlo.http.netty;
 
-import com.ethlo.http.model.PayloadProvider;
-
 import java.util.Optional;
+
+import com.ethlo.http.model.PayloadProvider;
 
 public interface DataBufferRepository
 {

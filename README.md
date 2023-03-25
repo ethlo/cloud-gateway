@@ -2,16 +2,18 @@
 
 Experimental reverse proxy built on top of Spring Cloud Gateway with full request/response (including body) logging.
 
-## 
+##  
 
 ## Logging
 
 ### Matching
+
 The requests can be conditionally logged based on numerous properties of the request, as an example:
 
-
 ### Filtering
+
 Sometimes it is not useful to, for example, not log all headers. This can be achieved as this:
+
 ```yaml
 logging:
   filter:
@@ -27,14 +29,17 @@ logging:
           - server
           - date
 ```
+
 NOTE: HTTP headers are _not_ case-sensitive!
 
 ### Logging support
+
 * File - log to file via template-pattern for ease of setup.
 * ClickHouse - Log to a clickhouse table for powerful and easy analysis.
 * [TBD] - JSON - log to JSON files for supporting easy-to-ingest data into 3rd-party storage.
 
 ### Configure logging provider(s)
+
 ```yaml
 logging:
   provider:
@@ -49,8 +54,9 @@ logging:
 ## Special features
 
 ### Logging of request body when upstream server is down
-Normally the request is not (fully) consumed by the load balancer/reverse-proxy/gateway, thus the request contents are lost.
-The request can still be captured by configuring a fallback for the route, as described below:
+
+Normally the request is not (fully) consumed by the load balancer/reverse-proxy/gateway, thus the request contents are
+lost. The request can still be captured by configuring a fallback for the route, as described below:
 
 ```yaml
 spring:

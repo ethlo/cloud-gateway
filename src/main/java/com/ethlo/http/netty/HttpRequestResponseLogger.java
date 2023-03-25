@@ -2,7 +2,7 @@ package com.ethlo.http.netty;
 
 import java.util.Optional;
 
-import com.ethlo.http.match.RequestPattern;
+import com.ethlo.http.match.RequestMatchingProcessor;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.ChannelHandlerContext;
@@ -65,9 +65,9 @@ public class HttpRequestResponseLogger extends LoggingHandler
         return getRequestId(ctx).map(requestId ->
         {
             final DataBufferRepository.Operation operation = "write".equalsIgnoreCase(eventName) ? DataBufferRepository.Operation.REQUEST : DataBufferRepository.Operation.RESPONSE;
-            final RequestPattern pattern = getRequestPattern(ctx).orElseThrow();
-            if (pattern.isRequestBody() && operation == DataBufferRepository.Operation.REQUEST
-                    || pattern.isResponseBody() && operation == DataBufferRepository.Operation.RESPONSE)
+            final RequestMatchingProcessor pattern = getRequestPattern(ctx).orElseThrow();
+            if (pattern.isLogRequestBody() && operation == DataBufferRepository.Operation.REQUEST
+                    || pattern.isLogResponseBody() && operation == DataBufferRepository.Operation.RESPONSE)
             {
                 final byte[] data = getBytes(msg);
                 if (data.length > 0)
@@ -79,7 +79,7 @@ public class HttpRequestResponseLogger extends LoggingHandler
         }).orElse(null);
     }
 
-    private Optional<RequestPattern> getRequestPattern(ChannelHandlerContext ctx)
+    private Optional<RequestMatchingProcessor> getRequestPattern(ChannelHandlerContext ctx)
     {
         final Context gatewayCtx = getContext(ctx);
         return gatewayCtx.hasKey(TagRequestIdGlobalFilter.LOG_CAPTURE_CONFIG_ATTRIBUTE_NAME) ? Optional.of(gatewayCtx.get(TagRequestIdGlobalFilter.LOG_CAPTURE_CONFIG_ATTRIBUTE_NAME)) : Optional.empty();

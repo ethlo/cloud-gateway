@@ -1,55 +1,34 @@
 package com.ethlo.http.match;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.http.server.reactive.ServerHttpRequest;
-import org.springframework.stereotype.Component;
 
-@ConfigurationProperties(prefix = "logging.match")
+@ConfigurationProperties(prefix = "http-logging")
 public class RequestMatchingConfiguration
 {
-    private final List<RequestPattern> includes;
-    private final List<RequestPattern> excludes;
+    private static final Logger logger = LoggerFactory.getLogger(RequestMatchingConfiguration.class);
+    private final List<RequestMatchingProcessor> matchers;
 
-    public RequestMatchingConfiguration(final List<RequestPattern> includes, final List<RequestPattern> excludes)
+    public RequestMatchingConfiguration(final List<RequestMatchingProcessor> matchers)
     {
-        this.includes = includes;
-        this.excludes = excludes;
+        this.matchers = matchers;
+        logger.info("Matchers found: {}", getMatchers().size());
+        getMatchers().forEach(m -> logger.info("{}", m));
     }
 
-    public List<RequestPattern> getIncludes()
+    public List<RequestMatchingProcessor> getMatchers()
     {
-        return includes;
+        return Optional.ofNullable(matchers).orElse(Collections.emptyList());
     }
 
-    public List<RequestPattern> getExcludes()
+    public Optional<RequestMatchingProcessor> matches(ServerHttpRequest request)
     {
-        return excludes;
-    }
-
-    public Optional<RequestPattern> matches(ServerHttpRequest request)
-    {
-        final Optional<RequestPattern> matchInclude = matches(includes, request);
-        final boolean matchesInclude = includes.isEmpty() || matchInclude.isPresent();
-        final boolean matchesExclude = !excludes.isEmpty() && matches(excludes, request).isPresent();
-        if (matchesInclude && !matchesExclude)
-        {
-            return matchInclude;
-        }
-        return Optional.empty();
-    }
-
-    private Optional<RequestPattern> matches(List<RequestPattern> requestPatterns, ServerHttpRequest request)
-    {
-        for (final RequestPattern requestPattern : requestPatterns)
-        {
-            if (requestPattern.matches(request))
-            {
-                return Optional.of(requestPattern);
-            }
-        }
-        return Optional.empty();
+        return getMatchers().stream().filter(m -> m.matches(request).isPresent()).findFirst();
     }
 }

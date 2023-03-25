@@ -1,4 +1,5 @@
-select formatReadableSize(sum(length(response_content))), formatReadableSize(sum(length(request_content))) from log;
+select formatReadableSize(sum(length(response_content))), formatReadableSize(sum(length(request_content)))
+from log;
 
 select concat(database, '.', table)                         as table,
        formatReadableSize(sum(bytes))                       as size,

@@ -23,7 +23,7 @@
     </appender>
 
     <logger name="access-log" additivity="false">
-        <appender-ref ref="access-file" />
+        <appender-ref ref="access-file"/>
     </logger>
 
     <root level="INFO">

@@ -16,9 +16,8 @@ import org.springframework.web.server.ServerWebExchange;
 
 import com.ethlo.http.logger.HttpLogger;
 import com.ethlo.http.match.RequestMatchingConfiguration;
-import com.ethlo.http.match.RequestPattern;
+import com.ethlo.http.match.RequestMatchingProcessor;
 import com.ethlo.http.model.WebExchangeDataProvider;
-import com.ethlo.http.processors.HeaderFilterConfiguration;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.SignalType;
 import reactor.core.scheduler.Schedulers;
@@ -34,20 +33,18 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
     private final HttpLogger httpLogger;
     private final DataBufferRepository dataBufferRepository;
     private final RequestMatchingConfiguration requestMatchingConfiguration;
-    private final HeaderFilterConfiguration headerFilterConfiguration;
 
-    public TagRequestIdGlobalFilter(final HttpLogger httpLogger, final DataBufferRepository dataBufferRepository, final RequestMatchingConfiguration requestMatchingConfiguration, final HeaderFilterConfiguration headerFilterConfiguration)
+    public TagRequestIdGlobalFilter(final HttpLogger httpLogger, final DataBufferRepository dataBufferRepository, final RequestMatchingConfiguration requestMatchingConfiguration)
     {
         this.httpLogger = httpLogger;
         this.dataBufferRepository = dataBufferRepository;
         this.requestMatchingConfiguration = requestMatchingConfiguration;
-        this.headerFilterConfiguration = headerFilterConfiguration;
     }
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain)
     {
-        final Optional<RequestPattern> match = requestMatchingConfiguration.matches(exchange.getRequest());
+        final Optional<RequestMatchingProcessor> match = requestMatchingConfiguration.matches(exchange.getRequest());
         if (match.isPresent())
         {
             final long started = System.nanoTime();
@@ -63,18 +60,18 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
                     {
                         if (st.equals(SignalType.ON_COMPLETE) || st.equals(SignalType.ON_ERROR))
                         {
-                            handleCompletedRequest(exchange, requestId, Duration.ofNanos(System.nanoTime() - started));
+                            handleCompletedRequest(exchange, requestId, Duration.ofNanos(System.nanoTime() - started), match.get());
                         }
                         else
                         {
-                            logger.warn("Signal type {} - {}", requestId, st);
+                            logger.warn("Unhandled signal type {} - {}", requestId, st);
                         }
                     });
         }
         return chain.filter(exchange);
     }
 
-    private void handleCompletedRequest(ServerWebExchange exchange, String requestId, final Duration duration)
+    private void handleCompletedRequest(ServerWebExchange exchange, String requestId, final Duration duration, final RequestMatchingProcessor requestMatchingProcessor)
     {
         logger.debug("Completed request {} in {}", requestId, duration);
         dataBufferRepository.finished(requestId);
@@ -87,8 +84,8 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
                 .path(req.getPath())
                 .uri(req.getURI())
                 .statusCode(res.getStatusCode())
-                .requestHeaders(headerFilterConfiguration.getRequestHeaders().filter(req.getHeaders()))
-                .responseHeaders(headerFilterConfiguration.getResponseHeaders().filter(res.getHeaders()))
+                .requestHeaders(req.getHeaders())
+                .responseHeaders(res.getHeaders())
                 .timestamp(OffsetDateTime.now())
                 .duration(duration)
                 .remoteAddress(req.getRemoteAddress());

@@ -9,6 +9,7 @@ public class HttpMessageUtil
     public static final int CR = 13;
     public static final int LF = 10;
     public static final byte[] BODY_SEPARATOR = new byte[]{CR, LF, CR, LF};
+
     private HttpMessageUtil()
     {
     }
