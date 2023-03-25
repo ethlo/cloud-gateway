@@ -27,7 +27,7 @@ logging:
           - server
           - date
 ```
-**Note**
+**note**
 The headers are lower-cased for easy matching before being compared in the filter.
 
 
