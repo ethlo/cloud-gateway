@@ -2,6 +2,7 @@ package com.ethlo.http.processors;
 
 import java.util.Collections;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.http.HttpHeaders;
 
@@ -14,8 +15,8 @@ public class HeaderFilter
 
     public HeaderFilter(final Set<String> includes, final Set<String> excludes)
     {
-        this.includes = includes;
-        this.excludes = excludes;
+        this.includes = includes.stream().map(String::toLowerCase).collect(Collectors.toSet());
+        this.excludes = excludes.stream().map(String::toLowerCase).collect(Collectors.toSet());
     }
 
     public HttpHeaders filter(HttpHeaders headers)
@@ -28,7 +29,7 @@ public class HeaderFilter
             final boolean excluded = excludes != null && excludes.contains(lCase);
             if (included && !excluded)
             {
-                result.put(lCase, value);
+                result.put(name, value);
             }
         });
         return result;
