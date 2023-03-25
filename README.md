@@ -27,7 +27,7 @@ logging:
           - server
           - date
 ```
-:large_blue_circle: HTTP headers are _not_ case-sensitive!
+NOTE: HTTP headers are _not_ case-sensitive!
 
 ### Logging support
 * File - log to file via template-pattern for ease of setup.
