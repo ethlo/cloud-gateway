@@ -16,11 +16,11 @@ import java.util.concurrent.ConcurrentMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
 import org.springframework.util.unit.DataSize;
 
 import ch.qos.logback.core.util.CloseUtil;
+import com.ethlo.http.logger.CaptureConfiguration;
 import com.ethlo.http.model.PayloadProvider;
 import com.ethlo.http.util.InspectableBufferedOutputStream;
 import com.ethlo.http.util.LazyFileOutputStream;
@@ -33,17 +33,16 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
     private final Path basePath;
     private final ConcurrentMap<Path, InspectableBufferedOutputStream> pool;
 
-    public PooledFileDataBufferRepository(@Value("${payload-logging.in-mem-buffer-size}") final DataSize bufferSize, @Value("${payload-logging.tmp-path}") final Path basePath)
+    public PooledFileDataBufferRepository(CaptureConfiguration captureConfiguration)
     {
-        this.bufferSize = bufferSize;
-        this.basePath = basePath;
+        this.bufferSize = captureConfiguration.getMemoryBufferSize();
+        this.basePath = captureConfiguration.getTempDirectory();
         this.pool = new ConcurrentHashMap<>();
     }
 
     @Override
     public void cleanup(final String requestId)
     {
-        logger.debug("Deleting buffer files for {}", requestId);
         cleanup(getFilename(Operation.REQUEST, requestId));
         cleanup(getFilename(Operation.RESPONSE, requestId));
     }
@@ -54,6 +53,7 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
         {
             if (requestBuffer.isFlushedToUnderlyingStream())
             {
+                logger.debug("Deleting buffer file {}", file);
                 deleteSilently(file);
             }
         });
@@ -117,7 +117,7 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
                     if (!stream.isFlushedToUnderlyingStream())
                     {
                         final byte[] data = stream.getBuffer();
-                        logger.debug("Using data directly from memory for {} {} with size {} bytes", operation, id, data.length);
+                        logger.debug("Using data directly from memory for {} {}", operation, id);
                         final InputStream in = new BufferedInputStream(new ByteArrayInputStream(data));
                         final long skipped = pos(in);
                         return new PayloadProvider(in, data.length - skipped);

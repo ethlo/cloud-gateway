@@ -11,15 +11,15 @@ public class RequestPattern
 {
     private final List<UriPattern> uris;
     private final List<HttpMethod> methods;
-    private final boolean logRequestBody;
-    private final boolean logResponseBody;
+    private final boolean requestBody;
+    private final boolean responseBody;
 
-    public RequestPattern(final List<UriPattern> uris, final List<HttpMethod> methods, final boolean logRequestBody, final boolean logResponseBody)
+    public RequestPattern(final List<UriPattern> uris, final List<HttpMethod> methods, final boolean requestBody, final boolean responseBody)
     {
         this.uris = uris;
         this.methods = methods;
-        this.logRequestBody = logRequestBody;
-        this.logResponseBody = logResponseBody;
+        this.requestBody = requestBody;
+        this.responseBody = responseBody;
     }
 
     public List<UriPattern> getUris()
@@ -32,14 +32,14 @@ public class RequestPattern
         return Optional.ofNullable(methods).orElse(Collections.emptyList());
     }
 
-    public boolean isLogRequestBody()
+    public boolean isRequestBody()
     {
-        return logRequestBody;
+        return requestBody;
     }
 
-    public boolean isLogResponseBody()
+    public boolean isResponseBody()
     {
-        return logResponseBody;
+        return responseBody;
     }
 
     public boolean matches(ServerHttpRequest request)

@@ -87,8 +87,8 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
                 .path(req.getPath())
                 .uri(req.getURI())
                 .statusCode(res.getStatusCode())
-                .requestHeaders(headerFilterConfiguration.getRequest().filter(req.getHeaders()))
-                .responseHeaders(headerFilterConfiguration.getResponse().filter(res.getHeaders()))
+                .requestHeaders(headerFilterConfiguration.getRequestHeaders().filter(req.getHeaders()))
+                .responseHeaders(headerFilterConfiguration.getResponseHeaders().filter(res.getHeaders()))
                 .timestamp(OffsetDateTime.now())
                 .duration(duration)
                 .remoteAddress(req.getRemoteAddress());

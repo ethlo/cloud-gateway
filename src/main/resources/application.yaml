@@ -1,89 +1,84 @@
 server:
-    port: 8888
-
+  port: 8888
 logging:
-    provider:
-        file:
-            enabled: true
-            pattern: '{{gateway_request_id}} {{method}} {{path}} {{request_headers["Content-Length"][0]}} {{status}}'
-        clickhouse:
-            enabled: true
-            url: jdbc:ch://localhost:18123/default?compress=0;async_insert=1,wait_for_async_insert=0
+  capture:
+    memory-buffer-size: 500KB
+    temp-directory: /tmp
+  providers:
+    file:
+      enabled: true
+      pattern: '{{gateway_request_id}} {{method}} {{path}} {{request_headers["Content-Length"][0]}} {{status}}'
+    clickhouse:
+      enabled: true
+      url: 'jdbc:ch://localhost:18123/default?compress=0;async_insert=1,wait_for_async_insert=0'
+  filter:
+    request-headers:
+      excludes:
+        - host
+        - user-agent
+    response-headers:
+      excludes:
+        - content-security-policy
+        - link
+        - server
+        - date
+  match:
+    includes:
+      - uris:
+          - path: /get
+          - path: /vg.*
+        methods:
+          - GET
+          - POST
+        request-body: true
+        response-body: true
+    excludes:
+      - uris:
+          - path: .*/foo$
+  level:
+    com.ethlo.http: INFO
 
-    filter:
-        headers:
-            request:
-                excludes:
-                    - host
-                    - user-agent
-            response:
-                excludes:
-                    - content-security-policy
-                    - link
-                    - server
-                    - date
-                    - content-length
-                    - content-type
-payload-logging:
-    tmp-path: /tmp
-    in-mem-buffer-size: 500KB
-    filter:
-        includes:
-            -   log-request-body: true
-                log-response-body: true
-                uris:
-                    -   path: /get
-                    -   path: /vg.*
-                methods:
-                    - GET
-                    - POST
-        excludes:
-            -   uris:
-                    -   path: .*/foo$
-
-
-# http://localhost:8888/actuator/metrics/spring.cloud.gateway.requests
 management:
-    endpoints:
-        web:
-            exposure:
-                include: health,gateway,metrics
+  endpoints:
+    web:
+      exposure:
+        include: 'health,gateway,metrics'
 spring:
-    cloud:
-        gateway:
-            metrics:
-                tags:
-                    path:
-                        enabled: true
-                enabled: true
-            routes:
-                -   id: http-bin-get
-                    uri: ${rewrite.backend.uri:http://localhost/get}
-                    predicates:
-                        - Path=/get
-                    filters:
-                        -   name: CircuitBreaker
-                            args:
-                                name: upstream-down
-                                fallbackUri: forward:/upstream-down
-                -   id: vg-front
-                    uri: ${rewrite.backend.uri:https://www.vg.no/}
-                    predicates:
-                        - Path=/vg
-                    filters:
-                        - StripPrefix=1
-                        - RewritePath=/(?<segment>.*), /$\{segment}
-                -   id: wallpaper
-                    uri: https://upload.wikimedia.org/wikipedia/commons/c/cc/ESC_large_ISS022_ISS022-E-11387-edit_01.JPG
-                    predicates:
-                        - Path=/wall
-
-                -   id: http-bin-post
-                    uri: ${rewrite.backend.uri:http://localhost/post}
-                    predicates:
-                        - Path=/post
-                    filters:
-                        -   name: CircuitBreaker
-                            args:
-                                name: upstream-down
-                                fallbackUri: forward:/upstream-down
+  cloud:
+    gateway:
+      metrics:
+        tags:
+          path:
+            enabled: true
+        enabled: true
+      routes:
+        - id: http-bin-get
+          uri: '${rewrite.backend.uri:http://localhost/get}'
+          predicates:
+            - Path=/get
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: upstream-down
+                fallbackUri: 'forward:/upstream-down'
+        - id: vg-front
+          uri: '${rewrite.backend.uri:https://www.vg.no/}'
+          predicates:
+            - Path=/vg
+          filters:
+            - StripPrefix=1
+            - 'RewritePath=/(?<segment>.*), /$\{segment}'
+        - id: wallpaper
+          uri: >-
+            https://upload.wikimedia.org/wikipedia/commons/c/cc/ESC_large_ISS022_ISS022-E-11387-edit_01.JPG
+          predicates:
+            - Path=/wall
+        - id: http-bin-post
+          uri: '${rewrite.backend.uri:http://localhost/post}'
+          predicates:
+            - Path=/post
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: upstream-down
+                fallbackUri: 'forward:/upstream-down'

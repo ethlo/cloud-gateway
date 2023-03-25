@@ -7,21 +7,19 @@ logging:
         headers:
             request:
                 excludes:
-                    #- host
-                    #- user-agent
+                    - host
             response:
                 excludes:
                     - content-security-policy
                     - link
                     - server
                     - date
-payload-logging:
-    tmp-path: /tmp
-    in-mem-buffer-size: 500KB
-    filter:
+    payload:
+        tmp-path: /tmp
+        in-mem-buffer-size: 500KB
         includes:
-            -   log-request-body: true
-                log-response-body: true
+            -   request-body: true
+                response-body: true
                 uris:
                     -   path: /get
                     -   path: /vg.*

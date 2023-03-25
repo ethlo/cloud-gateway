@@ -66,8 +66,8 @@ public class HttpRequestResponseLogger extends LoggingHandler
         {
             final DataBufferRepository.Operation operation = "write".equalsIgnoreCase(eventName) ? DataBufferRepository.Operation.REQUEST : DataBufferRepository.Operation.RESPONSE;
             final RequestPattern pattern = getRequestPattern(ctx).orElseThrow();
-            if (pattern.isLogRequestBody() && operation == DataBufferRepository.Operation.REQUEST
-                    || pattern.isLogResponseBody() && operation == DataBufferRepository.Operation.RESPONSE)
+            if (pattern.isRequestBody() && operation == DataBufferRepository.Operation.REQUEST
+                    || pattern.isResponseBody() && operation == DataBufferRepository.Operation.RESPONSE)
             {
                 final byte[] data = getBytes(msg);
                 if (data.length > 0)

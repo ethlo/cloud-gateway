@@ -4,25 +4,25 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.util.Optional;
 
-@ConfigurationProperties(prefix = "logging.filter.headers")
+@ConfigurationProperties(prefix = "logging.filter")
 public class HeaderFilterConfiguration
 {
-    private final HeaderFilter request;
-    private final HeaderFilter response;
+    private final HeaderFilter requestHeaders;
+    private final HeaderFilter responseHeaders;
 
-    public HeaderFilterConfiguration(final HeaderFilter request, final HeaderFilter response)
+    public HeaderFilterConfiguration(final HeaderFilter requestHeaders, final HeaderFilter responseHeaders)
     {
-        this.request = request;
-        this.response = response;
+        this.requestHeaders = requestHeaders;
+        this.responseHeaders = responseHeaders;
     }
 
-    public HeaderFilter getRequest()
+    public HeaderFilter getRequestHeaders()
     {
-        return Optional.ofNullable(request).orElse(HeaderFilter.EMPTY);
+        return Optional.ofNullable(requestHeaders).orElse(HeaderFilter.EMPTY);
     }
 
-    public HeaderFilter getResponse()
+    public HeaderFilter getResponseHeaders()
     {
-        return Optional.ofNullable(response).orElse(HeaderFilter.EMPTY);
+        return Optional.ofNullable(responseHeaders).orElse(HeaderFilter.EMPTY);
     }
 }

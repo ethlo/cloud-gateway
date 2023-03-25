@@ -1,7 +1,5 @@
 package com.ethlo.http.handlers;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.HttpStatus;
@@ -19,7 +17,6 @@ import reactor.core.publisher.Mono;
 @Component
 public class CircuitBreakerHandler implements HandlerFunction<ServerResponse>
 {
-    private static final Logger logger = LoggerFactory.getLogger(CircuitBreakerHandler.class);
     private final DataBufferRepository dataBufferRepository;
 
     public CircuitBreakerHandler(final DataBufferRepository dataBufferRepository)

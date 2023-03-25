@@ -7,7 +7,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
 
-@ConfigurationProperties(prefix = "payload-logging.filter")
+@ConfigurationProperties(prefix = "logging.match")
 public class RequestMatchingConfiguration
 {
     private final List<RequestPattern> includes;
