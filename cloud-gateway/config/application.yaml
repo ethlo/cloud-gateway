@@ -7,16 +7,14 @@ logging:
         headers:
             request:
                 excludes:
-                    - host
-                    - user-agent
+                    #- host
+                    #- user-agent
             response:
                 excludes:
                     - content-security-policy
                     - link
                     - server
                     - date
-                    - content-length
-                    - content-type
 payload-logging:
     tmp-path: /tmp
     in-mem-buffer-size: 500KB

@@ -1,7 +1,7 @@
 package com.ethlo.http.util;
 
-import java.io.BufferedInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 
 public class HttpMessageUtil
 {
@@ -13,7 +13,7 @@ public class HttpMessageUtil
     {
     }
 
-    public static long findBodyPositionInStream(BufferedInputStream data) throws IOException
+    public static long findBodyPositionInStream(InputStream data) throws IOException
     {
         final byte[] buffer = new byte[MAX_HEADER_SIZE];
         int read;

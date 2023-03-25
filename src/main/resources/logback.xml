@@ -20,24 +20,13 @@
             <pattern>%d - %m%n%ex
             </pattern>
         </encoder>
-        <!--
-        <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
-            <providers>
-                <timestamp/>
-                <logstashMarkers/>
-                <pattern>
-                    <omitEmptyFields>true</omitEmptyFields>
-                </pattern>
-            </providers>
-        </encoder>
-        -->
     </appender>
 
     <logger name="access-log" additivity="false">
         <appender-ref ref="access-file" />
     </logger>
 
-    <logger name="org.springframework.boot.context.config" level="TRACE" />
+    <logger name="org.springframework.boot.context.config" level="INFO" />
 
     <logger name="com.ethlo.http" level="INFO"/>
 

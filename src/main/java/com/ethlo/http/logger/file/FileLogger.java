@@ -1,12 +1,10 @@
 package com.ethlo.http.logger.file;
 
-import java.io.BufferedInputStream;
-import java.util.Map;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.ethlo.http.logger.HttpLogger;
+import com.ethlo.http.model.WebExchangeDataProvider;
 
 public class FileLogger implements HttpLogger
 {
@@ -19,11 +17,17 @@ public class FileLogger implements HttpLogger
     }
 
     @Override
-    public void accessLog(final Map<String, Object> data, final BufferedInputStream requestData, final BufferedInputStream responseData)
+    public void accessLog(final WebExchangeDataProvider dataProvider)
     {
         if (accessLogLogger.isInfoEnabled())
         {
-            accessLogLogger.info(accessLogTemplateRenderer.render(data));
+            accessLogLogger.info(accessLogTemplateRenderer.render(dataProvider.asMetaMap()));
         }
+    }
+
+    @Override
+    public String toString()
+    {
+        return getClass().getSimpleName() + " - pattern='" + accessLogTemplateRenderer.getPattern() + "'";
     }
 }

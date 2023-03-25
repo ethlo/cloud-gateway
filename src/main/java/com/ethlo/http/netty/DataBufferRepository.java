@@ -1,6 +1,8 @@
 package com.ethlo.http.netty;
 
-import java.io.BufferedInputStream;
+import com.ethlo.http.model.PayloadProvider;
+
+import java.util.Optional;
 
 public interface DataBufferRepository
 {
@@ -10,7 +12,7 @@ public interface DataBufferRepository
 
     void finished(String requestId);
 
-    BufferedInputStream get(final Operation operation, final String id);
+    Optional<PayloadProvider> get(final Operation operation, final String id);
 
     enum Operation
     {

@@ -1,8 +1,11 @@
 package com.ethlo.http.netty;
 
+import static com.ethlo.http.util.HttpMessageUtil.findBodyPositionInStream;
+
 import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
@@ -11,8 +14,6 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-import io.pebbletemplates.pebble.extension.core.NumberFormatFilter;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,6 +21,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.util.unit.DataSize;
 
 import ch.qos.logback.core.util.CloseUtil;
+import com.ethlo.http.model.PayloadProvider;
 import com.ethlo.http.util.InspectableBufferedOutputStream;
 import com.ethlo.http.util.LazyFileOutputStream;
 
@@ -106,16 +108,19 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
     }
 
     @Override
-    public BufferedInputStream get(final Operation operation, final String id)
+    public Optional<PayloadProvider> get(final Operation operation, final String id)
     {
-        return Optional.ofNullable(pool.get(getFilename(operation, id)))
+        final Path file = getFilename(operation, id);
+        return Optional.ofNullable(Optional.ofNullable(pool.get(file))
                 .map(stream ->
                 {
                     if (!stream.isFlushedToUnderlyingStream())
                     {
                         final byte[] data = stream.getBuffer();
                         logger.debug("Using data directly from memory for {} {} with size {} bytes", operation, id, data.length);
-                        return new BufferedInputStream(new ByteArrayInputStream(data));
+                        final InputStream in = new BufferedInputStream(new ByteArrayInputStream(data));
+                        final long skipped = pos(in);
+                        return new PayloadProvider(in, data.length - skipped);
                     }
                     stream.forceFlush();
                     stream.forceClose();
@@ -125,12 +130,13 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
                         {
                             try
                             {
-                                final Path file = getFilename(operation, id);
                                 if (logger.isDebugEnabled())
                                 {
                                     logger.debug("Size of file {} is {} bytes", file, Files.size(file));
                                 }
-                                return new BufferedInputStream(Files.newInputStream(file));
+                                final InputStream in = new BufferedInputStream(Files.newInputStream(file));
+                                final long skipped = pos(in);
+                                return new PayloadProvider(in, Files.size(file) - skipped);
                             }
                             catch (NoSuchFileException exc)
                             {
@@ -141,6 +147,22 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
                                 throw new UncheckedIOException(e);
                             }
                         }
-                );
+                ));
+    }
+
+    private long pos(InputStream rawData)
+    {
+        if (rawData != null)
+        {
+            try
+            {
+                return findBodyPositionInStream(rawData);
+            }
+            catch (IOException e)
+            {
+                throw new UncheckedIOException(e);
+            }
+        }
+        return 0;
     }
 }

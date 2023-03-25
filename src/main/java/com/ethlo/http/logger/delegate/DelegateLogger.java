@@ -1,8 +1,6 @@
 package com.ethlo.http.logger.delegate;
 
-import java.io.BufferedInputStream;
 import java.util.List;
-import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,6 +8,7 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
 import com.ethlo.http.logger.HttpLogger;
+import com.ethlo.http.model.WebExchangeDataProvider;
 
 @Primary
 @Component
@@ -25,14 +24,16 @@ public class DelegateLogger implements HttpLogger
         {
             logger.warn("No access logger(s) configured!");
         }
+        else
+        {
+            logger.info("Using {} loggers:", loggers.size());
+            loggers.forEach(l -> logger.info(l.toString()));
+        }
     }
 
     @Override
-    public void accessLog(final Map<String, Object> data, final BufferedInputStream requestData, final BufferedInputStream responseData)
+    public void accessLog(final WebExchangeDataProvider dataProvider)
     {
-        for (HttpLogger logger : loggers)
-        {
-            logger.accessLog(data, requestData, responseData);
-        }
+        loggers.forEach(l -> l.accessLog(dataProvider));
     }
 }

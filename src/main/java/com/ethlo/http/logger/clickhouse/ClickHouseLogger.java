@@ -1,18 +1,15 @@
 package com.ethlo.http.logger.clickhouse;
 
-import java.io.BufferedInputStream;
-import java.io.IOException;
-import java.io.UncheckedIOException;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
-import com.ethlo.http.logger.HttpLogger;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
-import org.springframework.stereotype.Component;
 
-import com.ethlo.http.logger.file.AccessLogTemplateRenderer;
+import com.ethlo.http.logger.HttpLogger;
+import com.ethlo.http.model.PayloadProvider;
+import com.ethlo.http.model.WebExchangeDataProvider;
+import com.ethlo.http.util.IoUtil;
 
 public class ClickHouseLogger implements HttpLogger
 {
@@ -24,36 +21,43 @@ public class ClickHouseLogger implements HttpLogger
     }
 
     @Override
-    public void accessLog(final Map<String, Object> data, final BufferedInputStream requestData, final BufferedInputStream responseData)
+    public void accessLog(final WebExchangeDataProvider dataProvider)
     {
-        data.put("request_content", getBytes(requestData));
-        data.put("response_content", getBytes(responseData));
+        final Map<String, Object> params = dataProvider.asMetaMap();
+        params.put("request_content", dataProvider.getRequestPayload().map(rp ->
+        {
+            params.put("request_size", rp.length());
+            return rp;
+        }).map(PayloadProvider::data).map(IoUtil::readAllBytes).orElse(null));
+        params.put("response_content", dataProvider.getResponsePayload().map(rp ->
+        {
+            params.put("response_size", rp.length());
+            return rp;
+        }).map(PayloadProvider::data).map(IoUtil::readAllBytes).orElse(null));
+        params.put("request_headers", flattenMap(dataProvider.getRequestHeaders()));
+        params.put("response_headers", flattenMap(dataProvider.getResponseHeaders()));
         tpl.update("""
                 INSERT INTO log (
                   timestamp, gateway_request_id, method, path,
                   response_time, request_size, response_size,
-                  status, request_headers, response_headers, request_content, response_content) 
+                  status, request_headers, response_headers, request_content, response_content)
                 VALUES(
                   :timestamp, :gateway_request_id, :method, :path, 
-                  :response_time, :request_size, :response_size, 
+                  :duration/1000000, :request_size, :response_size, 
                   :status, :request_headers, :response_headers, 
-                  :request_content, :response_content)""", data);
+                  :request_content, :response_content)""", params);
     }
 
-    private byte[] getBytes(BufferedInputStream requestData)
+    private Map<String, Object> flattenMap(HttpHeaders headers)
     {
-        if (requestData == null)
-        {
-            return null;
-        }
+        final Map<String, Object> result = new LinkedHashMap<>();
+        headers.forEach((name, list) -> result.put(name, list.size() > 1 ? list : list.get(0)));
+        return result;
+    }
 
-        try
-        {
-            return requestData.readAllBytes();
-        }
-        catch (IOException e)
-        {
-            throw new UncheckedIOException(e);
-        }
+    @Override
+    public String toString()
+    {
+        return getClass().getSimpleName();
     }
 }

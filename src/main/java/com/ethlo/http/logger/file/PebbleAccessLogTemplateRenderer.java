@@ -12,9 +12,11 @@ import io.pebbletemplates.pebble.template.PebbleTemplate;
 public class PebbleAccessLogTemplateRenderer implements AccessLogTemplateRenderer
 {
     private final PebbleTemplate compiledTemplate;
+    private final String pattern;
 
     public PebbleAccessLogTemplateRenderer(final String pattern, final boolean strict)
     {
+        this.pattern = pattern;
         final PebbleEngine engine = new PebbleEngine.Builder().strictVariables(strict).build();
         this.compiledTemplate = engine.getLiteralTemplate(pattern);
     }
@@ -32,5 +34,11 @@ public class PebbleAccessLogTemplateRenderer implements AccessLogTemplateRendere
             throw new UncheckedIOException(e);
         }
         return writer.toString();
+    }
+
+    @Override
+    public String getPattern()
+    {
+        return pattern;
     }
 }
