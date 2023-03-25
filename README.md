@@ -6,42 +6,15 @@ Experimental reverse proxy built on top of Spring Cloud Gateway with full reques
 
 ## Logging
 
-### Matching
-
-The requests can be conditionally logged based on numerous properties of the request, as an example:
-
-### Filtering
-
-Sometimes it is not useful to, for example, not log all headers. This can be achieved as this:
-
-```yaml
-logging:
-  filter:
-    headers:
-      request:
-        excludes:
-          - host
-          - user-agent
-      response:
-        excludes:
-          - content-security-policy
-          - link
-          - server
-          - date
-```
-
-NOTE: HTTP headers are _not_ case-sensitive!
-
 ### Logging support
 
 * File - log to file via template-pattern for ease of setup.
 * ClickHouse - Log to a clickhouse table for powerful and easy analysis.
-* [TBD] - JSON - log to JSON files for supporting easy-to-ingest data into 3rd-party storage.
 
-### Configure logging provider(s)
+### Logging provider(s)
 
 ```yaml
-logging:
+http-logging:
   provider:
     file:
       enabled: true
@@ -50,6 +23,31 @@ logging:
       enabled: true
       url: jdbc:ch://localhost:18123/default?compress=0;async_insert=1,wait_for_async_insert=0
 ```
+NOTE: The file log appender can be configured with the logger name `access_log`.
+
+### Capture configuration
+The requests can be conditionally logged based on numerous properties of the request. The capturing is happening straight from the bytebuffers in Netty, and is attempted to be done in a manner that incurs minimum overhead. The `memory-buffer-size` defines how large the request or response can be before it is buffered to file.
+
+```yaml
+capture:
+    memory-buffer-size: 500KB
+    temp-directory: /tmp
+  matchers:
+    - includes:
+        - uris:
+            - path: /my-service
+          methods:
+            - GET
+            - POST
+      log-request-body: true
+      log-response-body: true
+    - includes:
+      - uris:
+          - path: /my-other-service
+      log-request-body: true
+      log-response-body: false # default is also false for request/response body logging
+```
+ NOTE: Keep in mind that the request and response body logging may be invaluable for debugging and auditing, it also potentially affects the performance negatively, as this will require additional resources for both processing and storage.
 
 ## Special features
 
@@ -61,17 +59,17 @@ lost. The request can still be captured by configuring a fallback for the route,
 ```yaml
 spring:
   cloud:
-      gateway:
-        routes:
+    gateway:
+      routes:
         - id: my-upstream-is-down
-          uri: ${rewrite.backend.uri:http://localhost/get}
+          uri: ${rewrite.backend.uri:http://my-service1}
           predicates:
-            - Path=/get
+            - Path=/my-service
           filters:
            - name: CircuitBreaker
              args:
-             name: upstream-down
-             fallbackUri: forward:/upstream-down
+               name: upstream-down
+               fallbackUri: forward:/upstream-down
 ```
 
 ## References
