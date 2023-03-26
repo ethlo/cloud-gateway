@@ -331,7 +331,42 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Response Body Size"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Download response body",
+                    "url": "http://localhost:6464/data/responses/${__data.fields[\"Request ID\"]}"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Request Body Size"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Download request body",
+                    "url": "http://localhost:6464/data/requests/${__data.fields[\"Request ID\"]}"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 11,
@@ -353,7 +388,7 @@
         "sortBy": [
           {
             "desc": true,
-            "displayName": "Response Body Size"
+            "displayName": "Time"
           }
         ]
       },
@@ -386,10 +421,7 @@
             "mode": "list",
             "table": "log"
           },
-          "datasource": {
-            "type": "grafana-clickhouse-datasource",
-            "uid": "k9A37JBVz"
-          },
+          "datasource": "clickhouse",
           "format": 1,
           "meta": {
             "builderOptions": {
