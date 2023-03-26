@@ -5,6 +5,8 @@ services:
     image: yandex/clickhouse-server
     hostname: clickhouse-cloud-gateway
     container_name: clickhouse-cloud-gateway
+    volumes:
+      - ./clickhouse/init_schema.sql:/docker-entrypoint-initdb.d/init_schema.sql
     ports:
       - '18123:8123'
     ulimits:
@@ -15,21 +17,27 @@ services:
     hostname: cloud-gateway
     container_name: cloud-gateway
     image: ethlocom/cloud-gateway
+    restart: unless-stopped
     environment:
       - 'JAVA_OPTS="-XX:MaxDirectMemorySize=200M"'
       - 'SPRING_CONFIG_LOCATION=/config/application.yaml'
     volumes:
       - ./config:/config
-      - ./ddl/log.ddl:/docker-entrypoint-initdb.d/log.sql
     ports:
       - '6464:8888'
 
   grafana:
     image: grafana/grafana:latest
+    hostname: grafana
+    container_name: grafana
     environment:
       GF_INSTALL_PLUGINS: grafana-piechart-panel,grafana-worldmap-panel,grafana-clickhouse-datasource
-      GF_LOG_LEVEL: debug
+      GF_LOG_LEVEL: info
+      GF_SECURITY_ADMIN_PASSWORD: grafana
     ports:
-    - '3000:3000'
+      - '3000:3000'
     depends_on:
       - clickhouse
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards

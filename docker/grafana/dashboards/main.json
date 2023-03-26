@@ -1,0 +1,450 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "target": {
+          "limit": 100,
+          "matchAny": false,
+          "tags": [],
+          "type": "dashboard"
+        },
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": "clickhouse",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 4,
+      "links": [],
+      "options": {
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "9.4.7",
+      "targets": [
+        {
+          "builderOptions": {
+            "fields": [
+              "status"
+            ],
+            "filters": [
+              {
+                "condition": "AND",
+                "filterType": "custom",
+                "key": "timestamp",
+                "operator": "WITH IN DASHBOARD TIME RANGE",
+                "restrictToFields": [
+                  {
+                    "label": "timestamp",
+                    "name": "timestamp",
+                    "picklistValues": [],
+                    "type": "DateTime64(3)"
+                  }
+                ],
+                "type": "datetime"
+              }
+            ],
+            "groupBy": [
+              "status"
+            ],
+            "limit": 100,
+            "metrics": [
+              {
+                "aggregation": "count",
+                "alias": "Requests",
+                "field": "gateway_request_id"
+              }
+            ],
+            "mode": "aggregate",
+            "table": "log"
+          },
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "k9A37JBVz"
+          },
+          "meta": {
+            "builderOptions": {
+              "fields": [
+                "status"
+              ],
+              "filters": [
+                {
+                  "condition": "AND",
+                  "filterType": "custom",
+                  "key": "timestamp",
+                  "operator": "WITH IN DASHBOARD TIME RANGE",
+                  "restrictToFields": [
+                    {
+                      "label": "timestamp",
+                      "name": "timestamp",
+                      "picklistValues": [],
+                      "type": "DateTime64(3)"
+                    }
+                  ],
+                  "type": "datetime"
+                }
+              ],
+              "groupBy": [
+                "status"
+              ],
+              "limit": 100,
+              "metrics": [
+                {
+                  "aggregation": "count",
+                  "alias": "Requests",
+                  "field": "gateway_request_id"
+                }
+              ],
+              "mode": "aggregate",
+              "table": "log"
+            }
+          },
+          "queryType": "sql",
+          "rawSql": "SELECT concat('HTTP ', CAST (status as String)) as Status, count(gateway_request_id) Requests FROM \"log\" WHERE   ( timestamp  >= $__fromTime AND timestamp <= $__toTime ) GROUP BY status LIMIT 100\n",
+          "refId": "A"
+        }
+      ],
+      "title": "By status code",
+      "type": "table"
+    },
+    {
+      "datasource": "clickhouse",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "id": 6,
+      "options": {
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "9.4.7",
+      "targets": [
+        {
+          "builderOptions": {
+            "fields": [],
+            "filters": [
+              {
+                "condition": "AND",
+                "filterType": "custom",
+                "key": "timestamp",
+                "operator": "WITH IN DASHBOARD TIME RANGE",
+                "restrictToFields": [
+                  {
+                    "label": "timestamp",
+                    "name": "timestamp",
+                    "picklistValues": [],
+                    "type": "DateTime64(3)"
+                  }
+                ],
+                "type": "datetime"
+              }
+            ],
+            "limit": 100,
+            "metrics": [
+              {
+                "aggregation": "avg",
+                "field": "request_body_size"
+              },
+              {
+                "aggregation": "avg",
+                "field": "response_body_size"
+              },
+              {
+                "aggregation": "any",
+                "field": "path"
+              }
+            ],
+            "mode": "aggregate",
+            "table": "log"
+          },
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "k9A37JBVz"
+          },
+          "meta": {
+            "builderOptions": {
+              "fields": [],
+              "filters": [
+                {
+                  "condition": "AND",
+                  "filterType": "custom",
+                  "key": "timestamp",
+                  "operator": "WITH IN DASHBOARD TIME RANGE",
+                  "restrictToFields": [
+                    {
+                      "label": "timestamp",
+                      "name": "timestamp",
+                      "picklistValues": [],
+                      "type": "DateTime64(3)"
+                    }
+                  ],
+                  "type": "datetime"
+                }
+              ],
+              "limit": 100,
+              "metrics": [
+                {
+                  "aggregation": "avg",
+                  "field": "request_body_size"
+                },
+                {
+                  "aggregation": "avg",
+                  "field": "response_body_size"
+                },
+                {
+                  "aggregation": "any",
+                  "field": "path"
+                }
+              ],
+              "mode": "aggregate",
+              "table": "log"
+            }
+          },
+          "queryType": "sql",
+          "rawSql": "SELECT path, method, formatReadableSize(avg(request_body_size)) as avg_request_size, formatReadableSize(avg(response_body_size)) as avg_response_size, formatReadableSize(max(response_body_size)) as max_response_size FROM \"log\" WHERE   ( timestamp  >= $__fromTime AND timestamp <= $__toTime ) group by path, method LIMIT 100",
+          "refId": "A"
+        }
+      ],
+      "title": "Payload size overview",
+      "type": "table"
+    },
+    {
+      "datasource": "clickhouse",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 24,
+        "x": 0,
+        "y": 8
+      },
+      "id": 2,
+      "options": {
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Response Body Size"
+          }
+        ]
+      },
+      "pluginVersion": "9.4.7",
+      "targets": [
+        {
+          "builderOptions": {
+            "fields": [
+              "path",
+              "response_time"
+            ],
+            "filters": [
+              {
+                "condition": "AND",
+                "filterType": "custom",
+                "key": "timestamp",
+                "operator": "WITH IN DASHBOARD TIME RANGE",
+                "restrictToFields": [
+                  {
+                    "label": "timestamp",
+                    "name": "timestamp",
+                    "picklistValues": [],
+                    "type": "DateTime64(3)"
+                  }
+                ],
+                "type": "datetime"
+              }
+            ],
+            "limit": 100,
+            "mode": "list",
+            "table": "log"
+          },
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "k9A37JBVz"
+          },
+          "format": 1,
+          "meta": {
+            "builderOptions": {
+              "fields": [
+                "path",
+                "response_time"
+              ],
+              "filters": [
+                {
+                  "condition": "AND",
+                  "filterType": "custom",
+                  "key": "timestamp",
+                  "operator": "WITH IN DASHBOARD TIME RANGE",
+                  "restrictToFields": [
+                    {
+                      "label": "timestamp",
+                      "name": "timestamp",
+                      "picklistValues": [],
+                      "type": "DateTime64(3)"
+                    }
+                  ],
+                  "type": "datetime"
+                }
+              ],
+              "limit": 100,
+              "mode": "list",
+              "table": "log"
+            }
+          },
+          "queryType": "sql",
+          "rawSql": "SELECT \ntimestamp as \"Time\",\ngateway_request_id as \"Request ID\", \nconcat(method, ' ', path) as Request, \nstatus as \"HTTP status\", \nroute_id as RouteId, \nroute_uri as \"Route URI\", \nformatReadableSize(request_body_size) as \"Request Body Size\",\nformatReadableSize(response_body_size) as \"Response Body Size\",\nresponse_time/1000000000 as \"Response time\" \nFROM \"log\" \nWHERE   ( timestamp  >= $__fromTime AND timestamp <= $__toTime )",
+          "refId": "A",
+          "selectedFormat": 1
+        }
+      ],
+      "title": "Latest requests",
+      "type": "table"
+    }
+  ],
+  "refresh": "",
+  "revision": 1,
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": [],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "HTTP traffic",
+  "uid": "mYEuD1B4k",
+  "version": 1,
+  "weekStart": ""
+}

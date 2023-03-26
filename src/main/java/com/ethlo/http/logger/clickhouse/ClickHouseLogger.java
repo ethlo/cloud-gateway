@@ -44,13 +44,13 @@ public class ClickHouseLogger implements HttpLogger
         params.put("response_headers", flattenMap(dataProvider.getResponseHeaders()));
         tpl.update("""
                 INSERT INTO log (
-                  timestamp, gateway_request_id, method, path,
+                  timestamp, route_id, route_uri, gateway_request_id, method, path,
                   response_time, request_body_size, response_body_size,
-                  status, request_headers, response_headers, request_body, response_body)
+                  status, is_error, request_headers, response_headers, request_body, response_body)
                 VALUES(
-                  :timestamp, :gateway_request_id, :method, :path, 
+                  :timestamp, :route_id, :route_uri, :gateway_request_id, :method, :path, 
                   :duration, :request_body_size, :response_body_size, 
-                  :status, :request_headers, :response_headers, 
+                  :status, :is_error, :request_headers, :response_headers, 
                   :request_body, :response_body)""", params);
     }
 

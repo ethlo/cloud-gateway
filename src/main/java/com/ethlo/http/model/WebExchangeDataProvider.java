@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
+import org.springframework.cloud.gateway.route.Route;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatusCode;
@@ -19,6 +20,7 @@ public class WebExchangeDataProvider
 {
     private final DataBufferRepository dataBufferRepository;
     private String requestId;
+    private Route route;
     private HttpMethod method;
     private RequestPath path;
     private URI uri;
@@ -157,14 +159,28 @@ public class WebExchangeDataProvider
     public Map<String, Object> asMetaMap()
     {
         final Map<String, Object> params = new HashMap<>();
+        params.put("route_id", route.getId());
+        params.put("route_uri", route.getUri());
         params.put("timestamp", getTimestamp());
         params.put("gateway_request_id", getRequestId());
         params.put("method", getMethod().name());
         params.put("path", getPath().value());
         params.put("duration", getDuration().toNanos());
         params.put("status", getStatusCode().value());
+        params.put("is_error", getStatusCode().isError());
         params.put("request_headers", getRequestHeaders());
         params.put("response_headers", getResponseHeaders());
         return params;
+    }
+
+    public Route getRoute()
+    {
+        return route;
+    }
+
+    public WebExchangeDataProvider route(final Route route)
+    {
+        this.route = route;
+        return this;
     }
 }

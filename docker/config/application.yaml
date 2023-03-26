@@ -11,7 +11,7 @@ http-logging:
       pattern: '{{gateway_request_id}} {{method}} {{path}} {{request_headers["Content-Length"][0]}} {{status}}'
     clickhouse:
       enabled: true
-      url: 'jdbc:ch://clickhouse:8123/default?compress=0;async_insert=1,wait_for_async_insert=0'
+      url: 'jdbc:ch://clickhouse-cloud-gateway:8123/default?compress=0;async_insert=1,wait_for_async_insert=0'
   matchers:
     - includes:
         - uris:

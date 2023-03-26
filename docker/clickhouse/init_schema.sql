@@ -1,11 +1,14 @@
-CREATE TABLE log
+CREATE TABLE IF NOT EXISTS log
 (
     timestamp          DateTime64(3),
+    route_id String,
+    route_uri String,
     gateway_request_id String,
     method             LowCardinality(String),
     path               LowCardinality(String),
     response_time      Int64,
     status             Int16,
+    is_error           UInt8,
     request_headers    Map(String, String) codec (ZSTD(1)),
     response_headers   Map(String, String) codec (ZSTD(1)),
     request_body_size  Nullable(Int32),

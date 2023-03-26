@@ -60,7 +60,7 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
                     {
                         if (st.equals(SignalType.ON_COMPLETE) || st.equals(SignalType.ON_ERROR))
                         {
-                            handleCompletedRequest(exchange, requestId, Duration.ofNanos(System.nanoTime() - started), match.get());
+                            handleCompletedRequest(exchange, requestId, Duration.ofNanos(System.nanoTime() - started));
                         }
                         else
                         {
@@ -71,14 +71,16 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
         return chain.filter(exchange);
     }
 
-    private void handleCompletedRequest(ServerWebExchange exchange, String requestId, final Duration duration, final RequestMatchingProcessor requestMatchingProcessor)
+    private void handleCompletedRequest(ServerWebExchange exchange, String requestId, final Duration duration)
     {
         logger.debug("Completed request {} in {}", requestId, duration);
         dataBufferRepository.finished(requestId);
 
         final ServerHttpRequest req = exchange.getRequest();
         final ServerHttpResponse res = exchange.getResponse();
+        org.springframework.cloud.gateway.route.Route route = exchange.getAttribute(org.springframework.cloud.gateway.support.ServerWebExchangeUtils.GATEWAY_ROUTE_ATTR);
         final WebExchangeDataProvider data = new WebExchangeDataProvider(dataBufferRepository)
+                .route(route)
                 .requestId(req.getId())
                 .method(req.getMethod())
                 .path(req.getPath())
