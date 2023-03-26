@@ -2,16 +2,33 @@
 
 Experimental reverse proxy built on top of Spring Cloud Gateway with full request/response (including body) logging.
 
-##  
+## Trying it out
+
+<img src="doc/basic_dashboard.png" alt= "Simple overview dashboard">
+
+In the `docker` folder there is a `docker-compose.yaml` example that brings up Grafana on port `3000`, and the gateway on port `6464`. 
+
+NOTE: For more information on how to configure, se the sections below. The main config file is in `config/application.yaml` 
+
+Starting the services:
+```shell
+docker-compose up -d
+```
+
+Generate some traffic:
+```shell
+curl http://localhost:6464/<path-to-configured-service>
+```
+
+View the results in Grafana by going to http://localhost:3000/. The default username/password is `admin`/`grafana`. Show the dashboard by picking the dashboard named `HTTP traffic` from the left-hand menu.
 
 ## Logging
+One of the strong points of this project is the logging and ability to viev and analyze traffic. Below is a quick guide to configuring logging.
 
-### Logging support
+### Logging providers
 
 * File - log to file via template-pattern for ease of setup.
 * ClickHouse - Log to a clickhouse table for powerful and easy analysis.
-
-### Logging provider(s)
 
 ```yaml
 http-logging:
@@ -29,7 +46,8 @@ NOTE: The file log appender can be configured with the logger name `access_log`.
 The requests can be conditionally logged based on numerous properties of the request. The capturing is happening straight from the bytebuffers in Netty, and is attempted to be done in a manner that incurs minimum overhead. The `memory-buffer-size` defines how large the request or response can be before it is buffered to file.
 
 ```yaml
-capture:
+http-logging:
+  capture:
     memory-buffer-size: 500KB
     temp-directory: /tmp
   matchers:
