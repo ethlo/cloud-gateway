@@ -18,6 +18,7 @@ import com.ethlo.http.logger.HttpLogger;
 import com.ethlo.http.match.RequestMatchingConfiguration;
 import com.ethlo.http.match.RequestMatchingProcessor;
 import com.ethlo.http.model.WebExchangeDataProvider;
+import com.ethlo.http.processors.LogPreProcessor;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.SignalType;
 import reactor.core.scheduler.Schedulers;
@@ -33,12 +34,14 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
     private final HttpLogger httpLogger;
     private final DataBufferRepository dataBufferRepository;
     private final RequestMatchingConfiguration requestMatchingConfiguration;
+    private final LogPreProcessor logPreProcessor;
 
-    public TagRequestIdGlobalFilter(final HttpLogger httpLogger, final DataBufferRepository dataBufferRepository, final RequestMatchingConfiguration requestMatchingConfiguration)
+    public TagRequestIdGlobalFilter(final HttpLogger httpLogger, final DataBufferRepository dataBufferRepository, final RequestMatchingConfiguration requestMatchingConfiguration, final LogPreProcessor logPreProcessor)
     {
         this.httpLogger = httpLogger;
         this.dataBufferRepository = dataBufferRepository;
         this.requestMatchingConfiguration = requestMatchingConfiguration;
+        this.logPreProcessor = logPreProcessor;
     }
 
     @Override
@@ -58,7 +61,7 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
                     .publishOn(Schedulers.boundedElastic())
                     .doFinally(st ->
                     {
-                        if (st.equals(SignalType.ON_COMPLETE) || st.equals(SignalType.ON_ERROR))
+                        if (st.equals(SignalType.ON_COMPLETE) || st.equals(SignalType.ON_ERROR) || st.equals(SignalType.CANCEL))
                         {
                             handleCompletedRequest(exchange, requestId, Duration.ofNanos(System.nanoTime() - started));
                         }
@@ -79,6 +82,7 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
         final ServerHttpRequest req = exchange.getRequest();
         final ServerHttpResponse res = exchange.getResponse();
         org.springframework.cloud.gateway.route.Route route = exchange.getAttribute(org.springframework.cloud.gateway.support.ServerWebExchangeUtils.GATEWAY_ROUTE_ATTR);
+
         final WebExchangeDataProvider data = new WebExchangeDataProvider(dataBufferRepository)
                 .route(route)
                 .requestId(req.getId())
@@ -92,7 +96,9 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
                 .duration(duration)
                 .remoteAddress(req.getRemoteAddress());
 
-        httpLogger.accessLog(data);
+        final WebExchangeDataProvider processed = logPreProcessor.process(data);
+
+        httpLogger.accessLog(processed);
 
         // NOT in finally, as we do not want to delete data if it has not been properly processed
         dataBufferRepository.cleanup(requestId);

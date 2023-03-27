@@ -2,6 +2,14 @@ server:
   port: 8888
 
 http-logging:
+  auth:
+    jwt:
+      enabled: true
+      user-claim: preferred_username
+      realm-claim:
+    basic:
+      enabled: true
+      realm-header-name: x-realm
   capture:
     memory-buffer-size: 500KB
     temp-directory: /tmp

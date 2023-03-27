@@ -8,6 +8,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
+import com.ethlo.http.processors.auth.RealmUser;
+
 import org.springframework.cloud.gateway.route.Route;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -30,6 +32,7 @@ public class WebExchangeDataProvider
     private OffsetDateTime timestamp;
     private Duration duration;
     private InetSocketAddress remoteAddress;
+    private RealmUser user;
 
     public WebExchangeDataProvider(DataBufferRepository dataBufferRepository)
     {
@@ -182,5 +185,16 @@ public class WebExchangeDataProvider
     {
         this.route = route;
         return this;
+    }
+
+    public WebExchangeDataProvider user(RealmUser user)
+    {
+        this.user = user;
+        return this;
+    }
+
+    public Optional<RealmUser> getUser()
+    {
+        return Optional.ofNullable(user);
     }
 }
