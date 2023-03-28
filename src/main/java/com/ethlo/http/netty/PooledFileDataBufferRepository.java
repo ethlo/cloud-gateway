@@ -40,11 +40,16 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
         this.pool = new ConcurrentHashMap<>();
     }
 
+    public static Path getFilename(final Path basePath, Operation operation, String id)
+    {
+        return basePath.resolve(operation.name().toLowerCase() + "_" + id);
+    }
+
     @Override
     public void cleanup(final String requestId)
     {
-        cleanup(getFilename(Operation.REQUEST, requestId));
-        cleanup(getFilename(Operation.RESPONSE, requestId));
+        cleanup(getFilename(basePath, Operation.REQUEST, requestId));
+        cleanup(getFilename(basePath, Operation.RESPONSE, requestId));
     }
 
     private void cleanup(Path file)
@@ -74,7 +79,7 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
     @Override
     public void save(final Operation operation, final String requestId, final byte[] data)
     {
-        final Path file = getFilename(operation, requestId);
+        final Path file = getFilename(basePath, operation, requestId);
         final InspectableBufferedOutputStream out = pool.compute(file, (f, outputStream) ->
         {
             if (outputStream == null)
@@ -95,22 +100,17 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
         }
     }
 
-    private Path getFilename(Operation operation, String id)
-    {
-        return basePath.resolve(operation.name().toLowerCase() + "_" + id);
-    }
-
     @Override
     public void finished(final String requestId)
     {
-        Optional.ofNullable(pool.get(getFilename(Operation.REQUEST, requestId))).ifPresent(CloseUtil::closeQuietly);
-        Optional.ofNullable(pool.get(getFilename(Operation.RESPONSE, requestId))).ifPresent(CloseUtil::closeQuietly);
+        Optional.ofNullable(pool.get(getFilename(basePath, Operation.REQUEST, requestId))).ifPresent(CloseUtil::closeQuietly);
+        Optional.ofNullable(pool.get(getFilename(basePath, Operation.RESPONSE, requestId))).ifPresent(CloseUtil::closeQuietly);
     }
 
     @Override
     public Optional<PayloadProvider> get(final Operation operation, final String id)
     {
-        final Path file = getFilename(operation, id);
+        final Path file = getFilename(basePath, operation, id);
         return Optional.ofNullable(Optional.ofNullable(pool.get(file))
                 .map(stream ->
                 {

@@ -43,9 +43,13 @@ management:
     web:
       exposure:
         include: 'health,gateway,metrics'
+
 spring:
   cloud:
     gateway:
+      filter:
+        request-rate-limiter:
+          enabled: true
       metrics:
         tags:
           path:
@@ -61,6 +65,26 @@ spring:
               args:
                 name: upstream-down
                 fallbackUri: 'forward:/upstream-down'
+            - name: RequestRateLimiter
+              args:
+                local-rate-limiter:
+                  replenish-rate: 500
+                  refresh-period: PT10s
+        - id: http-bin-any
+          uri: '${rewrite.backend.uri:http://localhost/anything}'
+          predicates:
+            - Path=/anything
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: upstream-down
+                fallbackUri: 'forward:/upstream-down'
+            - name: RequestRateLimiter
+              args:
+                local-rate-limiter:
+                  replenish-rate: 2
+                  refresh_period: 10
+
         - id: vg-front
           uri: '${rewrite.backend.uri:https://www.vg.no/}'
           predicates:

@@ -13,4 +13,10 @@ public class FileLogCfg
     {
         return new FileLogger(new PebbleAccessLogTemplateRenderer(fileProviderConfig.getPattern(), false));
     }
+
+    @Bean
+    public FileBodyContentRepository fileBodyContentRepository(FileProviderConfig fileProviderConfig)
+    {
+        return new FileBodyContentRepository(fileProviderConfig.getBodyStorageDirectory());
+    }
 }

@@ -1,8 +1,8 @@
 package com.ethlo.http.logger;
 
-import org.springframework.core.io.Resource;
-
 import java.util.Optional;
+
+import org.springframework.core.io.Resource;
 
 public interface BodyContentRepository
 {

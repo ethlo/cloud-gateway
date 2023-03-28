@@ -8,8 +8,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
-import com.ethlo.http.processors.auth.RealmUser;
-
 import org.springframework.cloud.gateway.route.Route;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -17,6 +15,7 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.server.RequestPath;
 
 import com.ethlo.http.netty.DataBufferRepository;
+import com.ethlo.http.processors.auth.RealmUser;
 
 public class WebExchangeDataProvider
 {
