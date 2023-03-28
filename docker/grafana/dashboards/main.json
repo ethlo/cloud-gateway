@@ -32,6 +32,616 @@
       "fieldConfig": {
         "defaults": {
           "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "left",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Errors count"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "dark-red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Throughput count"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "dark-blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Response Time ms"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#73BF69",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "errors"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "dark-red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Errors requests"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "dark-red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 9,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "9.4.7",
+      "targets": [
+        {
+          "builderOptions": {
+            "fields": [
+              "response_time"
+            ],
+            "filters": [
+              {
+                "condition": "AND",
+                "filterType": "custom",
+                "key": "timestamp",
+                "operator": "WITH IN DASHBOARD TIME RANGE",
+                "restrictToFields": [
+                  {
+                    "label": "timestamp",
+                    "name": "timestamp",
+                    "picklistValues": [],
+                    "type": "DateTime64(3)"
+                  }
+                ],
+                "type": "datetime"
+              }
+            ],
+            "limit": 100,
+            "metrics": [
+              {
+                "aggregation": "avg",
+                "field": "response_time"
+              }
+            ],
+            "mode": "trend",
+            "table": "log",
+            "timeField": "timestamp",
+            "timeFieldType": "DateTime64(3)"
+          },
+          "datasource": "clickhouse",
+          "meta": {
+            "builderOptions": {
+              "fields": [
+                "response_time"
+              ],
+              "filters": [
+                {
+                  "condition": "AND",
+                  "filterType": "custom",
+                  "key": "timestamp",
+                  "operator": "WITH IN DASHBOARD TIME RANGE",
+                  "restrictToFields": [
+                    {
+                      "label": "timestamp",
+                      "name": "timestamp",
+                      "picklistValues": [],
+                      "type": "DateTime64(3)"
+                    }
+                  ],
+                  "type": "datetime"
+                }
+              ],
+              "limit": 100,
+              "metrics": [
+                {
+                  "aggregation": "avg",
+                  "field": "response_time"
+                }
+              ],
+              "mode": "trend",
+              "table": "log",
+              "timeField": "timestamp",
+              "timeFieldType": "DateTime64(3)"
+            }
+          },
+          "queryType": "sql",
+          "rawSql": "SELECT $__timeInterval(timestamp) as t,  count(gateway_request_id) as requests FROM log WHERE is_error=0 AND $__timeFilter(t) GROUP BY t ORDER BY t",
+          "refId": "Success"
+        },
+        {
+          "builderOptions": {
+            "fields": [],
+            "filters": [
+              {
+                "condition": "AND",
+                "filterType": "custom",
+                "key": "timestamp",
+                "operator": "WITH IN DASHBOARD TIME RANGE",
+                "restrictToFields": [
+                  {
+                    "label": "timestamp",
+                    "name": "timestamp",
+                    "picklistValues": [],
+                    "type": "DateTime64(3)"
+                  }
+                ],
+                "type": "datetime"
+              }
+            ],
+            "limit": 100,
+            "metrics": [
+              {
+                "aggregation": "count",
+                "alias": "count",
+                "field": "gateway_request_id"
+              }
+            ],
+            "mode": "trend",
+            "orderBy": [],
+            "table": "log",
+            "timeField": "timestamp",
+            "timeFieldType": "DateTime64(3)"
+          },
+          "datasource": "clickhouse",
+          "hide": false,
+          "meta": {
+            "builderOptions": {
+              "fields": [],
+              "filters": [
+                {
+                  "condition": "AND",
+                  "filterType": "custom",
+                  "key": "timestamp",
+                  "operator": "WITH IN DASHBOARD TIME RANGE",
+                  "restrictToFields": [
+                    {
+                      "label": "timestamp",
+                      "name": "timestamp",
+                      "picklistValues": [],
+                      "type": "DateTime64(3)"
+                    }
+                  ],
+                  "type": "datetime"
+                }
+              ],
+              "limit": 100,
+              "metrics": [
+                {
+                  "aggregation": "count",
+                  "alias": "count",
+                  "field": "gateway_request_id"
+                }
+              ],
+              "mode": "trend",
+              "orderBy": [],
+              "table": "log",
+              "timeField": "timestamp",
+              "timeFieldType": "DateTime64(3)"
+            }
+          },
+          "queryType": "sql",
+          "rawSql": "SELECT $__timeInterval(timestamp) as time,  count(gateway_request_id) as requests FROM \"log\" WHERE is_error=1 AND $__timeFilter(timestamp) GROUP BY time ORDER BY time ASC",
+          "refId": "Errors"
+        }
+      ],
+      "title": "Requests",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "clickhouse",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "left",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "Bps"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Errors count"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "dark-red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Throughput count"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "dark-blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Response Time ms"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#73BF69",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Traffic (incoming) bytes"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "dark-blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Traffic (outgoing) bytes"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#3babb8",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "id": 8,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "9.4.7",
+      "targets": [
+        {
+          "builderOptions": {
+            "fields": [],
+            "filters": [
+              {
+                "condition": "AND",
+                "filterType": "custom",
+                "key": "timestamp",
+                "operator": "WITH IN DASHBOARD TIME RANGE",
+                "restrictToFields": [
+                  {
+                    "label": "timestamp",
+                    "name": "timestamp",
+                    "picklistValues": [],
+                    "type": "DateTime64(3)"
+                  }
+                ],
+                "type": "datetime"
+              }
+            ],
+            "limit": 100,
+            "metrics": [
+              {
+                "aggregation": "count",
+                "alias": "count",
+                "field": "gateway_request_id"
+              }
+            ],
+            "mode": "trend",
+            "orderBy": [],
+            "table": "log",
+            "timeField": "timestamp",
+            "timeFieldType": "DateTime64(3)"
+          },
+          "datasource": "clickhouse",
+          "hide": false,
+          "meta": {
+            "builderOptions": {
+              "fields": [],
+              "filters": [
+                {
+                  "condition": "AND",
+                  "filterType": "custom",
+                  "key": "timestamp",
+                  "operator": "WITH IN DASHBOARD TIME RANGE",
+                  "restrictToFields": [
+                    {
+                      "label": "timestamp",
+                      "name": "timestamp",
+                      "picklistValues": [],
+                      "type": "DateTime64(3)"
+                    }
+                  ],
+                  "type": "datetime"
+                }
+              ],
+              "limit": 100,
+              "metrics": [
+                {
+                  "aggregation": "count",
+                  "alias": "count",
+                  "field": "gateway_request_id"
+                }
+              ],
+              "mode": "trend",
+              "orderBy": [],
+              "table": "log",
+              "timeField": "timestamp",
+              "timeFieldType": "DateTime64(3)"
+            }
+          },
+          "queryType": "sql",
+          "rawSql": "SELECT $__timeInterval(timestamp) as time, sum(request_body_size) as bytes FROM log WHERE $__timeFilter(timestamp) GROUP BY time ORDER BY time ASC",
+          "refId": "Traffic (incoming)"
+        },
+        {
+          "builderOptions": {
+            "fields": [],
+            "filters": [
+              {
+                "condition": "AND",
+                "filterType": "custom",
+                "key": "timestamp",
+                "operator": "WITH IN DASHBOARD TIME RANGE",
+                "restrictToFields": [
+                  {
+                    "label": "timestamp",
+                    "name": "timestamp",
+                    "picklistValues": [],
+                    "type": "DateTime64(3)"
+                  }
+                ],
+                "type": "datetime"
+              }
+            ],
+            "limit": 100,
+            "metrics": [
+              {
+                "aggregation": "count",
+                "alias": "count",
+                "field": "gateway_request_id"
+              }
+            ],
+            "mode": "trend",
+            "orderBy": [],
+            "table": "log",
+            "timeField": "timestamp",
+            "timeFieldType": "DateTime64(3)"
+          },
+          "datasource": "clickhouse",
+          "hide": false,
+          "meta": {
+            "builderOptions": {
+              "fields": [],
+              "filters": [
+                {
+                  "condition": "AND",
+                  "filterType": "custom",
+                  "key": "timestamp",
+                  "operator": "WITH IN DASHBOARD TIME RANGE",
+                  "restrictToFields": [
+                    {
+                      "label": "timestamp",
+                      "name": "timestamp",
+                      "picklistValues": [],
+                      "type": "DateTime64(3)"
+                    }
+                  ],
+                  "type": "datetime"
+                }
+              ],
+              "limit": 100,
+              "metrics": [
+                {
+                  "aggregation": "count",
+                  "alias": "count",
+                  "field": "gateway_request_id"
+                }
+              ],
+              "mode": "trend",
+              "orderBy": [],
+              "table": "log",
+              "timeField": "timestamp",
+              "timeFieldType": "DateTime64(3)"
+            }
+          },
+          "queryType": "sql",
+          "rawSql": "SELECT $__timeInterval(timestamp) as time, sum(response_body_size) as bytes FROM log WHERE $__timeFilter(timestamp) GROUP BY time ORDER BY time ASC",
+          "refId": "Traffic (outgoing)"
+        }
+      ],
+      "title": "Network throughput",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "clickhouse",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
             "mode": "thresholds"
           },
           "custom": {
@@ -59,10 +669,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
+        "h": 6,
+        "w": 9,
         "x": 0,
-        "y": 0
+        "y": 10
       },
       "id": 4,
       "links": [],
@@ -108,17 +718,14 @@
             "metrics": [
               {
                 "aggregation": "count",
-                "alias": "Requests",
                 "field": "gateway_request_id"
               }
             ],
             "mode": "aggregate",
+            "orderBy": [],
             "table": "log"
           },
-          "datasource": {
-            "type": "grafana-clickhouse-datasource",
-            "uid": "k9A37JBVz"
-          },
+          "datasource": "clickhouse",
           "meta": {
             "builderOptions": {
               "fields": [
@@ -148,16 +755,16 @@
               "metrics": [
                 {
                   "aggregation": "count",
-                  "alias": "Requests",
                   "field": "gateway_request_id"
                 }
               ],
               "mode": "aggregate",
+              "orderBy": [],
               "table": "log"
             }
           },
           "queryType": "sql",
-          "rawSql": "SELECT concat('HTTP ', CAST (status as String)) as Status, count(gateway_request_id) Requests FROM \"log\" WHERE   ( timestamp  >= $__fromTime AND timestamp <= $__toTime ) GROUP BY status LIMIT 100\n",
+          "rawSql": "SELECT concat('HTTP ', cast(status as String)) as Status, count(gateway_request_id) as Count FROM \"log\" WHERE   ( timestamp  >= $__fromTime AND timestamp <= $__toTime ) GROUP BY status LIMIT 100",
           "refId": "A"
         }
       ],
@@ -183,7 +790,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -192,13 +800,26 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Count"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 107
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 0
+        "h": 6,
+        "w": 15,
+        "x": 9,
+        "y": 10
       },
       "id": 6,
       "options": {
@@ -210,7 +831,8 @@
           ],
           "show": false
         },
-        "showHeader": true
+        "showHeader": true,
+        "sortBy": []
       },
       "pluginVersion": "9.4.7",
       "targets": [
@@ -252,10 +874,7 @@
             "mode": "aggregate",
             "table": "log"
           },
-          "datasource": {
-            "type": "grafana-clickhouse-datasource",
-            "uid": "k9A37JBVz"
-          },
+          "datasource": "clickhouse",
           "meta": {
             "builderOptions": {
               "fields": [],
@@ -296,11 +915,11 @@
             }
           },
           "queryType": "sql",
-          "rawSql": "SELECT path, method, formatReadableSize(avg(request_body_size)) as avg_request_size, formatReadableSize(avg(response_body_size)) as avg_response_size, formatReadableSize(max(response_body_size)) as max_response_size FROM \"log\" WHERE   ( timestamp  >= $__fromTime AND timestamp <= $__toTime ) group by path, method LIMIT 100",
+          "rawSql": "SELECT concat(method, ' ', path) as Request, \ncount(gateway_request_id) as Count,\nformatReadableSize(avg(request_body_size)) as \"Request Size (avg)\", \nformatReadableSize(max(request_body_size)) as \"Request Size (max)\", \nformatReadableSize(avg(response_body_size)) as \"Response Size (avg)\",\nformatReadableSize(max(response_body_size)) as \"Response Size (max)\"\nFROM \"log\" WHERE   ( timestamp  >= $__fromTime AND timestamp <= $__toTime ) group by path, method",
           "refId": "A"
         }
       ],
-      "title": "Payload size overview",
+      "title": "Request overview",
       "type": "table"
     },
     {
@@ -322,7 +941,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -365,14 +985,98 @@
                 ]
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Response time"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 3
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "HTTP status"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": []
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Route URI"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 198
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Realm"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 70
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Time"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 192
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "RouteId"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 111
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Username"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 107
+              }
+            ]
           }
         ]
       },
       "gridPos": {
-        "h": 11,
+        "h": 19,
         "w": 24,
         "x": 0,
-        "y": 8
+        "y": 16
       },
       "id": 2,
       "options": {
@@ -452,7 +1156,7 @@
             }
           },
           "queryType": "sql",
-          "rawSql": "SELECT \ntimestamp as \"Time\",\ngateway_request_id as \"Request ID\", \nconcat(method, ' ', path) as Request, \nstatus as \"HTTP status\", \nroute_id as RouteId, \nroute_uri as \"Route URI\", \nformatReadableSize(request_body_size) as \"Request Body Size\",\nformatReadableSize(response_body_size) as \"Response Body Size\",\nresponse_time/1000000000 as \"Response time\" \nFROM \"log\" \nWHERE   ( timestamp  >= $__fromTime AND timestamp <= $__toTime )",
+          "rawSql": "SELECT \ntimestamp as \"Time\",\ngateway_request_id as \"Request ID\", \nconcat(method, ' ', path) as Request, \nstatus as \"HTTP status\", \nrealm_claim as \"Realm\", \nuser_claim as \"Username\", \nroute_id as RouteId, \nroute_uri as \"Route URI\",\nuser_agent as \"User Agent\", \nformatReadableSize(request_body_size) as \"Request Body Size\",\nformatReadableSize(response_body_size) as \"Response Body Size\",\nresponse_time/1000000000 as \"Response time\" \nFROM \"log\" \nWHERE   ( timestamp  >= $__fromTime AND timestamp <= $__toTime )",
           "refId": "A",
           "selectedFormat": 1
         }
@@ -461,7 +1165,7 @@
       "type": "table"
     }
   ],
-  "refresh": "",
+  "refresh": "10s",
   "revision": 1,
   "schemaVersion": 38,
   "style": "dark",
@@ -470,7 +1174,7 @@
     "list": []
   },
   "time": {
-    "from": "now-6h",
+    "from": "now-15m",
     "to": "now"
   },
   "timepicker": {},

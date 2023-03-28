@@ -45,6 +45,9 @@ management:
 spring:
   cloud:
     gateway:
+      filter:
+        request-rate-limiter:
+          deny-empty-key: false
       metrics:
         tags:
           path:
@@ -67,3 +70,4 @@ spring:
           filters:
             - StripPrefix=1
             - 'RewritePath=/(?<segment>.*), /$\{segment}'
+

@@ -6,24 +6,31 @@ Experimental reverse proxy built on top of Spring Cloud Gateway with full reques
 
 <img src="doc/basic_dashboard.png" alt= "Simple overview dashboard">
 
-In the `docker` folder there is a `docker-compose.yaml` example that brings up Grafana on port `3000`, and the gateway on port `6464`. 
+In the `docker` folder there is a `docker-compose.yaml` example that brings up Grafana on port `3000`, and the gateway
+on port `6464`.
 
-NOTE: For more information on how to configure, se the sections below. The main config file is in `config/application.yaml` 
+NOTE: For more information on how to configure, se the sections below. The main config file is
+in `config/application.yaml`
 
 Starting the services:
+
 ```shell
 docker-compose up -d
 ```
 
 Generate some traffic:
+
 ```shell
 curl http://localhost:6464/<path-to-configured-service>
 ```
 
-View the results in Grafana by going to http://localhost:3000/. The default username/password is `admin`/`grafana`. Show the dashboard by picking the dashboard named `HTTP traffic` from the left-hand menu.
+View the results in Grafana by going to http://localhost:3000/. The default username/password is `admin`/`grafana`. Show
+the dashboard by picking the dashboard named `HTTP traffic` from the left-hand menu.
 
 ## Logging
-One of the strong points of this project is the logging and ability to viev and analyze traffic. Below is a quick guide to configuring logging.
+
+One of the strong points of this project is the logging and ability to viev and analyze traffic. Below is a quick guide
+to configuring logging.
 
 ### Logging providers
 
@@ -40,10 +47,14 @@ http-logging:
       enabled: true
       url: jdbc:ch://localhost:18123/default?compress=0;async_insert=1,wait_for_async_insert=0
 ```
+
 NOTE: The file log appender can be configured with the logger name `access_log`.
 
 ### Capture configuration
-The requests can be conditionally logged based on numerous properties of the request. The capturing is happening straight from the bytebuffers in Netty, and is attempted to be done in a manner that incurs minimum overhead. The `memory-buffer-size` defines how large the request or response can be before it is buffered to file.
+
+The requests can be conditionally logged based on numerous properties of the request. The capturing is happening
+straight from the bytebuffers in Netty, and is attempted to be done in a manner that incurs minimum overhead.
+The `memory-buffer-size` defines how large the request or response can be before it is buffered to file.
 
 ```yaml
 http-logging:
@@ -60,12 +71,15 @@ http-logging:
       log-request-body: true
       log-response-body: true
     - includes:
-      - uris:
-          - path: /my-other-service
+        - uris:
+            - path: /my-other-service
       log-request-body: true
       log-response-body: false # default is also false for request/response body logging
 ```
- NOTE: Keep in mind that the request and response body logging may be invaluable for debugging and auditing, it also potentially affects the performance negatively, as this will require additional resources for both processing and storage.
+
+NOTE: Keep in mind that the request and response body logging may be invaluable for debugging and auditing, it also
+potentially affects the performance negatively, as this will require additional resources for both processing and
+storage.
 
 ## Special features
 
@@ -84,10 +98,10 @@ spring:
           predicates:
             - Path=/my-service
           filters:
-           - name: CircuitBreaker
-             args:
-               name: upstream-down
-               fallbackUri: forward:/upstream-down
+            - name: CircuitBreaker
+              args:
+                name: upstream-down
+                fallbackUri: forward:/upstream-down
 ```
 
 ## References
