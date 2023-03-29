@@ -1,5 +1,7 @@
 package com.ethlo.http;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.web.reactive.error.ErrorWebExceptionHandler;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -9,6 +11,7 @@ import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpResponse;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.server.ServerWebExchange;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -19,6 +22,7 @@ import reactor.core.publisher.Mono;
 @Order(-2)
 public class GlobalErrorHandler implements ErrorWebExceptionHandler
 {
+    private final Logger logger = LoggerFactory.getLogger(GlobalErrorHandler.class);
     private final ObjectMapper objectMapper;
 
     public GlobalErrorHandler(final ObjectMapper objectMapper)
@@ -33,6 +37,11 @@ public class GlobalErrorHandler implements ErrorWebExceptionHandler
         {
             return handleError(serverWebExchange, HttpStatus.NOT_FOUND, e.getMessage());
         }
+        else if (throwable instanceof ResponseStatusException responseStatusException)
+        {
+            return handleError(serverWebExchange, HttpStatus.resolve(responseStatusException.getStatusCode().value()), responseStatusException.getMessage());
+        }
+        logger.warn("An unhandled exception occurred: {}", throwable.getMessage(), throwable);
         return handleError(serverWebExchange, HttpStatus.INTERNAL_SERVER_ERROR, "Unknown error");
     }
 

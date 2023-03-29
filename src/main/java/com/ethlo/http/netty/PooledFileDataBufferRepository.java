@@ -40,7 +40,7 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
         this.pool = new ConcurrentHashMap<>();
     }
 
-    public static Path getFilename(final Path basePath, Operation operation, String id)
+    public static Path getFilename(final Path basePath, ServerDirection operation, String id)
     {
         return basePath.resolve(operation.name().toLowerCase() + "_" + id);
     }
@@ -48,8 +48,8 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
     @Override
     public void cleanup(final String requestId)
     {
-        cleanup(getFilename(basePath, Operation.REQUEST, requestId));
-        cleanup(getFilename(basePath, Operation.RESPONSE, requestId));
+        cleanup(getFilename(basePath, ServerDirection.REQUEST, requestId));
+        cleanup(getFilename(basePath, ServerDirection.RESPONSE, requestId));
     }
 
     private void cleanup(Path file)
@@ -77,7 +77,7 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
     }
 
     @Override
-    public void save(final Operation operation, final String requestId, final byte[] data)
+    public void save(final ServerDirection operation, final String requestId, final byte[] data)
     {
         final Path file = getFilename(basePath, operation, requestId);
         final InspectableBufferedOutputStream out = pool.compute(file, (f, outputStream) ->
@@ -103,12 +103,12 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
     @Override
     public void finished(final String requestId)
     {
-        Optional.ofNullable(pool.get(getFilename(basePath, Operation.REQUEST, requestId))).ifPresent(CloseUtil::closeQuietly);
-        Optional.ofNullable(pool.get(getFilename(basePath, Operation.RESPONSE, requestId))).ifPresent(CloseUtil::closeQuietly);
+        Optional.ofNullable(pool.get(getFilename(basePath, ServerDirection.REQUEST, requestId))).ifPresent(CloseUtil::closeQuietly);
+        Optional.ofNullable(pool.get(getFilename(basePath, ServerDirection.RESPONSE, requestId))).ifPresent(CloseUtil::closeQuietly);
     }
 
     @Override
-    public Optional<PayloadProvider> get(final Operation operation, final String id)
+    public Optional<PayloadProvider> get(final ServerDirection operation, final String id)
     {
         final Path file = getFilename(basePath, operation, id);
         return Optional.ofNullable(Optional.ofNullable(pool.get(file))

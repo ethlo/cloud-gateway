@@ -9,9 +9,9 @@ import org.springframework.context.annotation.Configuration;
 public class FileLogCfg
 {
     @Bean
-    public FileLogger fileLogger(FileProviderConfig fileProviderConfig)
+    public FileLogger fileLogger(FileProviderConfig fileProviderConfig, FileBodyContentRepository bodyContentRepository)
     {
-        return new FileLogger(new PebbleAccessLogTemplateRenderer(fileProviderConfig.getPattern(), false));
+        return new FileLogger(bodyContentRepository, new PebbleAccessLogTemplateRenderer(fileProviderConfig.getPattern(), false));
     }
 
     @Bean

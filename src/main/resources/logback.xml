@@ -11,9 +11,9 @@
     </appender>
 
     <appender name="access-file" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>${java.io.tmpdir}/reverse-proxy-access.log</file>
+        <file>${java.io.tmpdir}/cloud-gateway/access.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <fileNamePattern>${java.io.tmpdir}/reverse-proxy-access.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <fileNamePattern>${java.io.tmpdir}/cloud-gateway/access.%d{yyyy-MM-dd}.log</fileNamePattern>
             <maxHistory>100</maxHistory>
         </rollingPolicy>
         <encoder>

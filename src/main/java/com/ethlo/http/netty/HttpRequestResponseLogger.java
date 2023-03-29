@@ -64,10 +64,10 @@ public class HttpRequestResponseLogger extends LoggingHandler
     {
         return getRequestId(ctx).map(requestId ->
         {
-            final DataBufferRepository.Operation operation = "write".equalsIgnoreCase(eventName) ? DataBufferRepository.Operation.REQUEST : DataBufferRepository.Operation.RESPONSE;
+            final ServerDirection operation = "write".equalsIgnoreCase(eventName) ? ServerDirection.REQUEST : ServerDirection.RESPONSE;
             final RequestMatchingProcessor pattern = getRequestPattern(ctx).orElseThrow();
-            if (pattern.isLogRequestBody() && operation == DataBufferRepository.Operation.REQUEST
-                    || pattern.isLogResponseBody() && operation == DataBufferRepository.Operation.RESPONSE)
+            if (pattern.isLogRequestBody() && operation == ServerDirection.REQUEST
+                    || pattern.isLogResponseBody() && operation == ServerDirection.RESPONSE)
             {
                 final byte[] data = getBytes(msg);
                 if (data.length > 0)

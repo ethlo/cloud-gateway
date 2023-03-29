@@ -12,9 +12,11 @@ import org.springframework.cloud.gateway.route.Route;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
 import org.springframework.http.server.RequestPath;
 
 import com.ethlo.http.netty.DataBufferRepository;
+import com.ethlo.http.netty.ServerDirection;
 import com.ethlo.http.processors.auth.RealmUser;
 
 public class WebExchangeDataProvider
@@ -100,12 +102,12 @@ public class WebExchangeDataProvider
 
     public Optional<PayloadProvider> getRequestPayload()
     {
-        return dataBufferRepository.get(DataBufferRepository.Operation.REQUEST, requestId);
+        return dataBufferRepository.get(ServerDirection.REQUEST, requestId);
     }
 
     public Optional<PayloadProvider> getResponsePayload()
     {
-        return dataBufferRepository.get(DataBufferRepository.Operation.RESPONSE, requestId);
+        return dataBufferRepository.get(ServerDirection.RESPONSE, requestId);
     }
 
     public String getRequestId()
@@ -163,11 +165,20 @@ public class WebExchangeDataProvider
         final Map<String, Object> params = new HashMap<>();
         params.put("route_id", route.getId());
         params.put("route_uri", route.getUri());
+        params.put("realm_claim", getUser().map(RealmUser::realm).orElse(null));
+        params.put("user_claim", getUser().map(RealmUser::username).orElse(null));
+
+        params.put("host", getRequestHeaders().getFirst(HttpHeaders.HOST));
+        params.put("user_agent", getRequestHeaders().getFirst(HttpHeaders.USER_AGENT));
+
+        params.put("request_content_type", Optional.ofNullable(getRequestHeaders().getContentType()).map(MediaType::toString).orElse(null));
+        params.put("response_content_type", Optional.ofNullable(getResponseHeaders().getContentType()).map(MediaType::toString).orElse(null));
+
         params.put("timestamp", getTimestamp());
         params.put("gateway_request_id", getRequestId());
         params.put("method", getMethod().name());
         params.put("path", getPath().value());
-        params.put("duration", getDuration().toNanos());
+        params.put("duration", getDuration().toNanos() / 1_000_000_000D);
         params.put("status", getStatusCode().value());
         params.put("is_error", getStatusCode().isError());
         params.put("request_headers", getRequestHeaders());

@@ -52,4 +52,10 @@ public class BasicAuthorizationExtractor implements AuthorizationExtractor
             return Optional.empty();
         }
     }
+
+    @Override
+    public int getOrder()
+    {
+        return 1;
+    }
 }

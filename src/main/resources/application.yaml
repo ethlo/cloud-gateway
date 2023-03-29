@@ -16,15 +16,15 @@ http-logging:
   providers:
     file:
       enabled: true
-      pattern: '{{gateway_request_id}} {{method}} {{path}} {{request_headers["Content-Length"][0]}} {{status}}'
-    clickhouse:
-      enabled: true
-      url: 'jdbc:ch://localhost:18123/default?compress=0;async_insert=1,wait_for_async_insert=0'
+      pattern: '{{gateway_request_id}} {{realm_claim}} {{user_claim}} {{method}} {{path}} {{host}} {{request_headers["Content-Length"][0]}} {{status}} {{user_agent}} {{duration | numberformat("#.###") }}'
+      body-storage-directory: /tmp/cloud-gateway/bodies
+    #clickhouse:
+    #  enabled: true
+    #  url: 'jdbc:ch://localhost:18123/default?compress=0;async_insert=1,wait_for_async_insert=0'
   matchers:
     - includes:
         - uris:
             - path: /get
-            - path: /vg
           methods:
             - GET
             - POST
@@ -38,11 +38,12 @@ logging:
   level:
     com.ethlo.http: INFO
 
+
 management:
   endpoints:
     web:
       exposure:
-        include: 'health,gateway,metrics'
+        include: 'health,gateway,metrics,clickhouse'
 
 spring:
   cloud:
@@ -50,6 +51,8 @@ spring:
       filter:
         request-rate-limiter:
           enabled: true
+          deny-empty-key: true
+          empty-key-status-code: 403
       metrics:
         tags:
           path:
@@ -68,7 +71,7 @@ spring:
             - name: RequestRateLimiter
               args:
                 local-rate-limiter:
-                  replenish-rate: 500
+                  replenish-rate: 40000
                   refresh-period: PT10s
         - id: http-bin-any
           uri: '${rewrite.backend.uri:http://localhost/anything}'
@@ -83,12 +86,4 @@ spring:
               args:
                 local-rate-limiter:
                   replenish-rate: 2
-                  refresh_period: 10
-
-        - id: vg-front
-          uri: '${rewrite.backend.uri:https://www.vg.no/}'
-          predicates:
-            - Path=/vg
-          filters:
-            - StripPrefix=1
-            - 'RewritePath=/(?<segment>.*), /$\{segment}'
+                  refresh-period: 10

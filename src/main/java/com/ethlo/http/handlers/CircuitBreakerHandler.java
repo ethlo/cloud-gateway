@@ -1,5 +1,7 @@
 package com.ethlo.http.handlers;
 
+import com.ethlo.http.netty.ServerDirection;
+
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.HttpStatus;
@@ -28,7 +30,7 @@ public class CircuitBreakerHandler implements HandlerFunction<ServerResponse>
     public Mono<ServerResponse> handle(ServerRequest request)
     {
         // Write preamble to find body correctly
-        dataBufferRepository.save(DataBufferRepository.Operation.REQUEST, request.exchange().getRequest().getId(), HttpMessageUtil.BODY_SEPARATOR);
+        dataBufferRepository.save(ServerDirection.REQUEST, request.exchange().getRequest().getId(), HttpMessageUtil.BODY_SEPARATOR);
 
         final Flux<Integer> res = request.bodyToFlux(DataBuffer.class)
                 .flatMap(dataBuffer ->
@@ -36,7 +38,7 @@ public class CircuitBreakerHandler implements HandlerFunction<ServerResponse>
                     byte[] bytes = new byte[dataBuffer.readableByteCount()];
                     dataBuffer.read(bytes);
                     DataBufferUtils.release(dataBuffer);
-                    dataBufferRepository.save(DataBufferRepository.Operation.REQUEST, request.exchange().getRequest().getId(), bytes);
+                    dataBufferRepository.save(ServerDirection.REQUEST, request.exchange().getRequest().getId(), bytes);
                     return Mono.empty();
                 });
 

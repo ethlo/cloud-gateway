@@ -20,6 +20,18 @@ public class ClickHouseBodyContentRepository implements BodyContentRepository
     }
 
     @Override
+    public void saveRequestBody(final String requestId, final Resource requestBody)
+    {
+        // Handled via logger
+    }
+
+    @Override
+    public void saveResponseBody(final String requestId, final Resource responseBody)
+    {
+        // Handled via logger
+    }
+
+    @Override
     public Optional<Resource> getRequestData(final String requestId)
     {
         return getByteArrayResource(requestId, "request_body");

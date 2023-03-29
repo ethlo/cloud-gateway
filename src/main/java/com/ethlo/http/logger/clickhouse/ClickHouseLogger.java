@@ -32,15 +32,6 @@ public class ClickHouseLogger implements HttpLogger
         params.put("response_body", null);
         params.put("response_body_size", 0);
 
-        params.put("realm_claim", dataProvider.getUser().map(RealmUser::realm).orElse(null));
-        params.put("user_claim", dataProvider.getUser().map(RealmUser::username).orElse(null));
-
-        params.put("host", dataProvider.getRequestHeaders().get(HttpHeaders.HOST));
-        params.put("user_agent", dataProvider.getRequestHeaders().get(HttpHeaders.USER_AGENT));
-
-        params.put("request_content_type", Optional.ofNullable(dataProvider.getRequestHeaders().getContentType()).map(MediaType::toString).orElse(null));
-        params.put("response_content_type", Optional.ofNullable(dataProvider.getResponseHeaders().getContentType()).map(MediaType::toString).orElse(null));
-
         // Remove headers already captured in dedicated columns
         dataProvider.requestHeaders(HttpHeaders.writableHttpHeaders(dataProvider.getRequestHeaders()));
         dataProvider.responseHeaders(HttpHeaders.writableHttpHeaders(dataProvider.getResponseHeaders()));
