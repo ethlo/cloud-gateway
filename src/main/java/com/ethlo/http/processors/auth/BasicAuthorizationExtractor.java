@@ -4,23 +4,27 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Optional;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
-import org.springframework.stereotype.Component;
 
-@Component
+import com.ethlo.http.processors.BasicAuthorizationConfig;
+
 public class BasicAuthorizationExtractor implements AuthorizationExtractor
 {
-    private final String realmHeaderParam;
+    private final BasicAuthorizationConfig config;
 
-    public BasicAuthorizationExtractor(@Value("${http-logging.auth.basic.realm-header-name}") final String realmHeaderParam)
+    public BasicAuthorizationExtractor(BasicAuthorizationConfig config)
     {
-        this.realmHeaderParam = realmHeaderParam;
+        this.config = config;
     }
 
     @Override
     public Optional<RealmUser> getUser(final HttpHeaders headers)
     {
+        if (! config.isEnabled())
+        {
+            return Optional.empty();
+        }
+
         return Optional.ofNullable(headers.getFirst(HttpHeaders.AUTHORIZATION))
                 .filter(headerValue -> headerValue.toLowerCase().startsWith("basic "))
                 .flatMap(headerValue ->
@@ -29,7 +33,7 @@ public class BasicAuthorizationExtractor implements AuthorizationExtractor
                             final String[] parts = usernameAndPassword.split(":");
                             if (parts.length == 2)
                             {
-                                final String realm = headers.getFirst(realmHeaderParam);
+                                final String realm = headers.getFirst(config.getRealmHeaderName());
                                 return new RealmUser(realm, parts[0]);
                             }
                             return null;

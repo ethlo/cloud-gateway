@@ -4,30 +4,30 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 
 import java.util.Optional;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
-import org.springframework.stereotype.Component;
 
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.exceptions.JWTDecodeException;
 import com.auth0.jwt.interfaces.DecodedJWT;
+import com.ethlo.http.processors.JwtAuthorizationConfig;
 
-@Component
 public class JwtAuthorizationExtractor implements AuthorizationExtractor
 {
-    private final String realmClaim;
-    private final String userClaimName;
+    private final JwtAuthorizationConfig config;
 
-    public JwtAuthorizationExtractor(@Value("${http-logging.auth.jwt.realm-claim}") final String realmClaim,
-                                     @Value("${http-logging.auth.jwt.user-claim}") final String userClaimName)
+    public JwtAuthorizationExtractor(JwtAuthorizationConfig config)
     {
-        this.realmClaim = realmClaim;
-        this.userClaimName = userClaimName;
+        this.config = config;
     }
 
     @Override
     public Optional<RealmUser> getUser(HttpHeaders headers)
     {
+        if (! config.isEnabled())
+        {
+            return Optional.empty();
+        }
+
         try
         {
             final Optional<String> headerValue = Optional.ofNullable(headers.getFirst(AUTHORIZATION));
@@ -36,7 +36,7 @@ public class JwtAuthorizationExtractor implements AuthorizationExtractor
                 if (h.toLowerCase().startsWith("bearer "))
                 {
                     final DecodedJWT decodedJWT = JWT.decode(h.substring(7));
-                    return new RealmUser(decodedJWT.getClaim(realmClaim).asString(), decodedJWT.getClaim(userClaimName).asString());
+                    return new RealmUser(decodedJWT.getClaim(config.getRealmClaimName()).asString(), decodedJWT.getClaim(config.getUsernameClaimName()).asString());
                 }
                 return null;
             });

@@ -46,6 +46,6 @@ public class ClickhouseLogCfg
     @Bean
     public ClickHouseStatsEndpoint clickHouseStatsEndpoint(NamedParameterJdbcTemplate tpl)
     {
-        return new ClickHouseStatsEndpoint(tpl, "default", "log");
+        return new ClickHouseStatsEndpoint(tpl, "log");
     }
 }

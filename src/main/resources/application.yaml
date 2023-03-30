@@ -5,11 +5,16 @@ http-logging:
   auth:
     jwt:
       enabled: true
-      user-claim: preferred_username
-      realm-claim:
+      username-claim-name: sub
+      realm-claim-name: realm
     basic:
       enabled: true
       realm-header-name: x-realm
+    response-header:
+      enabled: true
+      strip-headers: true
+      realm-header: x-realm
+      username-header: x-username
   capture:
     memory-buffer-size: 500KB
     temp-directory: /tmp
@@ -70,7 +75,7 @@ spring:
             - name: RequestRateLimiter
               args:
                 local-rate-limiter:
-                  replenish-rate: 1000
+                  replenish-rate: 10000
                   refresh-period: PT10s
         - id: http-bin-any
           uri: '${rewrite.backend.uri:http://localhost/anything}'

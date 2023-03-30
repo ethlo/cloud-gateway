@@ -10,12 +10,12 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 
 @ConfigurationProperties(prefix = "http-logging")
-public class RequestMatchingConfiguration
+public class HttpLoggingConfiguration
 {
-    private static final Logger logger = LoggerFactory.getLogger(RequestMatchingConfiguration.class);
+    private static final Logger logger = LoggerFactory.getLogger(HttpLoggingConfiguration.class);
     private final List<RequestMatchingProcessor> matchers;
 
-    public RequestMatchingConfiguration(final List<RequestMatchingProcessor> matchers)
+    public HttpLoggingConfiguration(final List<RequestMatchingProcessor> matchers)
     {
         this.matchers = matchers;
         logger.info("Matchers found: {}", getMatchers().size());

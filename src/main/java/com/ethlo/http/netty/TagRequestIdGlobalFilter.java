@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 
 import com.ethlo.http.logger.HttpLogger;
-import com.ethlo.http.match.RequestMatchingConfiguration;
+import com.ethlo.http.match.HttpLoggingConfiguration;
 import com.ethlo.http.match.RequestMatchingProcessor;
 import com.ethlo.http.model.WebExchangeDataProvider;
 import com.ethlo.http.processors.LogPreProcessor;
@@ -33,21 +33,21 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
 
     private final HttpLogger httpLogger;
     private final DataBufferRepository dataBufferRepository;
-    private final RequestMatchingConfiguration requestMatchingConfiguration;
+    private final HttpLoggingConfiguration httpLoggingConfiguration;
     private final LogPreProcessor logPreProcessor;
 
-    public TagRequestIdGlobalFilter(final HttpLogger httpLogger, final DataBufferRepository dataBufferRepository, final RequestMatchingConfiguration requestMatchingConfiguration, final LogPreProcessor logPreProcessor)
+    public TagRequestIdGlobalFilter(final HttpLogger httpLogger, final DataBufferRepository dataBufferRepository, final HttpLoggingConfiguration httpLoggingConfiguration, final LogPreProcessor logPreProcessor)
     {
         this.httpLogger = httpLogger;
         this.dataBufferRepository = dataBufferRepository;
-        this.requestMatchingConfiguration = requestMatchingConfiguration;
+        this.httpLoggingConfiguration = httpLoggingConfiguration;
         this.logPreProcessor = logPreProcessor;
     }
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain)
     {
-        final Optional<RequestMatchingProcessor> match = requestMatchingConfiguration.matches(exchange.getRequest());
+        final Optional<RequestMatchingProcessor> match = httpLoggingConfiguration.matches(exchange.getRequest());
         if (match.isPresent())
         {
             final long started = System.nanoTime();

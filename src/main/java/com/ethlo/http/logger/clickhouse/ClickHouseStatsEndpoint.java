@@ -14,13 +14,11 @@ import org.springframework.web.bind.annotation.ResponseBody;
 public class ClickHouseStatsEndpoint
 {
     private final NamedParameterJdbcTemplate tpl;
-    private final String databaseName;
     private final String tableName;
 
-    public ClickHouseStatsEndpoint(final NamedParameterJdbcTemplate tpl, final String databaseName, final String tableName)
+    public ClickHouseStatsEndpoint(final NamedParameterJdbcTemplate tpl, final String tableName)
     {
         this.tpl = tpl;
-        this.databaseName = databaseName;
         this.tableName = tableName;
     }
 
@@ -45,10 +43,10 @@ public class ClickHouseStatsEndpoint
                        any(engine)                      as engine,
                        sum(primary_key_bytes_in_memory) as primary_keys_size
                 from system.parts
-                where active and database = :database and table = :table
+                where active and database = currentDatabase() and table = :table
                 group by table
                 order by bytes_size desc""";
-        return tpl.queryForMap(sql, Map.of("database", databaseName, "table", tableName));
+        return tpl.queryForMap(sql, Map.of("table", tableName));
     }
 
     private Map<String, Object> getBodySizes()
