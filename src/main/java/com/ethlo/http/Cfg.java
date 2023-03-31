@@ -11,10 +11,12 @@ import org.springframework.web.reactive.function.server.RouterFunction;
 import org.springframework.web.reactive.function.server.ServerResponse;
 
 import com.ethlo.http.handlers.CircuitBreakerHandler;
-import com.ethlo.http.processors.BasicAuthorizationConfig;
-import com.ethlo.http.processors.JwtAuthorizationConfig;
-import com.ethlo.http.processors.auth.BasicAuthorizationExtractor;
-import com.ethlo.http.processors.auth.JwtAuthorizationExtractor;
+import com.ethlo.http.processors.auth.extractors.BasicAuthorizationConfig;
+import com.ethlo.http.processors.auth.extractors.BasicAuthorizationExtractor;
+import com.ethlo.http.processors.auth.extractors.JwtAuthorizationConfig;
+import com.ethlo.http.processors.auth.extractors.JwtAuthorizationExtractor;
+import com.ethlo.http.processors.auth.extractors.ResponseAuthorizationConfig;
+import com.ethlo.http.processors.auth.extractors.ResponseAuthorizationExtractor;
 
 @Configuration
 public class Cfg
@@ -35,5 +37,11 @@ public class Cfg
     public BasicAuthorizationExtractor basicAuthorizationExtractor(BasicAuthorizationConfig config)
     {
         return new BasicAuthorizationExtractor(config);
+    }
+
+    @Bean
+    public ResponseAuthorizationExtractor responseAuthorizationExtractor(ResponseAuthorizationConfig config)
+    {
+        return new ResponseAuthorizationExtractor(config);
     }
 }

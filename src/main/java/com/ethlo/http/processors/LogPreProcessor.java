@@ -7,7 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import com.ethlo.http.model.WebExchangeDataProvider;
-import com.ethlo.http.processors.auth.AuthorizationExtractor;
+import com.ethlo.http.processors.auth.extractors.AuthorizationExtractor;
 import com.ethlo.http.processors.auth.RealmUser;
 
 @Component
@@ -24,7 +24,7 @@ public class LogPreProcessor
 
     public WebExchangeDataProvider process(WebExchangeDataProvider data)
     {
-        final Optional<RealmUser> realmUser = authorizationExtractor.getUser(data.getRequestHeaders());
+        final Optional<RealmUser> realmUser = authorizationExtractor.getUser(data.getRequestHeaders(), data.getResponseHeaders());
         if (logger.isDebugEnabled())
         {
             logger.debug("Extracted user data: {}", realmUser.orElse(null));

@@ -1,5 +1,8 @@
 package com.ethlo.http.processors;
 
+import com.ethlo.http.processors.auth.extractors.BasicAuthorizationConfig;
+import com.ethlo.http.processors.auth.extractors.JwtAuthorizationConfig;
+
 public class AuthorizationExtractorConfig
 {
     /**

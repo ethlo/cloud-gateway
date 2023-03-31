@@ -1,12 +1,12 @@
-package com.ethlo.http.processors.auth;
+package com.ethlo.http.processors.auth.extractors;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Optional;
 
-import org.springframework.http.HttpHeaders;
+import com.ethlo.http.processors.auth.RealmUser;
 
-import com.ethlo.http.processors.BasicAuthorizationConfig;
+import org.springframework.http.HttpHeaders;
 
 public class BasicAuthorizationExtractor implements AuthorizationExtractor
 {
@@ -18,7 +18,7 @@ public class BasicAuthorizationExtractor implements AuthorizationExtractor
     }
 
     @Override
-    public Optional<RealmUser> getUser(final HttpHeaders headers)
+    public Optional<RealmUser> getUser(final HttpHeaders headers, final HttpHeaders responseHeaders)
     {
         if (! config.isEnabled())
         {

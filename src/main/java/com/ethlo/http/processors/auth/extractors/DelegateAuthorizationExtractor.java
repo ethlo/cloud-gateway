@@ -1,4 +1,4 @@
-package com.ethlo.http.processors.auth;
+package com.ethlo.http.processors.auth.extractors;
 
 import java.util.Comparator;
 import java.util.List;
@@ -8,6 +8,8 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.core.Ordered;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
+
+import com.ethlo.http.processors.auth.RealmUser;
 
 @Primary
 @Component
@@ -22,11 +24,11 @@ public class DelegateAuthorizationExtractor implements AuthorizationExtractor
     }
 
     @Override
-    public Optional<RealmUser> getUser(HttpHeaders headers)
+    public Optional<RealmUser> getUser(HttpHeaders requestHeaders, HttpHeaders responseHeaders)
     {
         for (AuthorizationExtractor e : providers)
         {
-            final Optional<RealmUser> result = e.getUser(headers);
+            final Optional<RealmUser> result = e.getUser(requestHeaders, responseHeaders);
             if (result.isPresent())
             {
                 return result;

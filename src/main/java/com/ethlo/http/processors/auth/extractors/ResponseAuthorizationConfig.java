@@ -1,4 +1,6 @@
-package com.ethlo.http.processors;
+package com.ethlo.http.processors.auth.extractors;
+
+import com.ethlo.http.processors.FeatureToggle;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 

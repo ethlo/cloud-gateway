@@ -5,12 +5,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
-import com.ethlo.http.processors.BasicAuthorizationConfig;
+import com.ethlo.http.processors.auth.extractors.BasicAuthorizationConfig;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 
-import com.ethlo.http.processors.auth.BasicAuthorizationExtractor;
+import com.ethlo.http.processors.auth.extractors.BasicAuthorizationExtractor;
 import com.ethlo.http.processors.auth.RealmUser;
 
 class BasicAuthorizationExtractorTest
@@ -22,6 +22,6 @@ class BasicAuthorizationExtractorTest
         final HttpHeaders headers = new HttpHeaders();
         headers.add(HttpHeaders.AUTHORIZATION, "basic " + authString);
         headers.add("x-realm", "acme");
-        assertThat(new BasicAuthorizationExtractor(new BasicAuthorizationConfig(true, "x-realm")).getUser(headers).orElseThrow()).isEqualTo(new RealmUser("acme", "myuser"));
+        assertThat(new BasicAuthorizationExtractor(new BasicAuthorizationConfig(true, "x-realm")).getUser(headers, null).orElseThrow()).isEqualTo(new RealmUser("acme", "myuser"));
     }
 }

@@ -1,15 +1,16 @@
-package com.ethlo.http.processors.auth;
+package com.ethlo.http.processors.auth.extractors;
 
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 
 import java.util.Optional;
+
+import com.ethlo.http.processors.auth.RealmUser;
 
 import org.springframework.http.HttpHeaders;
 
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.exceptions.JWTDecodeException;
 import com.auth0.jwt.interfaces.DecodedJWT;
-import com.ethlo.http.processors.JwtAuthorizationConfig;
 
 public class JwtAuthorizationExtractor implements AuthorizationExtractor
 {
@@ -21,7 +22,7 @@ public class JwtAuthorizationExtractor implements AuthorizationExtractor
     }
 
     @Override
-    public Optional<RealmUser> getUser(HttpHeaders headers)
+    public Optional<RealmUser> getUser(HttpHeaders headers, final HttpHeaders responseHeaders)
     {
         if (! config.isEnabled())
         {
