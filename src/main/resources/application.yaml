@@ -49,6 +49,7 @@ management:
       exposure:
         include: 'health,gateway,metrics,clickhouse'
 
+
 spring:
   cloud:
     gateway:
@@ -91,3 +92,7 @@ spring:
                 local-rate-limiter:
                   replenish-rate: 2
                   refresh-period: 10
+  web:
+    resources:
+      static-locations:
+        - file:/static

@@ -53,7 +53,7 @@ public class GlobalErrorHandler implements ErrorWebExceptionHandler
         DataBuffer dataBuffer;
         try
         {
-            dataBuffer = bufferFactory.wrap(objectMapper.writeValueAsBytes(new HttpError(message)));
+            dataBuffer = bufferFactory.wrap(objectMapper.writeValueAsBytes(new HttpError(status.value(), message)));
         }
         catch (JsonProcessingException e)
         {
@@ -63,18 +63,8 @@ public class GlobalErrorHandler implements ErrorWebExceptionHandler
         return response.writeWith(Mono.just(dataBuffer));
     }
 
-    public class HttpError
+    public record HttpError(int status, String message)
     {
-        private final String message;
 
-        HttpError(String message)
-        {
-            this.message = message;
-        }
-
-        public String getMessage()
-        {
-            return message;
-        }
     }
 }

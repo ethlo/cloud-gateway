@@ -21,8 +21,10 @@ services:
     environment:
       - 'JAVA_OPTS="-XX:MaxDirectMemorySize=200M"'
       - 'SPRING_CONFIG_LOCATION=/config/application.yaml'
+      - "HTTPLOGGING_PROVIDERS_CLICKHOUSE_URL=jdbc:ch://clickhouse-cloud-gateway/default?compress=0;async_insert=1,wait_for_async_insert=0"
     volumes:
       - ./config:/config
+      - ./static:/static
     ports:
       - '6464:8888'
 
@@ -31,7 +33,7 @@ services:
     hostname: grafana
     container_name: grafana
     environment:
-      GF_INSTALL_PLUGINS: grafana-piechart-panel,grafana-worldmap-panel,grafana-clickhouse-datasource
+      GF_INSTALL_PLUGINS: grafana-piechart-panel,grafana-worldmap-panel,grafana-clickhouse-datasource, marcusolsson-json-datasource
       GF_LOG_LEVEL: info
       GF_SECURITY_ADMIN_PASSWORD: grafana
     ports:
