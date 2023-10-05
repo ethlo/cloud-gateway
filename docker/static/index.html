@@ -1,9 +1,69 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>Index goes here</title>
+    <title>Welcome to the Cloud Gateway</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
 </head>
 <body>
-Hello world!
+<main class="container">
+    <h1>Welcome to the Cloud Gateway</h1>
+    <p>This page is just a static page that can be easily replaced with what you would prefer
+        mapping the <em>static</em> folder to the folder of your choice.</p>
+
+    <h2>Features</h2>
+    <p>Built on top of
+        <a href="https://spring.io/projects/spring-cloud-gateway">Spring Cloud Gateway</a>, giving it a powerful feature
+        set:</p>
+    <ul>
+        <li>
+            Built on Spring Framework and Spring Boot.
+        </li>
+        <li>
+            Able to match routes on any request attribute.
+        </li>
+        <li>
+            Predicates and filters are specific to routes.
+        </li>
+        <li>
+            Circuit Breaker integration.
+        </li>
+        <li>
+            Spring Cloud DiscoveryClient integration.
+        </li>
+        <li>
+            Easy to write Predicates and Filters.
+        </li>
+        <li>
+            Request Rate Limiting.
+        </li>
+        <li>
+            Path Rewriting.
+        </li>
+    </ul>
+    This project further adds additional features:
+    <ul>
+        <li>Full request and response logging, even when the upstream target service is down.</li>
+        <li>An in-memory rate-limiter implementation, avoiding setting up additional dependencies like Redis.</li>
+    </ul>
+
+    <h2>Generate traffic</h2>
+    <p>The default example configuration is set up to allow proxying to <a href="https://httpbin.org">https://httpbin.org</a>
+    </p>
+    <p>The sample configuration also requires that we present a username/password using basic-auth or using a JWT token,
+        as
+        the user identity is what is used to control the rate-limiting.</p>
+
+    <b>POST</b>
+    <pre><code>curl -v -H 'Content-Type: application/json' --data "{'key':'some data'}" http://localhost:6464/anything -ujohn:mypass</code></pre>
+
+    <b>GET</b>
+    <pre><code>curl -v -H 'Content-Type: application/json' http://localhost:6464/anything -ujohn:mypass</code></pre>
+
+    <b>Generate more traffic</b>
+    <pre><code>ab -A"john:pass" -n10 http://localhost:6464/anything</code></pre>
+
+    <h2>View traffic data</h2>
+    <p>Please visit the <a href="http://localhost:3000/dashboards">Grafana dashboards</a> to see traffic data.</p>
+</main>
 </body>
 </html>

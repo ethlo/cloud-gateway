@@ -21,7 +21,7 @@ docker-compose up -d
 Generate some traffic:
 
 ```shell
-curl http://localhost:6464/<path-to-configured-service>
+curl -uuser:pass http://localhost:6464/get
 ```
 
 View the results in Grafana by going to http://localhost:3000/. The default username/password is `admin`/`grafana`. Show

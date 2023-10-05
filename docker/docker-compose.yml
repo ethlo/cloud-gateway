@@ -43,3 +43,10 @@ services:
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning
       - ./grafana/dashboards:/var/lib/grafana/dashboards
+
+  httpbin:
+    image: kennethreitz/httpbin
+    hostname: httpbin
+    container_name: httpbin
+    ports:
+      - '9080:80'
