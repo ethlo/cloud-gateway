@@ -1,6 +1,6 @@
 # Cloud Gateway
 
-Experimental reverse proxy built on top of Spring Cloud Gateway with full request/response (including body) logging.
+A Docker-packaged reverse proxy built on top of Spring Cloud Gateway with full request/response (including body) logging.
 
 ## Trying it out
 
