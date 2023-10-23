@@ -18,6 +18,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import reactor.core.publisher.Mono;
 
+@SuppressWarnings("NullableProblems")
 @Configuration
 @Order(-2)
 public class GlobalErrorHandler implements ErrorWebExceptionHandler

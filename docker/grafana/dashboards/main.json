@@ -48,6 +48,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 2,
             "pointSize": 5,
@@ -352,6 +353,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 2,
             "pointSize": 5,
@@ -677,6 +679,7 @@
       "id": 4,
       "links": [],
       "options": {
+        "cellHeight": "sm",
         "footer": {
           "countRows": false,
           "fields": "",
@@ -687,7 +690,7 @@
         },
         "showHeader": true
       },
-      "pluginVersion": "9.4.7",
+      "pluginVersion": "10.1.4",
       "targets": [
         {
           "builderOptions": {
@@ -823,6 +826,7 @@
       },
       "id": 6,
       "options": {
+        "cellHeight": "sm",
         "footer": {
           "countRows": false,
           "fields": "",
@@ -834,7 +838,7 @@
         "showHeader": true,
         "sortBy": []
       },
-      "pluginVersion": "9.4.7",
+      "pluginVersion": "10.1.4",
       "targets": [
         {
           "builderOptions": {
@@ -923,17 +927,22 @@
       "type": "table"
     },
     {
-      "datasource": "clickhouse",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "P7E099F39B84EA795"
+      },
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "thresholds"
+            "fixedColor": "#686868",
+            "mode": "fixed"
           },
           "custom": {
             "align": "auto",
             "cellOptions": {
-              "type": "auto"
+              "type": "color-background"
             },
+            "filterable": true,
             "inspect": false
           },
           "mappings": [],
@@ -945,8 +954,8 @@
                 "value": null
               },
               {
-                "color": "red",
-                "value": 80
+                "color": "#EF843C",
+                "value": 429
               }
             ]
           }
@@ -983,6 +992,10 @@
                     "url": "http://localhost:6464/data/requests/${__data.fields[\"Request ID\"]}"
                   }
                 ]
+              },
+              {
+                "id": "custom.width",
+                "value": 113
               }
             ]
           },
@@ -1006,7 +1019,55 @@
             "properties": [
               {
                 "id": "mappings",
-                "value": []
+                "value": [
+                  {
+                    "options": {
+                      "429": {
+                        "color": "super-light-red",
+                        "index": 0,
+                        "text": "429 - Rate limited"
+                      }
+                    },
+                    "type": "value"
+                  },
+                  {
+                    "options": {
+                      "from": 200,
+                      "result": {
+                        "color": "green",
+                        "index": 1
+                      },
+                      "to": 204
+                    },
+                    "type": "range"
+                  },
+                  {
+                    "options": {
+                      "from": 400,
+                      "result": {
+                        "color": "light-red",
+                        "index": 2
+                      },
+                      "to": 428
+                    },
+                    "type": "range"
+                  },
+                  {
+                    "options": {
+                      "from": 500,
+                      "result": {
+                        "color": "dark-red",
+                        "index": 3
+                      },
+                      "to": 599
+                    },
+                    "type": "range"
+                  }
+                ]
+              },
+              {
+                "id": "custom.width",
+                "value": 56
               }
             ]
           },
@@ -1018,7 +1079,7 @@
             "properties": [
               {
                 "id": "custom.width",
-                "value": 198
+                "value": 204
               }
             ]
           },
@@ -1030,7 +1091,7 @@
             "properties": [
               {
                 "id": "custom.width",
-                "value": 70
+                "value": 110
               }
             ]
           },
@@ -1054,7 +1115,7 @@
             "properties": [
               {
                 "id": "custom.width",
-                "value": 111
+                "value": 158
               }
             ]
           },
@@ -1069,6 +1130,42 @@
                 "value": 107
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "User Agent"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 118
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Method"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 91
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Path"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 128
+              }
+            ]
           }
         ]
       },
@@ -1080,6 +1177,7 @@
       },
       "id": 2,
       "options": {
+        "cellHeight": "sm",
         "footer": {
           "countRows": false,
           "fields": "",
@@ -1092,11 +1190,11 @@
         "sortBy": [
           {
             "desc": true,
-            "displayName": "Time"
+            "displayName": "HTTP status"
           }
         ]
       },
-      "pluginVersion": "9.4.7",
+      "pluginVersion": "10.1.4",
       "targets": [
         {
           "builderOptions": {
@@ -1156,7 +1254,7 @@
             }
           },
           "queryType": "sql",
-          "rawSql": "SELECT \ntimestamp as \"Time\",\ngateway_request_id as \"Request ID\", \nconcat(method, ' ', path) as Request, \nstatus as \"HTTP status\", \nrealm_claim as \"Realm\", \nuser_claim as \"Username\", \nroute_id as RouteId, \nroute_uri as \"Route URI\",\nuser_agent as \"User Agent\", \nformatReadableSize(request_body_size) as \"Request Body Size\",\nformatReadableSize(response_body_size) as \"Response Body Size\",\nresponse_time/1000000000 as \"Response time\" \nFROM \"log\" \nWHERE   ( timestamp  >= $__fromTime AND timestamp <= $__toTime )",
+          "rawSql": "SELECT \ntimestamp as \"Time\",\ngateway_request_id as \"Request ID\", \nmethod as Method,\npath as Path,   \nstatus as \"HTTP status\",\nresponse_time as \"Response time\",\nformatReadableSize(request_body_size) as \"Request Body Size\",\nformatReadableSize(response_body_size) as \"Response Body Size\",\nrealm_claim as \"Realm\", \nuser_claim as \"Username\", \nroute_id as RouteId, \nroute_uri as \"Route URI\",\nuser_agent as \"User Agent\"\nFROM \"log\" \nWHERE   ( timestamp  >= $__fromTime AND timestamp <= $__toTime ) ",
           "refId": "A",
           "selectedFormat": 1
         }
@@ -1165,16 +1263,37 @@
       "type": "table"
     }
   ],
-  "refresh": "10s",
+  "refresh": "5s",
   "revision": 1,
   "schemaVersion": 38,
   "style": "dark",
   "tags": [],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "current": {
+          "selected": false,
+          "text": "john",
+          "value": "john"
+        },
+        "hide": 0,
+        "label": "Request Body",
+        "name": "requestbody",
+        "options": [
+          {
+            "selected": true,
+            "text": "john",
+            "value": "john"
+          }
+        ],
+        "query": "john",
+        "skipUrlSync": false,
+        "type": "textbox"
+      }
+    ]
   },
   "time": {
-    "from": "now-15m",
+    "from": "now-24h",
     "to": "now"
   },
   "timepicker": {},
