@@ -1,5 +1,7 @@
 package com.ethlo.http;
 
+import jakarta.annotation.Nonnull;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.web.reactive.error.ErrorWebExceptionHandler;
@@ -18,7 +20,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import reactor.core.publisher.Mono;
 
-@SuppressWarnings("NullableProblems")
 @Configuration
 @Order(-2)
 public class GlobalErrorHandler implements ErrorWebExceptionHandler
@@ -32,7 +33,7 @@ public class GlobalErrorHandler implements ErrorWebExceptionHandler
     }
 
     @Override
-    public Mono<Void> handle(ServerWebExchange serverWebExchange, Throwable throwable)
+    public @Nonnull Mono<Void> handle(@Nonnull ServerWebExchange serverWebExchange, @Nonnull Throwable throwable)
     {
         if (throwable instanceof EmptyResultDataAccessException e)
         {
