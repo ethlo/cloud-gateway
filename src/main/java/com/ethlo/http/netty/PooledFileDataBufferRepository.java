@@ -16,7 +16,6 @@ import java.util.concurrent.ConcurrentMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Repository;
 import org.springframework.util.unit.DataSize;
 
 import ch.qos.logback.core.util.CloseUtil;
@@ -25,7 +24,6 @@ import com.ethlo.http.model.PayloadProvider;
 import com.ethlo.http.util.InspectableBufferedOutputStream;
 import com.ethlo.http.util.LazyFileOutputStream;
 
-@Repository
 public class PooledFileDataBufferRepository implements DataBufferRepository
 {
     private static final Logger logger = LoggerFactory.getLogger(PooledFileDataBufferRepository.class);
@@ -108,16 +106,16 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
     }
 
     @Override
-    public Optional<PayloadProvider> get(final ServerDirection operation, final String id)
+    public Optional<PayloadProvider> get(final ServerDirection serverDirection, final String id)
     {
-        final Path file = getFilename(basePath, operation, id);
+        final Path file = getFilename(basePath, serverDirection, id);
         return Optional.ofNullable(Optional.ofNullable(pool.get(file))
                 .map(stream ->
                 {
                     if (!stream.isFlushedToUnderlyingStream())
                     {
                         final byte[] data = stream.getBuffer();
-                        logger.debug("Using data directly from memory for {} {}", operation, id);
+                        logger.debug("Using data directly from memory for {} {}", serverDirection, id);
                         final InputStream in = new BufferedInputStream(new ByteArrayInputStream(data));
                         final long skipped = pos(in);
                         return new PayloadProvider(in, data.length - skipped);

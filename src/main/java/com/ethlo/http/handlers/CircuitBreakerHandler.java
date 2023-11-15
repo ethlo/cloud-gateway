@@ -1,22 +1,19 @@
 package com.ethlo.http.handlers;
 
-import com.ethlo.http.netty.ServerDirection;
-
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.server.HandlerFunction;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
 
 import com.ethlo.http.netty.DataBufferRepository;
+import com.ethlo.http.netty.ServerDirection;
 import com.ethlo.http.util.HttpMessageUtil;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-@Component
 public class CircuitBreakerHandler implements HandlerFunction<ServerResponse>
 {
     private final DataBufferRepository dataBufferRepository;

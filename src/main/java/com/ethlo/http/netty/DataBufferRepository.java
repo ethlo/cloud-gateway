@@ -12,6 +12,6 @@ public interface DataBufferRepository
 
     void finished(String requestId);
 
-    Optional<PayloadProvider> get(final ServerDirection operation, final String id);
+    Optional<PayloadProvider> get(final ServerDirection serverDirection, final String id);
 
 }

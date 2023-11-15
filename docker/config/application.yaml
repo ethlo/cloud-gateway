@@ -11,6 +11,7 @@ http-logging:
       enabled: true
       realm-header-name: x-realm
   capture:
+    enabled: true
     memory-buffer-size: 500KB
     temp-directory: /tmp
   providers:
@@ -44,6 +45,9 @@ management:
     web:
       exposure:
         include: 'health,gateway,metrics,clickhouse'
+        management.endpoint.health.show-details: WHEN_AUTHORIZED
+        management.endpoint.env.show-values: WHEN_AUTHORIZED
+        management.endpoint.configprops.show-values: WHEN_AUTHORIZED
 
 spring:
   cloud:

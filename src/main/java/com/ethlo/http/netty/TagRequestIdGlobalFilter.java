@@ -23,7 +23,6 @@ import reactor.core.publisher.Mono;
 import reactor.core.publisher.SignalType;
 import reactor.core.scheduler.Schedulers;
 
-@Component
 public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
 {
     public static final String REQUEST_ID_ATTRIBUTE_NAME = "gateway-request-id";

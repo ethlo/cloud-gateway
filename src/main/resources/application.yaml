@@ -16,6 +16,7 @@ http-logging:
       realm-header: x-realm
       username-header: x-username
   capture:
+    enabled: true
     memory-buffer-size: 500KB
     temp-directory: /tmp
   providers:
