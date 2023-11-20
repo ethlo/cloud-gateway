@@ -3,9 +3,7 @@ package com.ethlo.http.netty;
 import java.lang.reflect.Field;
 import java.util.Objects;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cloud.gateway.config.HttpClientCustomizer;
-import org.springframework.stereotype.Component;
 import org.springframework.util.ReflectionUtils;
 
 import reactor.netty.http.client.HttpClient;
