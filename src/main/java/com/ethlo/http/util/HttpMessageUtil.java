@@ -3,6 +3,8 @@ package com.ethlo.http.util;
 import java.io.IOException;
 import java.io.InputStream;
 
+import org.springframework.util.Assert;
+
 public class HttpMessageUtil
 {
     public static final int MAX_HEADER_SIZE = 65_535;
@@ -30,8 +32,9 @@ public class HttpMessageUtil
                         && buffer[idx] == LF)
                 {
                     data.reset();
-                    final long offset = position + 4L;
-                    data.skip(offset);
+                    final long offset = position + BODY_SEPARATOR.length;
+                    final long skipped = data.skip(offset);
+                    Assert.isTrue(skipped == offset, "Unable to skip " + offset + " bytes, skipped only " + skipped + " bytes");
                     return offset;
                 }
                 position += 1;
