@@ -15,8 +15,8 @@ public class RequestMatchingProcessor
 
     public RequestMatchingProcessor(final List<RequestPattern> includes, final List<RequestPattern> excludes, final boolean logRequestBody, final boolean logResponseBody)
     {
-        this.includes = includes;
-        this.excludes = excludes;
+        this.includes = Optional.ofNullable(includes).orElse(List.of());
+        this.excludes = Optional.ofNullable(excludes).orElse(List.of());
         this.logRequestBody = logRequestBody;
         this.logResponseBody = logResponseBody;
     }
