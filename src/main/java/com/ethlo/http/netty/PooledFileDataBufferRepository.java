@@ -29,6 +29,16 @@ import rawhttp.core.body.BodyReader;
 public class PooledFileDataBufferRepository implements DataBufferRepository
 {
     private static final Logger logger = LoggerFactory.getLogger(PooledFileDataBufferRepository.class);
+
+    private static final RawHttp rawHttp = new RawHttp(getConfig());
+
+    private static RawHttpOptions getConfig()
+    {
+        final RawHttpOptions.Builder b = RawHttpOptions.newBuilder();
+        b.withHttpHeadersOptions().withMaxHeaderValueLength(Integer.MAX_VALUE).withMaxHeaderNameLength(255);
+        return b.build();
+    }
+
     private final DataSize bufferSize;
     private final Path basePath;
     private final ConcurrentMap<Path, InspectableBufferedOutputStream> pool;
@@ -149,7 +159,6 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
 
     private static PayloadProvider extractBody(final InputStream fullMessage, boolean isRequest)
     {
-        final RawHttp rawHttp = new RawHttp(RawHttpOptions.newBuilder().build());
         try
         {
             final HttpMessage message = isRequest ? rawHttp.parseRequest(fullMessage) : rawHttp.parseResponse(fullMessage);
