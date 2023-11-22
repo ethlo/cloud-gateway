@@ -31,18 +31,17 @@ http-logging:
     - includes:
         - uris:
             - path: /get
+            - path: /anything
           methods:
             - GET
             - POST
-      excludes:
-        - uris:
-            - path: .*/foo$
       log-request-body: true
       log-response-body: true
-
 logging:
   level:
-    com.ethlo.http: INFO
+    com.ethlo.http: TRACE
+    org.springframework.cloud.gateway: TRACE
+    reactor.netty.http.client: TRACE
 
 management:
   endpoints:
@@ -66,7 +65,7 @@ spring:
         enabled: true
       routes:
         - id: http-bin-get
-          uri: '${rewrite.backend.uri:http://localhost/get}'
+          uri: '${rewrite.backend.uri:https://httpbin.org/get}'
           predicates:
             - Path=/get
           filters:
@@ -80,7 +79,7 @@ spring:
                   replenish-rate: 10000
                   refresh-period: PT10s
         - id: http-bin-any
-          uri: '${rewrite.backend.uri:http://localhost/anything}'
+          uri: '${rewrite.backend.uri:https://httpbin.org/anything}'
           predicates:
             - Path=/anything
           filters:

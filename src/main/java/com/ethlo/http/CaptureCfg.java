@@ -5,6 +5,7 @@ import static org.springframework.web.reactive.function.server.RouterFunctions.n
 import static org.springframework.web.reactive.function.server.RouterFunctions.route;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.reactive.function.server.RequestPredicates;
@@ -68,7 +69,7 @@ public class CaptureCfg
     }
 
     @Bean
-    public TagRequestIdGlobalFilter tagRequestIdGlobalFilter(final HttpLogger httpLogger, final DataBufferRepository dataBufferRepository, final HttpLoggingConfiguration httpLoggingConfiguration, final LogPreProcessor logPreProcessor)
+    public GlobalFilter tagRequestIdGlobalFilter(final HttpLogger httpLogger, final DataBufferRepository dataBufferRepository, final HttpLoggingConfiguration httpLoggingConfiguration, final LogPreProcessor logPreProcessor)
     {
         return new TagRequestIdGlobalFilter(httpLogger, dataBufferRepository, httpLoggingConfiguration, logPreProcessor);
     }
