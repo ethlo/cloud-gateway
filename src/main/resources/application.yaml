@@ -28,15 +28,8 @@ http-logging:
       enabled: true
       url: 'jdbc:ch://localhost:18123/default?compress=0;async_insert=1,wait_for_async_insert=0'
   matchers:
-    - includes:
-        - uris:
-            - path: /get
-          methods:
-            - GET
-            - POST
-      excludes:
-        - uris:
-            - path: .*/foo$
+    - predicate:
+        - Path=/get/**
       log-request-body: true
       log-response-body: true
 
@@ -66,7 +59,7 @@ spring:
         enabled: true
       routes:
         - id: http-bin-get
-          uri: '${rewrite.backend.uri:http://localhost/get}'
+          uri: '${rewrite.backend.uri:https://httpbin.net/get}'
           predicates:
             - Path=/get
           filters:
