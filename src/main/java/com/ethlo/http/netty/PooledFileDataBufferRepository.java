@@ -1,7 +1,5 @@
 package com.ethlo.http.netty;
 
-import static com.ethlo.http.util.HttpMessageUtil.findBodyPositionInStream;
-
 import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -23,10 +21,24 @@ import com.ethlo.http.logger.CaptureConfiguration;
 import com.ethlo.http.model.PayloadProvider;
 import com.ethlo.http.util.InspectableBufferedOutputStream;
 import com.ethlo.http.util.LazyFileOutputStream;
+import rawhttp.core.HttpMessage;
+import rawhttp.core.RawHttp;
+import rawhttp.core.RawHttpOptions;
+import rawhttp.core.body.BodyReader;
 
 public class PooledFileDataBufferRepository implements DataBufferRepository
 {
     private static final Logger logger = LoggerFactory.getLogger(PooledFileDataBufferRepository.class);
+
+    private static final RawHttp rawHttp = new RawHttp(getConfig());
+
+    private static RawHttpOptions getConfig()
+    {
+        final RawHttpOptions.Builder b = RawHttpOptions.newBuilder();
+        b.withHttpHeadersOptions().withMaxHeaderValueLength(Integer.MAX_VALUE).withMaxHeaderNameLength(255);
+        return b.build();
+    }
+
     private final DataSize bufferSize;
     private final Path basePath;
     private final ConcurrentMap<Path, InspectableBufferedOutputStream> pool;
@@ -116,9 +128,7 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
                     {
                         final byte[] data = stream.getBuffer();
                         logger.debug("Using data directly from memory for {} {}", serverDirection, id);
-                        final InputStream in = new BufferedInputStream(new ByteArrayInputStream(data));
-                        final long skipped = pos(in);
-                        return new PayloadProvider(in, data.length - skipped);
+                        return extractBody(new ByteArrayInputStream(data), serverDirection == ServerDirection.REQUEST);
                     }
                     stream.forceFlush();
                     stream.forceClose();
@@ -132,9 +142,8 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
                                 {
                                     logger.debug("Size of file {} is {} bytes", file, Files.size(file));
                                 }
-                                final InputStream in = new BufferedInputStream(Files.newInputStream(file));
-                                final long skipped = pos(in);
-                                return new PayloadProvider(in, Files.size(file) - skipped);
+                                return extractBody(new BufferedInputStream(Files.newInputStream(file)), serverDirection == ServerDirection.REQUEST);
+
                             }
                             catch (NoSuchFileException exc)
                             {
@@ -148,19 +157,18 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
                 ));
     }
 
-    private long pos(InputStream rawData)
+    private static PayloadProvider extractBody(final InputStream fullMessage, boolean isRequest)
     {
-        if (rawData != null)
+        try
         {
-            try
-            {
-                return findBodyPositionInStream(rawData);
-            }
-            catch (IOException e)
-            {
-                throw new UncheckedIOException(e);
-            }
+            final HttpMessage message = isRequest ? rawHttp.parseRequest(fullMessage) : rawHttp.parseResponse(fullMessage);
+            final BodyReader body = message.getBody().orElseThrow(() -> new IllegalArgumentException("No body found"));
+            final byte[] bodyBytes = body.decodeBody();
+            return new PayloadProvider(new ByteArrayInputStream(bodyBytes), bodyBytes.length);
         }
-        return 0;
+        catch (IOException exc)
+        {
+            throw new UncheckedIOException(exc);
+        }
     }
 }

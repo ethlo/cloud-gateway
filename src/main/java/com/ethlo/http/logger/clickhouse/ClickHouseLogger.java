@@ -64,11 +64,11 @@ public class ClickHouseLogger implements HttpLogger
                   request_content_type, response_content_type, user_agent,
                   request_headers, response_headers, request_body, response_body)
                 VALUES(
-                  :timestamp, :route_id, :route_uri, :gateway_request_id, :method, :path, 
-                  :duration, :request_body_size, :response_body_size, 
-                  :status, :is_error, :user_claim, :realm_claim, 
-                  :host, :request_content_type, :response_content_type, :user_agent, 
-                  :request_headers, :response_headers, 
+                  :timestamp, :route_id, :route_uri, :gateway_request_id, :method, :path,
+                  :duration, :request_body_size, :response_body_size,
+                  :status, :is_error, :user_claim, :realm_claim,
+                  :host, :request_content_type, :response_content_type, :user_agent,
+                  :request_headers, :response_headers,
                   :request_body, :response_body)""", params);
     }
 

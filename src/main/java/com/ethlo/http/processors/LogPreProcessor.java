@@ -7,8 +7,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import com.ethlo.http.model.WebExchangeDataProvider;
-import com.ethlo.http.processors.auth.extractors.AuthorizationExtractor;
 import com.ethlo.http.processors.auth.RealmUser;
+import com.ethlo.http.processors.auth.extractors.AuthorizationExtractor;
 
 @Component
 public class LogPreProcessor
@@ -29,7 +29,6 @@ public class LogPreProcessor
         {
             logger.debug("Extracted user data: {}", realmUser.orElse(null));
         }
-        data.user(realmUser.orElse(null));
-        return data;
+        return data.user(realmUser.orElse(null));
     }
 }

@@ -16,7 +16,7 @@ services:
   cloud-gateway:
     hostname: cloud-gateway
     container_name: cloud-gateway
-    image: ethlocom/cloud-gateway
+    image: ethlocom/cloud-gateway:0.2.0-SNAPSHOT
     restart: unless-stopped
     environment:
       - 'JAVA_OPTS="-XX:MaxDirectMemorySize=200M"'

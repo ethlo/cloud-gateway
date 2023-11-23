@@ -178,7 +178,7 @@ public class WebExchangeDataProvider
         params.put("gateway_request_id", getRequestId());
         params.put("method", getMethod().name());
         params.put("path", getPath().value());
-        params.put("duration", getDuration().toNanos() / 1_000_000_000D);
+        params.put("duration", getDuration().toMillis());
         params.put("status", getStatusCode().value());
         params.put("is_error", getStatusCode().isError());
         params.put("request_headers", getRequestHeaders());
