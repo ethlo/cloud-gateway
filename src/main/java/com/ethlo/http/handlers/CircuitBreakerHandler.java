@@ -1,16 +1,21 @@
 package com.ethlo.http.handlers;
 
-import org.springframework.core.io.buffer.DataBuffer;
-import org.springframework.core.io.buffer.DataBufferUtils;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.reactive.function.BodyInserters;
+import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.web.reactive.function.server.HandlerFunction;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
 
 import com.ethlo.http.netty.DataBufferRepository;
 import com.ethlo.http.netty.ServerDirection;
-import com.ethlo.http.util.HttpMessageUtil;
+import jakarta.annotation.Nonnull;
+import rawhttp.core.RawHttpHeaders;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -24,21 +29,42 @@ public class CircuitBreakerHandler implements HandlerFunction<ServerResponse>
     }
 
     @Override
-    public Mono<ServerResponse> handle(ServerRequest request)
+    public @Nonnull Mono<ServerResponse> handle(@Nonnull ServerRequest serverRequest)
     {
-        // Write preamble to find body correctly
-        dataBufferRepository.save(ServerDirection.REQUEST, request.exchange().getRequest().getId(), HttpMessageUtil.BODY_SEPARATOR);
+        final ServerHttpRequest request = serverRequest.exchange().getRequest();
+        final String requestId = request.getId();
+        final HttpMethod method = request.getMethod();
 
-        final Flux<Integer> res = request.bodyToFlux(DataBuffer.class)
-                .flatMap(dataBuffer ->
+        final byte[] fakeRequestLine = (method.name() + " / HTTP/1.1\r\n").getBytes(StandardCharsets.UTF_8);
+        dataBufferRepository.save(ServerDirection.REQUEST, requestId, fakeRequestLine);
+        dataBufferRepository.save(ServerDirection.REQUEST, requestId, extractHeaders(request));
+
+        final Flux<Long> res = request.getBody()
+                .flatMapSequential(dataBuffer ->
                 {
-                    byte[] bytes = new byte[dataBuffer.readableByteCount()];
+                    final byte[] bytes = new byte[dataBuffer.readableByteCount()];
                     dataBuffer.read(bytes);
-                    DataBufferUtils.release(dataBuffer);
-                    dataBufferRepository.save(ServerDirection.REQUEST, request.exchange().getRequest().getId(), bytes);
-                    return Mono.empty();
+                    dataBufferRepository.save(ServerDirection.REQUEST, requestId, bytes);
+                    return Mono.just((long) bytes.length);
                 });
 
-        return ServerResponse.status(HttpStatus.SERVICE_UNAVAILABLE).body(BodyInserters.fromPublisher(res, Integer.class));
+        return ServerResponse.status(HttpStatus.SERVICE_UNAVAILABLE).body(res.reduce(0L, Long::sum), Long.class);
+    }
+
+    private static byte[] extractHeaders(ServerHttpRequest request)
+    {
+        RawHttpHeaders.Builder builder = RawHttpHeaders.newBuilder();
+        request.getHeaders().forEach((name, values) -> values.forEach(value -> builder.with(name, value)));
+        final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try
+        {
+            final RawHttpHeaders headers = builder.build();
+            headers.writeTo(baos);
+            return baos.toByteArray();
+        }
+        catch (IOException e)
+        {
+            throw new UncheckedIOException(e);
+        }
     }
 }

@@ -15,7 +15,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.reactive.function.server.RequestPredicates;
 import org.springframework.web.reactive.function.server.RouterFunction;
 import org.springframework.web.reactive.function.server.ServerResponse;
-import org.springframework.web.server.ServerWebExchange;
 
 import com.ethlo.http.handlers.CircuitBreakerHandler;
 import com.ethlo.http.logger.CaptureConfiguration;
