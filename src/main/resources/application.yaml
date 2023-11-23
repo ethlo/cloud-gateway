@@ -28,8 +28,8 @@ http-logging:
       enabled: true
       url: 'jdbc:ch://localhost:18123/default?compress=0;async_insert=1,wait_for_async_insert=0'
   matchers:
-    - predicate:
-        - Path=/get/**
+    - predicates:
+      - Path=/**
       log-request-body: true
       log-response-body: true
 

@@ -2,6 +2,7 @@ package com.ethlo.http.netty;
 
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,7 +17,6 @@ import org.springframework.web.server.ServerWebExchange;
 import com.ethlo.http.logger.HttpLogger;
 import com.ethlo.http.model.WebExchangeDataProvider;
 import com.ethlo.http.processors.LogPreProcessor;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.SignalType;
 import reactor.core.scheduler.Schedulers;
@@ -31,44 +31,46 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
     private final HttpLogger httpLogger;
     private final DataBufferRepository dataBufferRepository;
     private final LogPreProcessor logPreProcessor;
-    private final AsyncPredicate<ServerWebExchange> predicate;
+    private final List<? extends AsyncPredicate> predicates;
 
-    public TagRequestIdGlobalFilter(final HttpLogger httpLogger, final DataBufferRepository dataBufferRepository, final LogPreProcessor logPreProcessor, AsyncPredicate<ServerWebExchange> predicate)
+    public TagRequestIdGlobalFilter(final HttpLogger httpLogger, final DataBufferRepository dataBufferRepository, final LogPreProcessor logPreProcessor, List<? extends AsyncPredicate<?>> predicates)
     {
         this.httpLogger = httpLogger;
         this.dataBufferRepository = dataBufferRepository;
         this.logPreProcessor = logPreProcessor;
-        this.predicate = predicate;
+        this.predicates = predicates;
     }
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain)
     {
-        return Mono.from(Flux.from(predicate.apply(exchange)).map(isMatch ->
-        {
-            if (isMatch)
-            {
-                final long started = System.nanoTime();
-                final String requestId = exchange.getRequest().getId();
-                logger.debug("Tagging request: {}", requestId);
+        // FIXME: This is fishy!
+        final boolean isMatch = predicates.stream()
+                .map(p -> p.apply(exchange))
+                .anyMatch(p -> ((Mono<Boolean>) p).block());
 
-                return chain.filter(exchange)
-                        .contextWrite(ctx -> ctx.put(REQUEST_ID_ATTRIBUTE_NAME, requestId))
-                        .publishOn(Schedulers.boundedElastic())
-                        .doFinally(st ->
+        if (isMatch)
+        {
+            final long started = System.nanoTime();
+            final String requestId = exchange.getRequest().getId();
+            logger.debug("Tagging request: {}", requestId);
+
+            return chain.filter(exchange)
+                    .contextWrite(ctx -> ctx.put(REQUEST_ID_ATTRIBUTE_NAME, requestId))
+                    .publishOn(Schedulers.boundedElastic())
+                    .doFinally(st ->
+                    {
+                        if (st.equals(SignalType.ON_COMPLETE) || st.equals(SignalType.ON_ERROR) || st.equals(SignalType.CANCEL))
                         {
-                            if (st.equals(SignalType.ON_COMPLETE) || st.equals(SignalType.ON_ERROR) || st.equals(SignalType.CANCEL))
-                            {
-                                handleCompletedRequest(exchange, requestId, Duration.ofNanos(System.nanoTime() - started));
-                            }
-                            else
-                            {
-                                logger.warn("Unhandled signal type {} - {}", requestId, st);
-                            }
-                        });
-            }
-            return chain.filter(exchange);
-        })).then();
+                            handleCompletedRequest(exchange, requestId, Duration.ofNanos(System.nanoTime() - started));
+                        }
+                        else
+                        {
+                            logger.warn("Unhandled signal type {} - {}", requestId, st);
+                        }
+                    });
+        }
+        return chain.filter(exchange);
     }
 
     private void handleCompletedRequest(ServerWebExchange exchange, String requestId, final Duration duration)

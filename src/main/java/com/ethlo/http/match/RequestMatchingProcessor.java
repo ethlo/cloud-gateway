@@ -56,4 +56,9 @@ public class RequestMatchingProcessor
                 .add("logResponseBody=" + logResponseBody)
                 .toString();
     }
+
+    public List<PredicateDefinition> getPredicates()
+    {
+        return predicates;
+    }
 }

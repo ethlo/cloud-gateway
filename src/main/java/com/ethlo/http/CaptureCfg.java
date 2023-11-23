@@ -7,6 +7,7 @@ import static org.springframework.web.reactive.function.server.RouterFunctions.r
 import java.util.List;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.cloud.gateway.handler.AsyncPredicate;
 import org.springframework.cloud.gateway.handler.predicate.RoutePredicateFactory;
 import org.springframework.cloud.gateway.support.ConfigurationService;
 import org.springframework.context.annotation.Bean;
@@ -14,10 +15,13 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.reactive.function.server.RequestPredicates;
 import org.springframework.web.reactive.function.server.RouterFunction;
 import org.springframework.web.reactive.function.server.ServerResponse;
+import org.springframework.web.server.ServerWebExchange;
 
 import com.ethlo.http.handlers.CircuitBreakerHandler;
 import com.ethlo.http.logger.CaptureConfiguration;
 import com.ethlo.http.logger.HttpLogger;
+import com.ethlo.http.match.HttpLoggingConfiguration;
+import com.ethlo.http.match.RequestMatchingProcessor;
 import com.ethlo.http.netty.DataBufferRepository;
 import com.ethlo.http.netty.LoggerHttpClientCustomizer;
 import com.ethlo.http.netty.PooledFileDataBufferRepository;
@@ -71,9 +75,18 @@ public class CaptureCfg
     }
 
     @Bean
-    public TagRequestIdGlobalFilter tagRequestIdGlobalFilter(final HttpLogger httpLogger, final DataBufferRepository dataBufferRepository, final LogPreProcessor logPreProcessor, RoutePredicateLocator routePredicateLocator)
+    public TagRequestIdGlobalFilter tagRequestIdGlobalFilter(final HttpLogger httpLogger,
+                                                             final DataBufferRepository dataBufferRepository,
+                                                             final LogPreProcessor logPreProcessor,
+                                                             final RoutePredicateLocator routePredicateLocator,
+                                                             final HttpLoggingConfiguration httpLoggingConfiguration)
     {
-        return new TagRequestIdGlobalFilter(httpLogger, dataBufferRepository, logPreProcessor, List<Predi>);
+        final List<? extends AsyncPredicate<?>> predicates = httpLoggingConfiguration.getMatchers()
+                .stream()
+                .map(RequestMatchingProcessor::getPredicates)
+                .map(routePredicateLocator::getPredicates)
+                .toList();
+        return new TagRequestIdGlobalFilter(httpLogger, dataBufferRepository, logPreProcessor, predicates);
     }
 
     @Bean
@@ -83,8 +96,8 @@ public class CaptureCfg
     }
 
     @Bean
-    public RoutePredicateLocator routeDefinitionRouteLocator(List<RoutePredicateFactory> predicates, ConfigurationService configurationService)
+    public RoutePredicateLocator routePredicateLocator(final List<RoutePredicateFactory> predicateFactories, final ConfigurationService configurationService)
     {
-        return new RoutePredicateLocator(predicates, configurationService);
+        return new RoutePredicateLocator(predicateFactories, configurationService);
     }
 }
