@@ -50,7 +50,8 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
         return Flux.fromIterable(predicateConfigs)
                 .filterWhen(c -> (Publisher<Boolean>) c.predicate().apply(exchange))
                 .next()
-                .flatMap(c -> prepareForLoggingIfApplicable(exchange, chain, c));
+                .flatMap(c -> prepareForLoggingIfApplicable(exchange, chain, c))
+                .switchIfEmpty(chain.filter(exchange));
     }
 
     private Mono<Void> prepareForLoggingIfApplicable(ServerWebExchange exchange, GatewayFilterChain chain, PredicateConfig predicateConfig)
