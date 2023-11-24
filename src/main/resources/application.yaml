@@ -28,9 +28,11 @@ http-logging:
       enabled: true
       url: 'jdbc:ch://localhost:18123/default?compress=0;async_insert=1,wait_for_async_insert=0'
   matchers:
-    - predicates:
+    - id: foo
+      predicates:
         - Path=/nope
-    - predicates:
+    - id: bar
+      predicates:
         - Path=/anything/**
         - Method=POST,PUT
         - Host=localhost:8888
