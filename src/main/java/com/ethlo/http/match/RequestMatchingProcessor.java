@@ -1,11 +1,9 @@
 package com.ethlo.http.match;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.StringJoiner;
 
 import org.springframework.cloud.gateway.handler.predicate.PredicateDefinition;
-import org.springframework.http.server.reactive.ServerHttpRequest;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
@@ -35,23 +33,11 @@ public class RequestMatchingProcessor
         return logResponseBody;
     }
 
-    private Optional<RequestPattern> matches(List<RequestPattern> requestPatterns, ServerHttpRequest request)
-    {
-        for (final RequestPattern requestPattern : requestPatterns)
-        {
-            if (requestPattern.matches(request))
-            {
-                return Optional.of(requestPattern);
-            }
-        }
-        return Optional.empty();
-    }
-
     @Override
     public String toString()
     {
         return new StringJoiner(", ", RequestMatchingProcessor.class.getSimpleName() + "[", "]")
-                .add("predicates=" + predicates)
+                .add("predicate=" + predicates)
                 .add("logRequestBody=" + logRequestBody)
                 .add("logResponseBody=" + logResponseBody)
                 .toString();

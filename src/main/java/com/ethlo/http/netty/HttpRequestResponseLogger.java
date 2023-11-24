@@ -2,7 +2,6 @@ package com.ethlo.http.netty;
 
 import java.util.Optional;
 
-import com.ethlo.http.match.RequestMatchingProcessor;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.ChannelHandlerContext;
@@ -65,9 +64,8 @@ public class HttpRequestResponseLogger extends LoggingHandler
         return getRequestId(ctx).map(requestId ->
         {
             final ServerDirection operation = "write".equalsIgnoreCase(eventName) ? ServerDirection.REQUEST : ServerDirection.RESPONSE;
-            final RequestMatchingProcessor pattern = getRequestPattern(ctx).orElseThrow();
-            if (pattern.isLogRequestBody() && operation == ServerDirection.REQUEST
-                    || pattern.isLogResponseBody() && operation == ServerDirection.RESPONSE)
+            final PredicateConfig pattern = getRequestPattern(ctx).orElseThrow();
+            if (pattern.logRequest() && operation == ServerDirection.REQUEST || pattern.logResponse() && operation == ServerDirection.RESPONSE)
             {
                 final byte[] data = getBytes(msg);
                 if (data.length > 0)
@@ -79,7 +77,7 @@ public class HttpRequestResponseLogger extends LoggingHandler
         }).orElse(null);
     }
 
-    private Optional<RequestMatchingProcessor> getRequestPattern(ChannelHandlerContext ctx)
+    private Optional<PredicateConfig> getRequestPattern(ChannelHandlerContext ctx)
     {
         final Context gatewayCtx = getContext(ctx);
         return gatewayCtx.hasKey(TagRequestIdGlobalFilter.LOG_CAPTURE_CONFIG_ATTRIBUTE_NAME) ? Optional.of(gatewayCtx.get(TagRequestIdGlobalFilter.LOG_CAPTURE_CONFIG_ATTRIBUTE_NAME)) : Optional.empty();

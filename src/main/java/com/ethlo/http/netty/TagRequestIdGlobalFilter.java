@@ -9,7 +9,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
-import org.springframework.cloud.gateway.handler.AsyncPredicate;
 import org.springframework.cloud.gateway.route.Route;
 import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
 import org.springframework.core.Ordered;
@@ -35,48 +34,57 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
     private final HttpLogger httpLogger;
     private final DataBufferRepository dataBufferRepository;
     private final LogPreProcessor logPreProcessor;
-    private final List<? extends AsyncPredicate> predicates;
+    private final List<PredicateConfig> predicateConfigs;
 
-    public TagRequestIdGlobalFilter(final HttpLogger httpLogger, final DataBufferRepository dataBufferRepository, final LogPreProcessor logPreProcessor, List<? extends AsyncPredicate<?>> predicates)
+    public TagRequestIdGlobalFilter(final HttpLogger httpLogger, final DataBufferRepository dataBufferRepository, final LogPreProcessor logPreProcessor, List<PredicateConfig> predicateConfigs)
     {
         this.httpLogger = httpLogger;
         this.dataBufferRepository = dataBufferRepository;
         this.logPreProcessor = logPreProcessor;
-        this.predicates = predicates;
+        this.predicateConfigs = predicateConfigs;
     }
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain)
     {
-        final Flux<Boolean> flux = Flux.merge(predicates.stream()
-                .map(p -> p.apply(exchange))
-                .map(p -> ((Publisher<Boolean>) p)).toList());
-        final Mono<Boolean> result = flux.reduce((a, b) -> a || b);
-        return result.flatMap(isMatch ->
-        {
-            if (isMatch)
-            {
-                final long started = System.nanoTime();
-                final String requestId = exchange.getRequest().getId();
-                logger.debug("Tagging request: {}", requestId);
+        return Flux.fromIterable(predicateConfigs)
+                .filterWhen(c -> (Publisher<Boolean>) c.predicate().apply(exchange))
+                .next()
+                .flatMap(c -> prepareForLoggingIfApplicable(exchange, chain, c));
+    }
 
-                return chain.filter(exchange)
-                        .contextWrite(ctx -> ctx.put(REQUEST_ID_ATTRIBUTE_NAME, requestId))
-                        .publishOn(Schedulers.boundedElastic())
-                        .doFinally(st ->
+    private Mono<Void> prepareForLoggingIfApplicable(ServerWebExchange exchange, GatewayFilterChain chain, PredicateConfig predicateConfig)
+    {
+        final long started = System.nanoTime();
+        final String requestId = exchange.getRequest().getId();
+
+        if (exchange.getAttribute(TagRequestIdGlobalFilter.LOG_CAPTURE_CONFIG_ATTRIBUTE_NAME) == null)
+        {
+            return chain.filter(exchange)
+                    .contextWrite(ctx ->
+                    {
+                        logger.debug("Tagging request {}: {}", requestId, predicateConfig);
+                        ctx.put(REQUEST_ID_ATTRIBUTE_NAME, requestId);
+                        ctx.put(TagRequestIdGlobalFilter.LOG_CAPTURE_CONFIG_ATTRIBUTE_NAME, predicateConfig);
+                        return ctx;
+                    })
+                    .publishOn(Schedulers.boundedElastic())
+                    .doFinally(st ->
+                    {
+                        if (st.equals(SignalType.ON_COMPLETE) || st.equals(SignalType.ON_ERROR) || st.equals(SignalType.CANCEL))
                         {
-                            if (st.equals(SignalType.ON_COMPLETE) || st.equals(SignalType.ON_ERROR) || st.equals(SignalType.CANCEL))
-                            {
-                                handleCompletedRequest(exchange, requestId, Duration.ofNanos(System.nanoTime() - started));
-                            }
-                            else
-                            {
-                                logger.warn("Unhandled signal type {} - {}", requestId, st);
-                            }
-                        });
-            }
+                            handleCompletedRequest(exchange, requestId, Duration.ofNanos(System.nanoTime() - started));
+                        }
+                        else
+                        {
+                            logger.warn("Unhandled signal type {} - {}", requestId, st);
+                        }
+                    });
+        }
+        else
+        {
             return chain.filter(exchange);
-        });
+        }
     }
 
     private void handleCompletedRequest(ServerWebExchange exchange, String requestId, final Duration duration)

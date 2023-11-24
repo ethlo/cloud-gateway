@@ -7,7 +7,6 @@ import static org.springframework.web.reactive.function.server.RouterFunctions.r
 import java.util.List;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.cloud.gateway.handler.AsyncPredicate;
 import org.springframework.cloud.gateway.handler.predicate.RoutePredicateFactory;
 import org.springframework.cloud.gateway.support.ConfigurationService;
 import org.springframework.context.annotation.Bean;
@@ -20,10 +19,10 @@ import com.ethlo.http.handlers.CircuitBreakerHandler;
 import com.ethlo.http.logger.CaptureConfiguration;
 import com.ethlo.http.logger.HttpLogger;
 import com.ethlo.http.match.HttpLoggingConfiguration;
-import com.ethlo.http.match.RequestMatchingProcessor;
 import com.ethlo.http.netty.DataBufferRepository;
 import com.ethlo.http.netty.LoggerHttpClientCustomizer;
 import com.ethlo.http.netty.PooledFileDataBufferRepository;
+import com.ethlo.http.netty.PredicateConfig;
 import com.ethlo.http.netty.TagRequestIdGlobalFilter;
 import com.ethlo.http.processors.LogPreProcessor;
 import com.ethlo.http.processors.auth.extractors.BasicAuthorizationConfig;
@@ -80,12 +79,11 @@ public class CaptureCfg
                                                              final RoutePredicateLocator routePredicateLocator,
                                                              final HttpLoggingConfiguration httpLoggingConfiguration)
     {
-        final List<? extends AsyncPredicate<?>> predicates = httpLoggingConfiguration.getMatchers()
+        final List<PredicateConfig> predicateConfigs = httpLoggingConfiguration.getMatchers()
                 .stream()
-                .map(RequestMatchingProcessor::getPredicates)
-                .map(routePredicateLocator::getPredicates)
+                .map(c -> new PredicateConfig(routePredicateLocator.getPredicates(c.getPredicates()), c.isLogRequestBody(), c.isLogResponseBody()))
                 .toList();
-        return new TagRequestIdGlobalFilter(httpLogger, dataBufferRepository, logPreProcessor, predicates);
+        return new TagRequestIdGlobalFilter(httpLogger, dataBufferRepository, logPreProcessor, predicateConfigs);
     }
 
     @Bean

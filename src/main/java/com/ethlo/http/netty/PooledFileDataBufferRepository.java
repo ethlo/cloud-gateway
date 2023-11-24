@@ -95,7 +95,7 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
             if (outputStream == null)
             {
                 outputStream = new InspectableBufferedOutputStream(new LazyFileOutputStream(f), Math.toIntExact(bufferSize.toBytes()));
-                logger.debug("Opened buffer for {} for {}", operation, requestId);
+                logger.trace("Opened buffer for {} for {}", operation, requestId);
             }
             return outputStream;
         });

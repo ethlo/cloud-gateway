@@ -67,7 +67,7 @@ public class LazyFileOutputStream extends OutputStream
         {
             outputStream = Files.newOutputStream(file, StandardOpenOption.CREATE);
             opened = true;
-            logger.debug("Opened file output stream for {}", file);
+            logger.trace("Opened file output stream for {}", file);
         }
     }
 }
