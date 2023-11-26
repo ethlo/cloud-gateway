@@ -4,6 +4,7 @@ import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
@@ -24,7 +25,6 @@ import com.ethlo.http.util.LazyFileOutputStream;
 import rawhttp.core.HttpMessage;
 import rawhttp.core.RawHttp;
 import rawhttp.core.RawHttpOptions;
-import rawhttp.core.body.BodyReader;
 
 public class PooledFileDataBufferRepository implements DataBufferRepository
 {
@@ -87,18 +87,9 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
     }
 
     @Override
-    public void save(final ServerDirection operation, final String requestId, final byte[] data)
+    public void write(final ServerDirection operation, final String requestId, final byte[] data)
     {
-        final Path file = getFilename(basePath, operation, requestId);
-        final InspectableBufferedOutputStream out = pool.compute(file, (f, outputStream) ->
-        {
-            if (outputStream == null)
-            {
-                outputStream = new InspectableBufferedOutputStream(new LazyFileOutputStream(f), Math.toIntExact(bufferSize.toBytes()));
-                logger.trace("Opened buffer for {} for {}", operation, requestId);
-            }
-            return outputStream;
-        });
+        final OutputStream out = getOutputStream(operation, requestId);
         try
         {
             out.write(data);
@@ -108,6 +99,21 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
         {
             throw new UncheckedIOException(e);
         }
+    }
+
+    @Override
+    public OutputStream getOutputStream(final ServerDirection operation, final String requestId)
+    {
+        final Path file = getFilename(basePath, operation, requestId);
+        return pool.compute(file, (f, outputStream) ->
+        {
+            if (outputStream == null)
+            {
+                outputStream = new InspectableBufferedOutputStream(new LazyFileOutputStream(f), Math.toIntExact(bufferSize.toBytes()));
+                logger.trace("Opened buffer for {} for {}", operation, requestId);
+            }
+            return outputStream;
+        });
     }
 
     @Override
@@ -162,8 +168,17 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
         try
         {
             final HttpMessage message = isRequest ? rawHttp.parseRequest(fullMessage) : rawHttp.parseResponse(fullMessage);
-            final BodyReader body = message.getBody().orElseThrow(() -> new IllegalArgumentException("No body found"));
-            final byte[] bodyBytes = body.decodeBody();
+            final byte[] bodyBytes = message.getBody().map(b ->
+            {
+                try
+                {
+                    return b.decodeBody();
+                }
+                catch (IOException exc)
+                {
+                    throw new UncheckedIOException(exc);
+                }
+            }).orElse(new byte[0]);
             return new PayloadProvider(new ByteArrayInputStream(bodyBytes), bodyBytes.length);
         }
         catch (IOException exc)

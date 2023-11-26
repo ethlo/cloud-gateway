@@ -81,7 +81,7 @@ public class CaptureCfg
     {
         final List<PredicateConfig> predicateConfigs = httpLoggingConfiguration.getMatchers()
                 .stream()
-                .map(c -> new PredicateConfig(c.id(), routePredicateLocator.getPredicates(c.predicates()), c.logRequestBody(), c.logResponseBody()))
+                .map(c -> new PredicateConfig(c.id(), routePredicateLocator.getPredicates(c.predicates()), c.request(), c.response()))
                 .toList();
         return new TagRequestIdGlobalFilter(httpLogger, dataBufferRepository, logPreProcessor, predicateConfigs);
     }

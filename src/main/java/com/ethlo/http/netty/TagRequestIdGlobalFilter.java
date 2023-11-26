@@ -7,24 +7,25 @@ import java.util.List;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.cloud.gateway.filter.GatewayFilterChain;
-import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.cloud.gateway.route.Route;
 import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
 import org.springframework.core.Ordered;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.web.server.ServerWebExchange;
+import org.springframework.web.server.WebFilter;
+import org.springframework.web.server.WebFilterChain;
 
 import com.ethlo.http.logger.HttpLogger;
 import com.ethlo.http.model.WebExchangeDataProvider;
 import com.ethlo.http.processors.LogPreProcessor;
+import jakarta.annotation.Nonnull;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.SignalType;
 import reactor.core.scheduler.Schedulers;
 
-public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
+public class TagRequestIdGlobalFilter implements WebFilter, Ordered
 {
     public static final String REQUEST_ID_ATTRIBUTE_NAME = "gateway-request-id";
     public static final String LOG_CAPTURE_CONFIG_ATTRIBUTE_NAME = "log_capture_config";
@@ -45,7 +46,7 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
     }
 
     @Override
-    public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain)
+    public @Nonnull Mono<Void> filter(@Nonnull ServerWebExchange exchange, WebFilterChain chain)
     {
         return Flux.fromIterable(predicateConfigs)
                 .filterWhen(c -> (Publisher<Boolean>) c.predicate().apply(exchange))
@@ -54,13 +55,13 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
                 .switchIfEmpty(chain.filter(exchange));
     }
 
-    private Mono<Void> prepareForLoggingIfApplicable(ServerWebExchange exchange, GatewayFilterChain chain, PredicateConfig predicateConfig)
+    private Mono<Void> prepareForLoggingIfApplicable(ServerWebExchange exchange, WebFilterChain chain, PredicateConfig predicateConfig)
     {
         final long started = System.nanoTime();
         final String requestId = exchange.getRequest().getId();
-
         if (exchange.getAttribute(TagRequestIdGlobalFilter.LOG_CAPTURE_CONFIG_ATTRIBUTE_NAME) == null)
         {
+            exchange.getAttributes().put(TagRequestIdGlobalFilter.LOG_CAPTURE_CONFIG_ATTRIBUTE_NAME, predicateConfig);
             return chain.filter(exchange)
                     .contextWrite(ctx ->
                     {

@@ -2,25 +2,35 @@ package com.ethlo.http.handlers;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Optional;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
+import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
+import org.springframework.util.StreamUtils;
 import org.springframework.web.reactive.function.server.HandlerFunction;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
 
+import com.ethlo.http.netty.ContextUtil;
 import com.ethlo.http.netty.DataBufferRepository;
+import com.ethlo.http.netty.PredicateConfig;
 import com.ethlo.http.netty.ServerDirection;
 import jakarta.annotation.Nonnull;
 import rawhttp.core.RawHttpHeaders;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 public class CircuitBreakerHandler implements HandlerFunction<ServerResponse>
 {
+    private static final Logger logger = LoggerFactory.getLogger(CircuitBreakerHandler.class);
     private final DataBufferRepository dataBufferRepository;
 
     public CircuitBreakerHandler(final DataBufferRepository dataBufferRepository)
@@ -31,24 +41,45 @@ public class CircuitBreakerHandler implements HandlerFunction<ServerResponse>
     @Override
     public @Nonnull Mono<ServerResponse> handle(@Nonnull ServerRequest serverRequest)
     {
+            final Optional<Exception> exc = serverRequest.attribute(ServerWebExchangeUtils.CIRCUITBREAKER_EXECUTION_EXCEPTION_ATTR).map(Exception.class::cast);
+            exc.ifPresent(e -> logger.info("An error occurred when routing upstream: {}", e.getMessage()));
+
+            final Optional<PredicateConfig> config = ContextUtil.getLoggingConfig(serverRequest);
+            logger.debug("Reading logging config: {}", config.orElse(null));
+            return config
+                    .filter(predicateConfig -> predicateConfig.request().body())
+                    .map(p -> saveIncomingRequest(serverRequest))
+                    .orElse(ServerResponse.status(504).build());
+    }
+
+    private Mono<ServerResponse> saveIncomingRequest(ServerRequest serverRequest)
+    {
         final ServerHttpRequest request = serverRequest.exchange().getRequest();
         final String requestId = request.getId();
         final HttpMethod method = request.getMethod();
 
         final byte[] fakeRequestLine = (method.name() + " / HTTP/1.1\r\n").getBytes(StandardCharsets.UTF_8);
-        dataBufferRepository.save(ServerDirection.REQUEST, requestId, fakeRequestLine);
-        dataBufferRepository.save(ServerDirection.REQUEST, requestId, extractHeaders(request));
+        dataBufferRepository.write(ServerDirection.REQUEST, requestId, fakeRequestLine);
+        dataBufferRepository.write(ServerDirection.REQUEST, requestId, extractHeaders(request));
 
-        final Flux<Long> res = request.getBody()
-                .flatMapSequential(dataBuffer ->
-                {
-                    final byte[] bytes = new byte[dataBuffer.readableByteCount()];
-                    dataBuffer.read(bytes);
-                    dataBufferRepository.save(ServerDirection.REQUEST, requestId, bytes);
-                    return Mono.just((long) bytes.length);
-                });
+        return serverRequest.exchange().getRequest().getBody()
+                .flatMapSequential(dataBuffer -> saveDataChunk(requestId, dataBuffer)
+                        .publishOn(Schedulers.boundedElastic()))
+                .then(ServerResponse.status(504).build());
+    }
 
-        return ServerResponse.status(HttpStatus.SERVICE_UNAVAILABLE).body(res.reduce(0L, Long::sum), Long.class);
+    private Mono<Integer> saveDataChunk(String requestId, DataBuffer dataBuffer)
+    {
+        try (final InputStream in = dataBuffer.asInputStream())
+        {
+            final int copied = StreamUtils.copy(in, dataBufferRepository.getOutputStream(ServerDirection.REQUEST, requestId));
+            DataBufferUtils.release(dataBuffer);
+            return Mono.just(copied);
+        }
+        catch (IOException exc)
+        {
+            return Mono.error(exc);
+        }
     }
 
     private static byte[] extractHeaders(ServerHttpRequest request)

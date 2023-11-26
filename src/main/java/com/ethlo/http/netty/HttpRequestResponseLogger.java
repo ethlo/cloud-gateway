@@ -1,6 +1,7 @@
 package com.ethlo.http.netty;
 
-import java.util.Optional;
+import static com.ethlo.http.netty.ContextUtil.getRequestId;
+import static com.ethlo.http.netty.ContextUtil.getLoggingConfig;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
@@ -9,12 +10,11 @@ import io.netty.channel.ChannelPromise;
 import io.netty.handler.logging.ByteBufFormat;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
-import io.netty.util.Attribute;
-import io.netty.util.AttributeKey;
-import reactor.util.context.Context;
 
 public class HttpRequestResponseLogger extends LoggingHandler
 {
+    public static final String WRITE = "WRITE";
+    public static final String READ = "READ";
     private final DataBufferRepository dataBufferRepository;
 
     public HttpRequestResponseLogger(final DataBufferRepository dataBufferRepository)
@@ -23,29 +23,17 @@ public class HttpRequestResponseLogger extends LoggingHandler
         this.dataBufferRepository = dataBufferRepository;
     }
 
-    private static Optional<String> getRequestId(ChannelHandlerContext ctx)
-    {
-        final Context gatewayCtx = getContext(ctx);
-        return gatewayCtx.hasKey(TagRequestIdGlobalFilter.REQUEST_ID_ATTRIBUTE_NAME) ? Optional.of(gatewayCtx.get(TagRequestIdGlobalFilter.REQUEST_ID_ATTRIBUTE_NAME)) : Optional.empty();
-    }
-
-    private static Context getContext(ChannelHandlerContext ctx)
-    {
-        final Attribute<?> context = ctx.channel().attr(AttributeKey.valueOf("$CONTEXT_VIEW"));
-        return (Context) context.get();
-    }
-
     @Override
     public void write(final ChannelHandlerContext ctx, final Object msg, final ChannelPromise promise)
     {
-        format(ctx, "WRITE", msg);
+        format(ctx, WRITE, msg);
         ctx.write(msg, promise);
     }
 
     @Override
     public void channelRead(final ChannelHandlerContext ctx, final Object msg)
     {
-        format(ctx, "READ", msg);
+        format(ctx, READ, msg);
         ctx.fireChannelRead(msg);
     }
 
@@ -63,24 +51,18 @@ public class HttpRequestResponseLogger extends LoggingHandler
     {
         return getRequestId(ctx).map(requestId ->
         {
-            final ServerDirection operation = "write".equalsIgnoreCase(eventName) ? ServerDirection.REQUEST : ServerDirection.RESPONSE;
-            final PredicateConfig pattern = getRequestPattern(ctx).orElseThrow();
-            if (pattern.logRequest() && operation == ServerDirection.REQUEST || pattern.logResponse() && operation == ServerDirection.RESPONSE)
+            final ServerDirection operation = WRITE.equalsIgnoreCase(eventName) ? ServerDirection.REQUEST : ServerDirection.RESPONSE;
+            final PredicateConfig pattern = getLoggingConfig(ctx).orElseThrow();
+            if (pattern.request().body() && operation == ServerDirection.REQUEST || pattern.response().body() && operation == ServerDirection.RESPONSE)
             {
                 final byte[] data = getBytes(msg);
                 if (data.length > 0)
                 {
-                    dataBufferRepository.save(operation, requestId, data);
+                    dataBufferRepository.write(operation, requestId, data);
                 }
             }
             return requestId;
         }).orElse(null);
-    }
-
-    private Optional<PredicateConfig> getRequestPattern(ChannelHandlerContext ctx)
-    {
-        final Context gatewayCtx = getContext(ctx);
-        return gatewayCtx.hasKey(TagRequestIdGlobalFilter.LOG_CAPTURE_CONFIG_ATTRIBUTE_NAME) ? Optional.of(gatewayCtx.get(TagRequestIdGlobalFilter.LOG_CAPTURE_CONFIG_ATTRIBUTE_NAME)) : Optional.empty();
     }
 
     private byte[] getBytes(ByteBuf buf)
