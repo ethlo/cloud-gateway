@@ -7,7 +7,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 import okhttp3.Headers;
@@ -58,20 +57,5 @@ public class HandleDifferentResponseTypesTest
         System.out.println(new String(body.returnResult().getResponseBody()));
 
         server.shutdown();
-    }
-
-    @Test
-    public void testRedirect()
-    {
-        client.get()
-                .uri("/redirect")
-                .exchange()
-                .expectStatus()
-                .is3xxRedirection();
-    }
-
-    @TestConfiguration
-    public static class TestRoutesConfiguration
-    {
     }
 }

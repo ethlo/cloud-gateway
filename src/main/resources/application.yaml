@@ -32,6 +32,8 @@ http-logging:
       predicates:
         - Path=/nope
         - NotHost=example.com
+        - NotPath=/yep
+        - NotMethod=GET
       request:
         body: true
     - id: bar
