@@ -1,8 +1,10 @@
-package com.ethlo.http.match;
+package com.ethlo.http.configuration;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+
+import com.ethlo.http.match.RequestMatchingProcessor;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

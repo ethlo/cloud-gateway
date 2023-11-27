@@ -46,6 +46,8 @@ http-logging:
       predicates:
         - Path=/anything/**
         - Method=GET
+        - NotExtension=
+
 logging:
   level:
     com.ethlo.http: debug
@@ -76,6 +78,7 @@ spring:
           uri: '${rewrite.backend.uri:https://sdasdasdpopiwqhiqwndqlwdk.org}'
           predicates:
             - Path=/nope
+            - NotExtension=js,css,gif,png,jpg
           filters:
             - name: CircuitBreaker
               args:

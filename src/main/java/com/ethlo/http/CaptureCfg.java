@@ -18,7 +18,7 @@ import org.springframework.web.reactive.function.server.ServerResponse;
 import com.ethlo.http.handlers.CircuitBreakerHandler;
 import com.ethlo.http.logger.CaptureConfiguration;
 import com.ethlo.http.logger.HttpLogger;
-import com.ethlo.http.match.HttpLoggingConfiguration;
+import com.ethlo.http.configuration.HttpLoggingConfiguration;
 import com.ethlo.http.netty.DataBufferRepository;
 import com.ethlo.http.netty.LoggerHttpClientCustomizer;
 import com.ethlo.http.netty.PooledFileDataBufferRepository;
