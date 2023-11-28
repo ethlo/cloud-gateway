@@ -1,9 +1,15 @@
 package com.ethlo.http.netty;
 
+import static com.ethlo.http.netty.TagRequestIdGlobalFilter.LOG_CAPTURE_CONFIG_ATTRIBUTE_NAME;
+import static com.ethlo.http.netty.TagRequestIdGlobalFilter.REQUEST_ID_ATTRIBUTE_NAME;
+
+import java.util.Map;
 import java.util.Optional;
 
+import org.springframework.http.server.reactive.observation.ServerRequestObservationContext;
 import org.springframework.web.reactive.function.server.ServerRequest;
 
+import io.micrometer.observation.Observation;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
@@ -13,28 +19,29 @@ public class ContextUtil
 {
     public static Optional<PredicateConfig> getLoggingConfig(ChannelHandlerContext ctx)
     {
-        return getOptional(getContext(ctx), TagRequestIdGlobalFilter.LOG_CAPTURE_CONFIG_ATTRIBUTE_NAME);
-    }
-
-    private static <T> Optional<T> getOptional(Context gatewayCtx, String attrName)
-    {
-        return gatewayCtx.hasKey(attrName) ? Optional.of(gatewayCtx.get(attrName)) : Optional.empty();
+        return getAttributes(ctx).map(m -> m.get(LOG_CAPTURE_CONFIG_ATTRIBUTE_NAME)).map(PredicateConfig.class::cast);
     }
 
     public static Optional<String> getRequestId(ChannelHandlerContext ctx)
     {
-        return getOptional(getContext(ctx), TagRequestIdGlobalFilter.REQUEST_ID_ATTRIBUTE_NAME);
-    }
-
-    private static Context getContext(ChannelHandlerContext ctx)
-    {
-        final Attribute<?> context = ctx.channel().attr(AttributeKey.valueOf("$CONTEXT_VIEW"));
-        return (Context) context.get();
+        return getAttributes(ctx).map(m -> m.get(REQUEST_ID_ATTRIBUTE_NAME)).map(String.class::cast);
     }
 
     public static Optional<PredicateConfig> getLoggingConfig(ServerRequest context)
     {
-        return context.attribute(TagRequestIdGlobalFilter.LOG_CAPTURE_CONFIG_ATTRIBUTE_NAME)
-                .map(PredicateConfig.class::cast);
+        return context.attribute(LOG_CAPTURE_CONFIG_ATTRIBUTE_NAME).map(PredicateConfig.class::cast);
     }
+
+
+    private static Optional<Map<String, Object>> getAttributes(ChannelHandlerContext ctx)
+    {
+        final Attribute<?> contextView = ctx.channel().attr(AttributeKey.valueOf("$CONTEXT_VIEW"));
+        final Context context = (Context) contextView.get();
+        return Optional.ofNullable(context.getOrDefault("micrometer.observation", null))
+                .map(Observation.class::cast)
+                .map(Observation::getContextView)
+                .map(ServerRequestObservationContext.class::cast)
+                .map(ServerRequestObservationContext::getAttributes);
+    }
+
 }

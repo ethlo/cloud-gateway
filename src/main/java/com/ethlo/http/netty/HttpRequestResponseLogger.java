@@ -1,7 +1,7 @@
 package com.ethlo.http.netty;
 
-import static com.ethlo.http.netty.ContextUtil.getRequestId;
 import static com.ethlo.http.netty.ContextUtil.getLoggingConfig;
+import static com.ethlo.http.netty.ContextUtil.getRequestId;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;

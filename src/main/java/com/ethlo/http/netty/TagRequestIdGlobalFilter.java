@@ -61,6 +61,7 @@ public class TagRequestIdGlobalFilter implements WebFilter, Ordered
         final String requestId = exchange.getRequest().getId();
         if (exchange.getAttribute(TagRequestIdGlobalFilter.LOG_CAPTURE_CONFIG_ATTRIBUTE_NAME) == null)
         {
+            exchange.getAttributes().put(TagRequestIdGlobalFilter.REQUEST_ID_ATTRIBUTE_NAME, requestId);
             exchange.getAttributes().put(TagRequestIdGlobalFilter.LOG_CAPTURE_CONFIG_ATTRIBUTE_NAME, predicateConfig);
             return chain.filter(exchange)
                     .contextWrite(ctx ->
