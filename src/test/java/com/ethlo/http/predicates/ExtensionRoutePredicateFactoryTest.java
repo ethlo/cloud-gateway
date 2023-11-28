@@ -33,4 +33,12 @@ class ExtensionRoutePredicateFactoryTest
         final MockServerWebExchange exchange = new MockServerWebExchange.Builder(MockServerHttpRequest.get("/hello/there/image.jpg").build()).build();
         assertThat(new ExtensionRoutePredicateFactory().apply(config).test(exchange)).isFalse();
     }
+
+    @Test
+    void emptyExtensionPath()
+    {
+        final ExtensionRoutePredicateFactory.Config config = new ExtensionRoutePredicateFactory.Config().setExtensions(List.of("gif"));
+        final MockServerWebExchange exchange = new MockServerWebExchange.Builder(MockServerHttpRequest.get("/hello/there/image.").build()).build();
+        assertThat(new ExtensionRoutePredicateFactory().apply(config).test(exchange)).isFalse();
+    }
 }
