@@ -5,7 +5,6 @@ import static com.ethlo.http.netty.ContextUtil.getRequestId;
 import static com.ethlo.http.netty.ServerDirection.REQUEST;
 import static com.ethlo.http.netty.ServerDirection.RESPONSE;
 
-import com.ethlo.http.match.LogOptions.BodyProcessing;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.ChannelHandlerContext;
@@ -53,10 +52,15 @@ public class HttpRequestResponseLogger extends LoggingHandler
     private String format(ChannelHandlerContext ctx, String eventName, ByteBuf msg)
     {
         final ServerDirection operation = WRITE.equalsIgnoreCase(eventName) ? REQUEST : RESPONSE;
-        final String requestId = getRequestId(ctx).orElseThrow();
-        return getLoggingConfig(ctx).map(pattern ->
+        getRequestId(ctx).ifPresent(requestId ->
         {
             final int bytesAvailable = msg.readableBytes();
+            dataBufferRepository.appendSizeAvailable(operation, requestId, bytesAvailable);
+        });
+
+        return getLoggingConfig(ctx).map(pattern ->
+        {
+            final String requestId = getRequestId(ctx).orElseThrow();
             final boolean isRequestAndShouldStore = pattern.request().body().mustParse() && operation == REQUEST;
             final boolean isResponseAndShouldStore = pattern.response().body().mustParse() && operation == RESPONSE;
             if (isRequestAndShouldStore || isResponseAndShouldStore)
@@ -68,7 +72,6 @@ public class HttpRequestResponseLogger extends LoggingHandler
                     dataBufferRepository.write(operation, requestId, data);
                 }
             }
-            dataBufferRepository.appendSizeAvailable(operation, requestId, bytesAvailable);
             return requestId;
         }).orElse(null);
     }

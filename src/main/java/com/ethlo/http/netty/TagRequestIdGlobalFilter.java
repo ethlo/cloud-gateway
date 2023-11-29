@@ -68,7 +68,6 @@ public class TagRequestIdGlobalFilter implements WebFilter, Ordered
                     .contextWrite(ctx ->
                     {
                         logger.debug("Tagging request {}: {}", requestId, predicateConfig);
-                        ctx.put(REQUEST_ID_ATTRIBUTE_NAME, requestId);
                         ctx.put(TagRequestIdGlobalFilter.LOG_CAPTURE_CONFIG_ATTRIBUTE_NAME, predicateConfig);
                         return ctx;
                     })
@@ -87,7 +86,11 @@ public class TagRequestIdGlobalFilter implements WebFilter, Ordered
         }
         else
         {
-            return chain.filter(exchange);
+            return chain.filter(exchange).contextWrite(ctx ->
+            {
+                ctx.put(REQUEST_ID_ATTRIBUTE_NAME, requestId);
+                return ctx;
+            });
         }
     }
 
