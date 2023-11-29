@@ -18,7 +18,9 @@ CREATE TABLE IF NOT EXISTS log
     user_claim            Nullable(String),
     realm_claim           LowCardinality(Nullable(String)),
     request_body_size     Nullable(Int32),
+    request_total_size    Nullable(Int32),
     response_body_size    Nullable(Int32),
+    response_total_size   Nullable(Int32),
     request_body          Nullable(String) codec (ZSTD(3)),
     response_body         Nullable(String) codec (ZSTD(3))
 )

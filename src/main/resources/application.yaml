@@ -35,13 +35,15 @@ http-logging:
         - NotPath=/yep
         - NotMethod=GET
       request:
-        body: true
+        body: STORE
     - id: bar
       predicates:
         - Path=/anything/**
         - Method=POST,PUT
       request:
-        body: true
+        body: STORE
+      response:
+        body: SIZE
     - id: baz
       predicates:
         - Path=/anything/**

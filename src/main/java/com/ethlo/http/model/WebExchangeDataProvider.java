@@ -6,6 +6,7 @@ import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 import org.springframework.cloud.gateway.route.Route;
@@ -16,6 +17,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.server.RequestPath;
 
 import com.ethlo.http.netty.DataBufferRepository;
+import com.ethlo.http.netty.PredicateConfig;
 import com.ethlo.http.netty.ServerDirection;
 import com.ethlo.http.processors.auth.RealmUser;
 
@@ -34,10 +36,12 @@ public class WebExchangeDataProvider
     private Duration duration;
     private InetSocketAddress remoteAddress;
     private RealmUser user;
+    private final PredicateConfig predicateConfig;
 
-    public WebExchangeDataProvider(DataBufferRepository dataBufferRepository)
+    public WebExchangeDataProvider(DataBufferRepository dataBufferRepository, final PredicateConfig predicateConfig)
     {
-        this.dataBufferRepository = dataBufferRepository;
+        this.dataBufferRepository = Objects.requireNonNull(dataBufferRepository);
+        this.predicateConfig = Objects.requireNonNull(predicateConfig);
     }
 
     public WebExchangeDataProvider requestId(String requestId)
@@ -206,5 +210,10 @@ public class WebExchangeDataProvider
     public Optional<RealmUser> getUser()
     {
         return Optional.ofNullable(user);
+    }
+
+    public PredicateConfig logOptions()
+    {
+        return predicateConfig;
     }
 }

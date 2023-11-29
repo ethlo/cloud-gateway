@@ -17,4 +17,5 @@ public interface DataBufferRepository
 
     Optional<PayloadProvider> get(final ServerDirection serverDirection, final String id);
 
+    void appendSizeAvailable(ServerDirection operation, String requestId, int byteCount);
 }

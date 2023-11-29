@@ -7,6 +7,8 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
+import com.ethlo.http.match.LogOptions;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
@@ -47,7 +49,7 @@ public class CircuitBreakerHandler implements HandlerFunction<ServerResponse>
             final Optional<PredicateConfig> config = ContextUtil.getLoggingConfig(serverRequest);
             logger.debug("Reading logging config: {}", config.orElse(null));
             return config
-                    .filter(predicateConfig -> predicateConfig.request().body())
+                    .filter(predicateConfig -> predicateConfig.request().body() == LogOptions.BodyProcessing.STORE)
                     .map(p -> saveIncomingRequest(serverRequest))
                     .orElse(ServerResponse.status(504).build());
     }

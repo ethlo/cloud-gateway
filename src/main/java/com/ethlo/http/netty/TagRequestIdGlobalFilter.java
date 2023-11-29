@@ -59,9 +59,10 @@ public class TagRequestIdGlobalFilter implements WebFilter, Ordered
     {
         final long started = System.nanoTime();
         final String requestId = exchange.getRequest().getId();
+        exchange.getAttributes().put(TagRequestIdGlobalFilter.REQUEST_ID_ATTRIBUTE_NAME, requestId);
+
         if (exchange.getAttribute(TagRequestIdGlobalFilter.LOG_CAPTURE_CONFIG_ATTRIBUTE_NAME) == null)
         {
-            exchange.getAttributes().put(TagRequestIdGlobalFilter.REQUEST_ID_ATTRIBUTE_NAME, requestId);
             exchange.getAttributes().put(TagRequestIdGlobalFilter.LOG_CAPTURE_CONFIG_ATTRIBUTE_NAME, predicateConfig);
             return chain.filter(exchange)
                     .contextWrite(ctx ->
@@ -98,8 +99,9 @@ public class TagRequestIdGlobalFilter implements WebFilter, Ordered
         final ServerHttpRequest req = exchange.getRequest();
         final ServerHttpResponse res = exchange.getResponse();
         final Route route = exchange.getAttribute(ServerWebExchangeUtils.GATEWAY_ROUTE_ATTR);
+        final PredicateConfig predicateConfig = exchange.getAttribute(TagRequestIdGlobalFilter.LOG_CAPTURE_CONFIG_ATTRIBUTE_NAME);
 
-        final WebExchangeDataProvider data = new WebExchangeDataProvider(dataBufferRepository)
+        final WebExchangeDataProvider data = new WebExchangeDataProvider(dataBufferRepository, predicateConfig)
                 .route(route)
                 .requestId(req.getId())
                 .method(req.getMethod())

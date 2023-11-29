@@ -12,6 +12,7 @@ import java.nio.file.Path;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,12 +43,14 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
     private final DataSize bufferSize;
     private final Path basePath;
     private final ConcurrentMap<Path, InspectableBufferedOutputStream> pool;
+    private final ConcurrentMap<String, AtomicLong> sizePool;
 
     public PooledFileDataBufferRepository(CaptureConfiguration captureConfiguration)
     {
         this.bufferSize = captureConfiguration.getMemoryBufferSize();
         this.basePath = captureConfiguration.getTempDirectory();
         this.pool = new ConcurrentHashMap<>();
+        this.sizePool = new ConcurrentHashMap<>();
     }
 
     public static Path getFilename(final Path basePath, ServerDirection operation, String id)
@@ -58,6 +61,8 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
     @Override
     public void cleanup(final String requestId)
     {
+        sizePool.remove(requestId + "_" + ServerDirection.REQUEST.name());
+        sizePool.remove(requestId + "_" + ServerDirection.RESPONSE.name());
         cleanup(getFilename(basePath, ServerDirection.REQUEST, requestId));
         cleanup(getFilename(basePath, ServerDirection.RESPONSE, requestId));
     }
@@ -124,36 +129,34 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
     }
 
     @Override
-    public Optional<PayloadProvider> get(final ServerDirection serverDirection, final String id)
+    public Optional<PayloadProvider> get(final ServerDirection serverDirection, final String requestId)
     {
-        final Path file = getFilename(basePath, serverDirection, id);
-        return Optional.ofNullable(Optional.ofNullable(pool.get(file))
+        final Path file = getFilename(basePath, serverDirection, requestId);
+        final long size = Optional.ofNullable(sizePool.get(requestId + "_" + serverDirection.name())).map(AtomicLong::get).orElseThrow();
+        return Optional.of(Optional.ofNullable(pool.get(file))
                 .map(stream ->
                 {
                     if (!stream.isFlushedToUnderlyingStream())
                     {
                         final byte[] data = stream.getBuffer();
-                        logger.debug("Using data directly from memory for {} {}", serverDirection, id);
-                        return extractBody(new ByteArrayInputStream(data), serverDirection == ServerDirection.REQUEST);
+                        logger.debug("Using data directly from memory for {} {}", serverDirection, requestId);
+                        return extractBody(new ByteArrayInputStream(data), serverDirection == ServerDirection.REQUEST, stream.getTotalBytesWritten());
                     }
                     stream.forceFlush();
                     stream.forceClose();
-                    return null;
+                    return new PayloadProvider(InputStream.nullInputStream(), null, size);
                 }).orElseGet(
                         () ->
                         {
                             try
                             {
-                                if (logger.isDebugEnabled())
-                                {
-                                    logger.debug("Size of file {} is {} bytes", file, Files.size(file));
-                                }
-                                return extractBody(new BufferedInputStream(Files.newInputStream(file)), serverDirection == ServerDirection.REQUEST);
-
+                                final long fileSize = Files.size(file);
+                                logger.debug("Size of file {} is {} bytes", file, fileSize);
+                                return extractBody(new BufferedInputStream(Files.newInputStream(file)), serverDirection == ServerDirection.REQUEST, fileSize);
                             }
                             catch (NoSuchFileException exc)
                             {
-                                return null;
+                                return new PayloadProvider(InputStream.nullInputStream(), null, size);
                             }
                             catch (IOException e)
                             {
@@ -163,7 +166,23 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
                 ));
     }
 
-    private static PayloadProvider extractBody(final InputStream fullMessage, boolean isRequest)
+    @Override
+    public void appendSizeAvailable(final ServerDirection operation, final String requestId, final int byteCount)
+    {
+        sizePool.compute(requestId + "_" + operation.name(), (reqId, size) ->
+        {
+            if (size == null)
+            {
+                size = new AtomicLong();
+                logger.trace("Opened size calculation counter for {} for {}", operation, requestId);
+            }
+            final long newSize = size.addAndGet(byteCount);
+            logger.trace("{} size: {}", operation, newSize);
+            return size;
+        });
+    }
+
+    private static PayloadProvider extractBody(final InputStream fullMessage, boolean isRequest, final long totalBytesWritten)
     {
         try
         {
@@ -179,7 +198,7 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
                     throw new UncheckedIOException(exc);
                 }
             }).orElse(new byte[0]);
-            return new PayloadProvider(new ByteArrayInputStream(bodyBytes), bodyBytes.length);
+            return new PayloadProvider(new ByteArrayInputStream(bodyBytes), (long) bodyBytes.length, totalBytesWritten);
         }
         catch (IOException exc)
         {

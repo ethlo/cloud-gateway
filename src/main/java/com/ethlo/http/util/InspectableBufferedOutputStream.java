@@ -5,9 +5,12 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.Arrays;
 
+import jakarta.annotation.Nonnull;
+
 public class InspectableBufferedOutputStream extends BufferedOutputStream
 {
     private boolean flushed;
+    private long total;
 
     public InspectableBufferedOutputStream(LazyFileOutputStream lazyFileOutputStream, int bufferByteSize)
     {
@@ -43,7 +46,7 @@ public class InspectableBufferedOutputStream extends BufferedOutputStream
     }
 
     @Override
-    public synchronized void write(byte[] b, int off, int len) throws IOException
+    public synchronized void write(@Nonnull byte[] b, int off, int len) throws IOException
     {
         if (len >= this.buf.length)
         {
@@ -60,6 +63,7 @@ public class InspectableBufferedOutputStream extends BufferedOutputStream
             System.arraycopy(b, off, this.buf, this.count, len);
             this.count += len;
         }
+        total += len;
     }
 
     private void flushBuffer() throws IOException
@@ -75,7 +79,7 @@ public class InspectableBufferedOutputStream extends BufferedOutputStream
     @Override
     public void close()
     {
-        // Supress closing
+        // Suppress closing
     }
 
     public void forceClose()
@@ -88,5 +92,10 @@ public class InspectableBufferedOutputStream extends BufferedOutputStream
         {
             throw new UncheckedIOException(e);
         }
+    }
+
+    public long getTotalBytesWritten()
+    {
+        return total;
     }
 }

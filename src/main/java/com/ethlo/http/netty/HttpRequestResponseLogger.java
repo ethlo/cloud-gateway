@@ -2,7 +2,10 @@ package com.ethlo.http.netty;
 
 import static com.ethlo.http.netty.ContextUtil.getLoggingConfig;
 import static com.ethlo.http.netty.ContextUtil.getRequestId;
+import static com.ethlo.http.netty.ServerDirection.REQUEST;
+import static com.ethlo.http.netty.ServerDirection.RESPONSE;
 
+import com.ethlo.http.match.LogOptions.BodyProcessing;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.ChannelHandlerContext;
@@ -49,25 +52,29 @@ public class HttpRequestResponseLogger extends LoggingHandler
 
     private String format(ChannelHandlerContext ctx, String eventName, ByteBuf msg)
     {
-        return getRequestId(ctx).map(requestId ->
+        final ServerDirection operation = WRITE.equalsIgnoreCase(eventName) ? REQUEST : RESPONSE;
+        final String requestId = getRequestId(ctx).orElseThrow();
+        return getLoggingConfig(ctx).map(pattern ->
         {
-            final ServerDirection operation = WRITE.equalsIgnoreCase(eventName) ? ServerDirection.REQUEST : ServerDirection.RESPONSE;
-            final PredicateConfig pattern = getLoggingConfig(ctx).orElseThrow();
-            if (pattern.request().body() && operation == ServerDirection.REQUEST || pattern.response().body() && operation == ServerDirection.RESPONSE)
+            final int bytesAvailable = msg.readableBytes();
+            final boolean isRequestAndShouldStore = pattern.request().body().mustParse() && operation == REQUEST;
+            final boolean isResponseAndShouldStore = pattern.response().body().mustParse() && operation == RESPONSE;
+            if (isRequestAndShouldStore || isResponseAndShouldStore)
             {
+                // Store the body if requested
                 final byte[] data = getBytes(msg);
                 if (data.length > 0)
                 {
                     dataBufferRepository.write(operation, requestId, data);
                 }
             }
+            dataBufferRepository.appendSizeAvailable(operation, requestId, bytesAvailable);
             return requestId;
         }).orElse(null);
     }
 
     private byte[] getBytes(ByteBuf buf)
     {
-        int readerIndex = buf.readerIndex();
-        return ByteBufUtil.getBytes(buf, readerIndex, buf.readableBytes(), false);
+        return ByteBufUtil.getBytes(buf, buf.readerIndex(), buf.readableBytes(), false);
     }
 }

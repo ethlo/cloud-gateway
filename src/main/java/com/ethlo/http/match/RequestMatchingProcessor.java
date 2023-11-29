@@ -14,25 +14,16 @@ public record RequestMatchingProcessor(
         @NotEmpty
         @Valid
         List<PredicateDefinition> predicates,
-        Log request,
-        Log response)
+        LogOptions request,
+        LogOptions response)
 {
     public RequestMatchingProcessor(@NotEmpty final String id, @NotEmpty
     @Valid final
-    List<PredicateDefinition> predicates, final Log request, final Log response)
+    List<PredicateDefinition> predicates, final LogOptions request, final LogOptions response)
     {
         this.id = id;
         this.predicates = predicates;
-        this.request = Optional.ofNullable(request).orElse(new Log(null, null));
-        this.response = Optional.ofNullable(response).orElse(new Log(null, null));
-    }
-
-    public record Log(Boolean headers, Boolean body)
-    {
-        public Log(final Boolean headers, final Boolean body)
-        {
-            this.headers = Optional.ofNullable(headers).orElse(true);
-            this.body = Optional.ofNullable(body).orElse(false);
-        }
+        this.request = Optional.ofNullable(request).orElse(new LogOptions(null, null));
+        this.response = Optional.ofNullable(response).orElse(new LogOptions(null, null));
     }
 }
