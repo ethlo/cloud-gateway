@@ -1,5 +1,7 @@
 package com.ethlo.http.handlers;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.core.io.Resource;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpHeaders;
@@ -11,6 +13,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.ethlo.http.logger.BodyContentRepository;
 
+@RefreshScope
+@ConditionalOnProperty("features.body-handlers.enabled")
 @RestController
 public class BodyDownloadHandlers
 {

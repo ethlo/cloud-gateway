@@ -1,17 +1,23 @@
 server:
   port: 8888
 
+features:
+  control-panel-handlers:
+    enabled: true
+  body-handlers:
+    enabled: false
+
 http-logging:
   auth:
     jwt:
-      enabled: true
+      enabled: false
       user-claim: preferred_username
       realm-claim:
     basic:
       enabled: true
       realm-header-name: baz-realm
   capture:
-    enabled: true
+    enabled: false
     memory-buffer-size: 2KB
     temp-directory: /tmp
   providers:

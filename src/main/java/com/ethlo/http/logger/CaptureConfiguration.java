@@ -8,17 +8,19 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.util.unit.DataSize;
+import org.springframework.validation.annotation.Validated;
 
+@Validated
 @RefreshScope
 @ConfigurationProperties("http-logging.capture")
 public class CaptureConfiguration
 {
     private static final Logger logger = LoggerFactory.getLogger(CaptureConfiguration.class);
-    private final Boolean enabled;
-    private final Path tempDirectory;
-    private final DataSize memoryBufferSize;
+    private Boolean enabled;
+    private Path tempDirectory;
+    private DataSize memoryBufferSize;
 
-    public CaptureConfiguration(final Boolean enabled, final Path tempDirectory, final DataSize memoryBufferSize)
+    public void setEnabled(final Boolean enabled)
     {
         this.enabled = Optional.ofNullable(enabled).orElse(true);
         if (this.enabled)
@@ -29,9 +31,6 @@ public class CaptureConfiguration
         {
             logger.warn("Capture is disabled");
         }
-        
-        this.tempDirectory = tempDirectory;
-        this.memoryBufferSize = memoryBufferSize;
     }
 
     public Path getTempDirectory()
@@ -47,5 +46,15 @@ public class CaptureConfiguration
     public boolean isEnabled()
     {
         return enabled;
+    }
+
+    public void setTempDirectory(final Path tempDirectory)
+    {
+        this.tempDirectory = tempDirectory;
+    }
+
+    public void setMemoryBufferSize(final DataSize memoryBufferSize)
+    {
+        this.memoryBufferSize = memoryBufferSize;
     }
 }

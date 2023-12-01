@@ -1,5 +1,6 @@
 package com.ethlo.http.handlers;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cloud.endpoint.event.RefreshEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.io.Resource;
@@ -7,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+@ConditionalOnProperty("features.control-panel-handlers.enabled")
 @RestController
 public class ControlPanelHandlers
 {
@@ -17,7 +19,6 @@ public class ControlPanelHandlers
         this.eventPublisher = eventPublisher;
     }
 
-    //@Scheduled(cron="")
     public void triggerRefreshEvent()
     {
         eventPublisher.publishEvent(new RefreshEvent(this, "RefreshEvent", "Refreshing scope"));

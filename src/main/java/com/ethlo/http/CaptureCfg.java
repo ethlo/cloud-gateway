@@ -6,7 +6,6 @@ import static org.springframework.web.reactive.function.server.RouterFunctions.r
 
 import java.util.List;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.cloud.gateway.handler.predicate.RoutePredicateFactory;
 import org.springframework.cloud.gateway.support.ConfigurationService;
@@ -21,24 +20,15 @@ import com.ethlo.http.handlers.CircuitBreakerHandler;
 import com.ethlo.http.logger.CaptureConfiguration;
 import com.ethlo.http.logger.HttpLogger;
 import com.ethlo.http.netty.DataBufferRepository;
-import com.ethlo.http.netty.LoggerHttpClientCustomizer;
 import com.ethlo.http.netty.PooledFileDataBufferRepository;
 import com.ethlo.http.netty.PredicateConfig;
 import com.ethlo.http.netty.TagRequestIdGlobalFilter;
 import com.ethlo.http.processors.LogPreProcessor;
 
-@ConditionalOnProperty("http-logging.capture.enabled")
 @Configuration
 @RefreshScope
 public class CaptureCfg
 {
-    @Bean
-    @RefreshScope
-    public LoggerHttpClientCustomizer loggerHttpClientCustomizer(DataBufferRepository dataBufferRepository)
-    {
-        return new LoggerHttpClientCustomizer(dataBufferRepository);
-    }
-
     @Bean
     public DataBufferRepository pooledFileDataBufferRepository(CaptureConfiguration captureConfiguration)
     {

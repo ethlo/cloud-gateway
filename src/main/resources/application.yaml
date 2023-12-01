@@ -1,6 +1,10 @@
 server:
   port: 8888
-
+features:
+  control-panel-handlers:
+    enabled: true
+  body-handlers:
+    enabled: false
 http-logging:
   auth:
     jwt:
