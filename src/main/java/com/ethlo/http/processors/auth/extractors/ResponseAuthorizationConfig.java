@@ -1,34 +1,30 @@
 package com.ethlo.http.processors.auth.extractors;
 
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
+import org.springframework.validation.annotation.Validated;
+
 import com.ethlo.http.processors.FeatureToggle;
 
-import org.springframework.boot.context.properties.ConfigurationProperties;
-
+@Validated
+@RefreshScope
 @ConfigurationProperties(prefix = "http-logging.auth.response-header")
 public class ResponseAuthorizationConfig extends FeatureToggle
 {
     /**
      * The response header name that is used extracting which realm the user belongs to
      */
-    private final String realmHeader;
+    private String realmHeader;
 
     /**
      * The response header name that is used for deciding which username the user has
      */
-    private final String usernameHeader;
+    private String usernameHeader;
 
     /**
      * Whether to strip the headers before returning the response downstream
      */
-    private final boolean stripHeaders;
-
-    public ResponseAuthorizationConfig(final boolean enabled, final String realmHeader, final String usernameHeader, final boolean stripHeaders)
-    {
-        super(enabled);
-        this.realmHeader = realmHeader;
-        this.usernameHeader = usernameHeader;
-        this.stripHeaders = stripHeaders;
-    }
+    private boolean stripHeaders;
 
     public String getRealmHeader()
     {
@@ -43,5 +39,20 @@ public class ResponseAuthorizationConfig extends FeatureToggle
     public boolean isStripHeaders()
     {
         return stripHeaders;
+    }
+
+    public void setRealmHeader(final String realmHeader)
+    {
+        this.realmHeader = realmHeader;
+    }
+
+    public void setUsernameHeader(final String usernameHeader)
+    {
+        this.usernameHeader = usernameHeader;
+    }
+
+    public void setStripHeaders(final boolean stripHeaders)
+    {
+        this.stripHeaders = stripHeaders;
     }
 }

@@ -1,19 +1,21 @@
 package com.ethlo.http.processors;
 
+import java.util.Optional;
+
 public abstract class FeatureToggle
 {
     /**
-     * Whether this feature is enabled
+     * Whether this feature is enabled. Defaults to true
      */
-    private final boolean enabled;
+    private Boolean enabled;
 
-    protected FeatureToggle(final boolean enabled)
+    public void setEnabled(final Boolean enabled)
     {
         this.enabled = enabled;
     }
 
     public boolean isEnabled()
     {
-        return enabled;
+        return Optional.ofNullable(enabled).orElse(true);
     }
 }

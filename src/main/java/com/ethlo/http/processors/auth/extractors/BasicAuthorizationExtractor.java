@@ -4,15 +4,26 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Optional;
 
+import jakarta.validation.constraints.NotNull;
+
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
+import org.springframework.http.HttpHeaders;
+import org.springframework.stereotype.Component;
+
 import com.ethlo.http.processors.auth.RealmUser;
 
-import org.springframework.http.HttpHeaders;
+import org.springframework.validation.annotation.Validated;
 
+@Validated
+@Component
+@RefreshScope
+@ConditionalOnProperty("http-logging.auth.basic.enabled")
 public class BasicAuthorizationExtractor implements AuthorizationExtractor
 {
     private final BasicAuthorizationConfig config;
 
-    public BasicAuthorizationExtractor(BasicAuthorizationConfig config)
+    public BasicAuthorizationExtractor(@NotNull BasicAuthorizationConfig config)
     {
         this.config = config;
     }
@@ -20,7 +31,7 @@ public class BasicAuthorizationExtractor implements AuthorizationExtractor
     @Override
     public Optional<RealmUser> getUser(final HttpHeaders headers, final HttpHeaders responseHeaders)
     {
-        if (! config.isEnabled())
+        if (!config.isEnabled())
         {
             return Optional.empty();
         }

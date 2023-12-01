@@ -46,7 +46,7 @@ http-logging:
         body: SIZE
     - id: baz
       predicates:
-        - Path=/anything/**
+        - Path=/get/**
         - Method=GET
         - NotExtension=
 
@@ -59,17 +59,15 @@ management:
   endpoints:
     web:
       exposure:
-        include: 'health,gateway,metrics,clickhouse'
-
-
+        include: health,gateway,metrics,clickhouse,refresh
 spring:
   cloud:
     gateway:
-      filter:
-        request-rate-limiter:
-          enabled: true
-          deny-empty-key: true
-          empty-key-status-code: 403
+      #filter:
+      #  request-rate-limiter:
+      #    enabled: true
+      #    deny-empty-key: true
+      #    empty-key-status-code: 403
       metrics:
         tags:
           path:

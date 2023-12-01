@@ -1,4 +1,4 @@
-version: '3'
+version: '3.7'
 
 services:
   clickhouse:
@@ -17,7 +17,7 @@ services:
     hostname: cloud-gateway
     container_name: cloud-gateway
     image: ethlocom/cloud-gateway:0.2.0-SNAPSHOT
-    restart: unless-stopped
+    restart: on-failure:5
     environment:
       - 'JAVA_OPTS="-XX:MaxDirectMemorySize=200M"'
       - 'SPRING_CONFIG_LOCATION=/config/application.yaml'

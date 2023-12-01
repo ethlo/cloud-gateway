@@ -7,8 +7,6 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
-import com.ethlo.http.match.LogOptions;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
@@ -21,6 +19,7 @@ import org.springframework.web.reactive.function.server.HandlerFunction;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
 
+import com.ethlo.http.match.LogOptions;
 import com.ethlo.http.netty.ContextUtil;
 import com.ethlo.http.netty.DataBufferRepository;
 import com.ethlo.http.netty.PredicateConfig;
@@ -33,6 +32,7 @@ import reactor.core.scheduler.Schedulers;
 public class CircuitBreakerHandler implements HandlerFunction<ServerResponse>
 {
     private static final Logger logger = LoggerFactory.getLogger(CircuitBreakerHandler.class);
+    private static final String PROCESSED_KEY = CircuitBreakerHandler.class + ".PROCESSED";
     private final DataBufferRepository dataBufferRepository;
 
     public CircuitBreakerHandler(final DataBufferRepository dataBufferRepository)
@@ -43,15 +43,16 @@ public class CircuitBreakerHandler implements HandlerFunction<ServerResponse>
     @Override
     public @Nonnull Mono<ServerResponse> handle(@Nonnull ServerRequest serverRequest)
     {
-            final Optional<Exception> exc = serverRequest.attribute(ServerWebExchangeUtils.CIRCUITBREAKER_EXECUTION_EXCEPTION_ATTR).map(Exception.class::cast);
-            exc.ifPresent(e -> logger.info("An error occurred when routing upstream: {}", e.getMessage()));
+        final Optional<Exception> exc = serverRequest.attribute(ServerWebExchangeUtils.CIRCUITBREAKER_EXECUTION_EXCEPTION_ATTR).map(Exception.class::cast);
+        exc.ifPresent(e -> logger.info("An error occurred when routing upstream: {}", e.toString()));
 
-            final Optional<PredicateConfig> config = ContextUtil.getLoggingConfig(serverRequest);
-            logger.debug("Reading logging config: {}", config.orElse(null));
-            return config
-                    .filter(predicateConfig -> predicateConfig.request().body() == LogOptions.BodyProcessing.STORE)
-                    .map(p -> saveIncomingRequest(serverRequest))
-                    .orElse(ServerResponse.status(504).build());
+        final Optional<PredicateConfig> config = ContextUtil.getLoggingConfig(serverRequest);
+        logger.debug("Reading logging config: {}", config.orElse(null));
+        return config
+                .filter(predicateConfig -> predicateConfig.request().body() == LogOptions.BodyProcessing.STORE)
+                .map(p -> saveIncomingRequest(serverRequest))
+                .orElse(ServerResponse.status(504)
+                        .build());
     }
 
     private Mono<ServerResponse> saveIncomingRequest(ServerRequest serverRequest)
@@ -75,6 +76,7 @@ public class CircuitBreakerHandler implements HandlerFunction<ServerResponse>
         try (final InputStream in = dataBuffer.asInputStream())
         {
             final int copied = StreamUtils.copy(in, dataBufferRepository.getOutputStream(ServerDirection.REQUEST, requestId));
+            dataBufferRepository.appendSizeAvailable(ServerDirection.REQUEST, requestId, copied);
             DataBufferUtils.release(dataBuffer);
             return Mono.just(copied);
         }

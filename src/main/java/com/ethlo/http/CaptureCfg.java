@@ -7,6 +7,7 @@ import static org.springframework.web.reactive.function.server.RouterFunctions.r
 import java.util.List;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.cloud.gateway.handler.predicate.RoutePredicateFactory;
 import org.springframework.cloud.gateway.support.ConfigurationService;
 import org.springframework.context.annotation.Bean;
@@ -15,46 +16,24 @@ import org.springframework.web.reactive.function.server.RequestPredicates;
 import org.springframework.web.reactive.function.server.RouterFunction;
 import org.springframework.web.reactive.function.server.ServerResponse;
 
+import com.ethlo.http.configuration.HttpLoggingConfiguration;
 import com.ethlo.http.handlers.CircuitBreakerHandler;
 import com.ethlo.http.logger.CaptureConfiguration;
 import com.ethlo.http.logger.HttpLogger;
-import com.ethlo.http.configuration.HttpLoggingConfiguration;
 import com.ethlo.http.netty.DataBufferRepository;
 import com.ethlo.http.netty.LoggerHttpClientCustomizer;
 import com.ethlo.http.netty.PooledFileDataBufferRepository;
 import com.ethlo.http.netty.PredicateConfig;
 import com.ethlo.http.netty.TagRequestIdGlobalFilter;
 import com.ethlo.http.processors.LogPreProcessor;
-import com.ethlo.http.processors.auth.extractors.BasicAuthorizationConfig;
-import com.ethlo.http.processors.auth.extractors.BasicAuthorizationExtractor;
-import com.ethlo.http.processors.auth.extractors.JwtAuthorizationConfig;
-import com.ethlo.http.processors.auth.extractors.JwtAuthorizationExtractor;
-import com.ethlo.http.processors.auth.extractors.ResponseAuthorizationConfig;
-import com.ethlo.http.processors.auth.extractors.ResponseAuthorizationExtractor;
 
 @ConditionalOnProperty("http-logging.capture.enabled")
 @Configuration
+@RefreshScope
 public class CaptureCfg
 {
     @Bean
-    public JwtAuthorizationExtractor jwtAuthorizationExtractor(JwtAuthorizationConfig config)
-    {
-        return new JwtAuthorizationExtractor(config);
-    }
-
-    @Bean
-    public BasicAuthorizationExtractor basicAuthorizationExtractor(BasicAuthorizationConfig config)
-    {
-        return new BasicAuthorizationExtractor(config);
-    }
-
-    @Bean
-    public ResponseAuthorizationExtractor responseAuthorizationExtractor(ResponseAuthorizationConfig config)
-    {
-        return new ResponseAuthorizationExtractor(config);
-    }
-
-    @Bean
+    @RefreshScope
     public LoggerHttpClientCustomizer loggerHttpClientCustomizer(DataBufferRepository dataBufferRepository)
     {
         return new LoggerHttpClientCustomizer(dataBufferRepository);
@@ -73,6 +52,7 @@ public class CaptureCfg
     }
 
     @Bean
+    @RefreshScope
     public TagRequestIdGlobalFilter tagRequestIdGlobalFilter(final HttpLogger httpLogger,
                                                              final DataBufferRepository dataBufferRepository,
                                                              final LogPreProcessor logPreProcessor,
@@ -93,6 +73,7 @@ public class CaptureCfg
     }
 
     @Bean
+    @RefreshScope
     public RoutePredicateLocator routePredicateLocator(final List<RoutePredicateFactory> predicateFactories, final ConfigurationService configurationService)
     {
         return new RoutePredicateLocator(predicateFactories, configurationService);

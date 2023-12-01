@@ -4,6 +4,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import com.ethlo.http.logger.BaseProviderConfig;
 
+import org.springframework.cloud.context.config.annotation.RefreshScope;
+
+@RefreshScope
 @ConfigurationProperties("http-logging.providers.clickhouse")
 public class ClickHouseProviderConfig extends BaseProviderConfig
 {

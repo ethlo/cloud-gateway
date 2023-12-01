@@ -35,6 +35,13 @@ public class ClickHouseLogger implements HttpLogger
 
         dataProvider.getResponseHeaders().remove(HttpHeaders.CONTENT_TYPE);
 
+        params.put("request_body", null);
+        params.put("request_body_size", null);
+        params.put("request_total_size", null);
+        params.put("response_body", null);
+        params.put("response_body_size", null);
+        params.put("response_total_size", null);
+
         dataProvider.getRequestPayload().ifPresent(rp ->
         {
             params.put("request_body", dataProvider.logOptions().isLogRequestBody() ? IoUtil.readAllBytes(rp.data()) : null);

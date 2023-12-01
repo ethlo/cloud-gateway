@@ -20,8 +20,8 @@ public class UserCredentialsKeyResolver implements KeyResolver
     @Override
     public Mono<String> resolve(final ServerWebExchange exchange)
     {
-        return Mono
-                .fromCallable(() -> authorizationExtractor.getUser(exchange.getRequest().getHeaders(), exchange.getResponse().getHeaders())
+        return Mono.fromCallable(() ->
+                authorizationExtractor.getUser(exchange.getRequest().getHeaders(), exchange.getResponse().getHeaders())
                         .map(realmUser -> realmUser.realm() + " - " + realmUser.username()).orElse(null));
     }
 }
