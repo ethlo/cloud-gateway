@@ -2,7 +2,7 @@ server:
   port: 8888
 features:
   control-panel-handlers:
-    enabled: true
+    enabled: false
   body-handlers:
     enabled: false
 http-logging:
@@ -120,3 +120,6 @@ spring:
     resources:
       static-locations:
         - file:/static
+config-refresh:
+  enabled: true
+  interval: PT5S

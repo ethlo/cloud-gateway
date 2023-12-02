@@ -1,23 +1,16 @@
 package com.ethlo.http.configuration;
 
-import static java.nio.file.StandardWatchEventKinds.ENTRY_CREATE;
-import static java.nio.file.StandardWatchEventKinds.ENTRY_DELETE;
-import static java.nio.file.StandardWatchEventKinds.ENTRY_MODIFY;
-
 import java.io.File;
-import java.io.IOException;
-import java.nio.file.FileSystems;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.WatchEvent;
-import java.nio.file.WatchKey;
-import java.nio.file.WatchService;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.commons.io.filefilter.FileFilterUtils;
+import org.apache.commons.io.monitor.FileAlterationListenerAdaptor;
+import org.apache.commons.io.monitor.FileAlterationMonitor;
+import org.apache.commons.io.monitor.FileAlterationObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cloud.endpoint.event.RefreshEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.env.StandardEnvironment;
@@ -27,76 +20,49 @@ import org.springframework.util.StringUtils;
 
 import jakarta.annotation.PreDestroy;
 
-@ConditionalOnProperty(value = "features.config-files-watch.enabled", matchIfMissing = true)
 @Component
 public class FileConfigurationChangeDetector
 {
     private static final Logger logger = LoggerFactory.getLogger(FileConfigurationChangeDetector.class);
 
-    private final WatchService watchService = FileSystems.getDefault().newWatchService();
+    private final FileAlterationListenerAdaptor listener;
+    private final FileAlterationMonitor monitor;
 
-    private final ApplicationEventPublisher applicationEventPublisher;
-    private Thread watchThread;
-
-    public FileConfigurationChangeDetector(final StandardEnvironment environment, final ApplicationEventPublisher applicationEventPublisher) throws IOException, InterruptedException
+    public FileConfigurationChangeDetector(final StandardEnvironment environment, final ApplicationEventPublisher applicationEventPublisher, final FileConfigurationChangeDetectorConfiguration config) throws Exception
     {
-        this.applicationEventPublisher = applicationEventPublisher;
-        final List<Path> paths = new ArrayList<>(getPaths(environment.getProperty("spring.config.location", "")));
-        paths.addAll(getPaths(environment.getProperty("spring.config.additional-location", "")));
-        setup(paths);
-    }
-
-    private void setup(List<Path> paths) throws IOException
-    {
-        for (Path path : paths)
+        if (!config.enabled())
         {
-            // We can only watch directories
-            if (Files.isDirectory(path))
-            {
-                path.register(watchService, ENTRY_MODIFY, ENTRY_CREATE, ENTRY_DELETE);
-            }
-            else
-            {
-                // In case of a file, we watch the parent directory
-                path.getParent().register(watchService, ENTRY_MODIFY, ENTRY_CREATE, ENTRY_DELETE);
-            }
-            logger.info("Watching config location {} for change", path);
+            logger.info("Configuration file watcher is disabled");
         }
 
-        this.watchThread = new Thread(() ->
+        logger.info("Starting configuration file watcher");
+        this.listener = new FileAlterationListenerAdaptor()
         {
-            boolean poll = true;
-            long lastLoaded = 0;
-            while (poll)
+            @Override
+            public void onFileChange(File file)
             {
-                final WatchKey key;
-                try
-                {
-                    key = watchService.take();
-                    for (WatchEvent<?> event : key.pollEvents())
-                    {
-                        if (System.currentTimeMillis() - lastLoaded > 1_000)
-                        {
-                            final Path modified = (Path) event.context();
-                            logger.info("Triggering refresh due to modification of configuration: {}", modified);
-                            applicationEventPublisher.publishEvent(new RefreshEvent(this, "RefreshEvent", "Refreshing scope"));
-                            lastLoaded = System.currentTimeMillis();
-                        }
-                    }
-                    poll = key.reset();
-                }
-                catch (InterruptedException e)
-                {
-                    Thread.currentThread().interrupt();
-                }
+                logger.info("Triggering refresh due to modification of configuration: {}", file);
+                applicationEventPublisher.publishEvent(new RefreshEvent(this, "RefreshEvent", "Refreshing scope"));
             }
-        });
-        watchThread.start();
+        };
+
+        this.monitor = new FileAlterationMonitor(config.interval().toMillis());
+        final List<Path> paths = new ArrayList<>(getPaths(environment.getProperty("spring.config.location", "")));
+        paths.addAll(getPaths(environment.getProperty("spring.config.additional-location", "")));
+        for (Path path : paths)
+        {
+            final FileAlterationObserver observer = new FileAlterationObserver(path.toFile().isDirectory() ? path.toFile() : path.getParent().toFile(), FileFilterUtils.nameFileFilter(path.getFileName().toString()));
+            observer.addListener(listener);
+            monitor.addObserver(observer);
+            logger.info("Watching config location {} for change", path);
+        }
+        monitor.start();
     }
 
     private static List<Path> getPaths(String locations)
     {
         return StringUtils.commaDelimitedListToSet(locations).stream().map(FileSystemResource::new)
+                .peek(location -> logger.debug("Checking location: {}   ", location))
                 .filter(FileSystemResource::exists)
                 .map(FileSystemResource::getFile)
                 .map(File::toPath)
@@ -104,8 +70,8 @@ public class FileConfigurationChangeDetector
     }
 
     @PreDestroy
-    public void destroy()
+    public void destroy() throws Exception
     {
-        this.watchThread = null;
+        monitor.stop();
     }
 }

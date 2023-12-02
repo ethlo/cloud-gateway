@@ -17,7 +17,7 @@ http-logging:
       enabled: true
       realm-header-name: baz-realm
   capture:
-    enabled: false
+    enabled: true
     memory-buffer-size: 2KB
     temp-directory: /tmp
   providers:
@@ -40,7 +40,7 @@ http-logging:
     - id: bar
       predicates:
         - Path=/anything/**
-        - Method=POST,PUT
+        - Method=POST,PUT,DELETE
       request:
         body: STORE
       response:
@@ -49,10 +49,12 @@ http-logging:
       predicates:
         - Path=/get/**
         - Method=GET
-        - NotExtension=
+        - NotExtension=js
+      response:
+        body: NONE
 logging:
   level:
-    com.ethlo.http: DEBUG
+    com.ethlo.http: INFO
 management:
   endpoints:
     web:
@@ -79,16 +81,6 @@ spring:
           uri: '${rewrite.backend.uri:https://httpbin.org/get}'
           predicates:
             - Path=/get
-          filters:
-            - name: CircuitBreaker
-              args:
-                name: upstream-down
-                fallbackUri: 'forward:/upstream-down'
-            - name: RequestRateLimiter
-              args:
-                local-rate-limiter:
-                  replenish-rate: 1000
-                  refresh-period: PT10s
         - id: http-bin-anything
           uri: '${rewrite.backend.uri:https://httpbin.org/anything}'
           predicates:
