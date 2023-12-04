@@ -33,30 +33,16 @@ import reactor.netty.http.client.HttpClient;
 public class HttpUpstreamServicesCfg
 {
     private final HttpClient httpClient;
+    private final UpstreamServiceConfiguration upstreamServiceConfiguration;
 
     private final ObjectMapper mapper = new ObjectMapper(new YAMLFactory().enable(YAMLGenerator.Feature.MINIMIZE_QUOTES));
 
     private static final Logger logger = LoggerFactory.getLogger(HttpUpstreamServicesCfg.class);
 
-    private final Map<String, RouteDefinition> mappings = new ConcurrentHashMap<>();
-
     public HttpUpstreamServicesCfg(final HttpClient httpClient, UpstreamServiceConfiguration upstreamServiceConfiguration)
     {
         this.httpClient = httpClient;
-        upstreamServiceConfiguration.getServices().forEach(upstreamService ->
-        {
-            logger.info("Fetching upstream config: {}", upstreamService);
-            try
-            {
-                final ConfigSourceData configSourceData = fetchSourceData(upstreamService);
-                final Map<String, RouteDefinition> routeDefinitions = parse(configSourceData);
-                mappings.putAll(routeDefinitions);
-            }
-            catch (Exception exc)
-            {
-                logger.warn("Unable to process property source from {}: {}", upstreamService, exc.toString());
-            }
-        });
+        this.upstreamServiceConfiguration = upstreamServiceConfiguration;
     }
 
     private Map<String, RouteDefinition> parse(final ConfigSourceData configSourceData) throws IOException
@@ -116,8 +102,25 @@ public class HttpUpstreamServicesCfg
     }
 
     @Bean
+    @RefreshScope
     public UpstreamServiceProperties upstreamServiceProperties()
     {
+        final Map<String, RouteDefinition> mappings = new ConcurrentHashMap<>();
+
+        upstreamServiceConfiguration.getServices().forEach(upstreamService ->
+        {
+            logger.info("Fetching upstream config: {}", upstreamService);
+            try
+            {
+                final ConfigSourceData configSourceData = fetchSourceData(upstreamService);
+                final Map<String, RouteDefinition> routeDefinitions = parse(configSourceData);
+                mappings.putAll(routeDefinitions);
+            }
+            catch (Exception exc)
+            {
+                logger.warn("Unable to process property source from {}: {}", upstreamService, exc.toString());
+            }
+        });
         return new UpstreamServiceProperties(mappings);
     }
 }
