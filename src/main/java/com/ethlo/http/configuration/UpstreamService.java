@@ -1,7 +1,9 @@
 package com.ethlo.http.configuration;
 
 import java.net.URI;
+import java.util.Map;
 
+import org.springframework.cloud.gateway.route.RouteDefinition;
 import org.springframework.validation.annotation.Validated;
 
 import jakarta.validation.Valid;

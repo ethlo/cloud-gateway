@@ -11,7 +11,6 @@ import org.springframework.web.reactive.function.server.ServerRequest;
 
 import io.micrometer.observation.Observation;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
 import reactor.util.context.Context;
 
@@ -35,13 +34,14 @@ public class ContextUtil
 
     private static Optional<Map<String, Object>> getAttributes(ChannelHandlerContext ctx)
     {
-        final Attribute<?> contextView = ctx.channel().attr(AttributeKey.valueOf("$CONTEXT_VIEW"));
-        final Context context = (Context) contextView.get();
-        return Optional.ofNullable(context.getOrDefault("micrometer.observation", null))
+        final Optional<Context> contextView = Optional.ofNullable(ctx.channel().attr(AttributeKey.valueOf("$CONTEXT_VIEW")))
+                .filter(o -> o instanceof Context)
+                .map(Context.class::cast);
+        return contextView.flatMap(context -> Optional.ofNullable(context.getOrDefault("micrometer.observation", null))
                 .map(Observation.class::cast)
                 .map(Observation::getContextView)
                 .map(ServerRequestObservationContext.class::cast)
-                .map(ServerRequestObservationContext::getAttributes);
+                .map(ServerRequestObservationContext::getAttributes));
     }
 
 }

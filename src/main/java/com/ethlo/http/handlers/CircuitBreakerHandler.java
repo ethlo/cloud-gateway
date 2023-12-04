@@ -32,7 +32,6 @@ import reactor.core.scheduler.Schedulers;
 public class CircuitBreakerHandler implements HandlerFunction<ServerResponse>
 {
     private static final Logger logger = LoggerFactory.getLogger(CircuitBreakerHandler.class);
-    private static final String PROCESSED_KEY = CircuitBreakerHandler.class + ".PROCESSED";
     private final DataBufferRepository dataBufferRepository;
 
     public CircuitBreakerHandler(final DataBufferRepository dataBufferRepository)
@@ -44,7 +43,7 @@ public class CircuitBreakerHandler implements HandlerFunction<ServerResponse>
     public @Nonnull Mono<ServerResponse> handle(@Nonnull ServerRequest serverRequest)
     {
         final Optional<Exception> exc = serverRequest.attribute(ServerWebExchangeUtils.CIRCUITBREAKER_EXECUTION_EXCEPTION_ATTR).map(Exception.class::cast);
-        exc.ifPresent(e -> logger.info("An error occurred when routing upstream: {}", e.toString()));
+        exc.ifPresent(e -> logger.info("An error occurred when routing upstream: {}", e, e));
 
         final Optional<PredicateConfig> config = ContextUtil.getLoggingConfig(serverRequest);
         logger.debug("Reading logging config: {}", config.orElse(null));
@@ -66,8 +65,8 @@ public class CircuitBreakerHandler implements HandlerFunction<ServerResponse>
         dataBufferRepository.write(ServerDirection.REQUEST, requestId, extractHeaders(request));
 
         return serverRequest.exchange().getRequest().getBody()
-                .flatMapSequential(dataBuffer -> saveDataChunk(requestId, dataBuffer)
-                        .publishOn(Schedulers.boundedElastic()))
+                .publishOn(Schedulers.boundedElastic())
+                .flatMapSequential(dataBuffer -> saveDataChunk(requestId, dataBuffer))
                 .then(ServerResponse.status(504).build());
     }
 
