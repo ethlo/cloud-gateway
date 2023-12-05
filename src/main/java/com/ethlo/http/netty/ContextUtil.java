@@ -18,7 +18,9 @@ public class ContextUtil
 {
     public static Optional<PredicateConfig> getLoggingConfig(ChannelHandlerContext ctx)
     {
-        return getServerWebExchange(ctx).map(r -> r.getAttribute(LOG_CAPTURE_CONFIG_ATTRIBUTE_NAME)).map(PredicateConfig.class::cast);
+        final Optional<ServerWebExchange> context = getServerWebExchange(ctx);
+        return context.map(r -> r.getAttribute(LOG_CAPTURE_CONFIG_ATTRIBUTE_NAME))
+                .map(PredicateConfig.class::cast);
     }
 
     public static Optional<String> getRequestId(ChannelHandlerContext ctx)
@@ -35,7 +37,10 @@ public class ContextUtil
     {
         final Optional<Attribute<?>> contextView = getContextView(ctx);
         final String key = ServerWebExchangeContextFilter.EXCHANGE_CONTEXT_ATTRIBUTE;
-        return contextView.map(Attribute::get).map(Context.class::cast).map(context -> context.getOrDefault(key, null))
+        //System.out.println("e = " + e.getClass().getCanonicalName() + " - " + e.getOrDefault(ServerWebExchangeContextFilter.EXCHANGE_CONTEXT_ATTRIBUTE, null));
+        return contextView.map(Attribute::get)
+                .map(Context.class::cast)
+                .map(context -> context.getOrDefault(key, null))
                 .map(ServerWebExchange.class::cast);
     }
 

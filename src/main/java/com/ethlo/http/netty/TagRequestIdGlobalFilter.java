@@ -27,7 +27,6 @@ import reactor.core.scheduler.Schedulers;
 
 public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
 {
-    public static final String REQUEST_ID_ATTRIBUTE_NAME = "gateway-request-id";
     public static final String LOG_CAPTURE_CONFIG_ATTRIBUTE_NAME = "log_capture_config";
 
     private static final Logger logger = LoggerFactory.getLogger(TagRequestIdGlobalFilter.class);
@@ -60,38 +59,31 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
     {
         final long started = System.nanoTime();
         final String requestId = exchange.getRequest().getId();
+        logger.debug("Tagging request {}: {}", requestId, predicateConfig);
+        exchange.getAttributes().put(TagRequestIdGlobalFilter.LOG_CAPTURE_CONFIG_ATTRIBUTE_NAME, predicateConfig);
         return chain.filter(exchange)
-                .contextWrite(ctx ->
-                {
-                    logger.debug("Tagging request {}: {}", requestId, predicateConfig);
-                    ctx.put(TagRequestIdGlobalFilter.REQUEST_ID_ATTRIBUTE_NAME, requestId);
-                    ctx.put(TagRequestIdGlobalFilter.LOG_CAPTURE_CONFIG_ATTRIBUTE_NAME, predicateConfig);
-                    return ctx;
-                })
                 .publishOn(Schedulers.boundedElastic())
                 .doFinally(st ->
                 {
                     if (st.equals(SignalType.ON_COMPLETE) || st.equals(SignalType.ON_ERROR) || st.equals(SignalType.CANCEL))
                     {
-                        handleCompletedRequest(exchange, requestId, Duration.ofNanos(System.nanoTime() - started));
+                        handleCompletedRequest(exchange, requestId, predicateConfig, Duration.ofNanos(System.nanoTime() - started));
                     }
                     else
                     {
                         logger.warn("Unhandled signal type {} - {}", requestId, st);
                     }
                 });
-        //.publishOn(Schedulers.boundedElastic());
     }
 
-    private void handleCompletedRequest(ServerWebExchange exchange, String requestId, final Duration duration)
+    private void handleCompletedRequest(ServerWebExchange exchange, String requestId, final PredicateConfig predicateConfig, final Duration duration)
     {
-        logger.debug("Completed request {} in {}", requestId, duration);
-        dataBufferRepository.finished(requestId);
-
         final ServerHttpRequest req = exchange.getRequest();
         final ServerHttpResponse res = exchange.getResponse();
         final Route route = exchange.getAttribute(ServerWebExchangeUtils.GATEWAY_ROUTE_ATTR);
-        final PredicateConfig predicateConfig = exchange.getAttribute(TagRequestIdGlobalFilter.LOG_CAPTURE_CONFIG_ATTRIBUTE_NAME);
+
+        logger.debug("Completed request {} in {}: {}", requestId, duration, predicateConfig);
+        dataBufferRepository.finished(requestId);
 
         final WebExchangeDataProvider data = new WebExchangeDataProvider(dataBufferRepository, predicateConfig)
                 .route(route)
