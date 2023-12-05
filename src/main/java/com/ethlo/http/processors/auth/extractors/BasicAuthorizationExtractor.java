@@ -4,21 +4,20 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Optional;
 
-import jakarta.validation.constraints.NotNull;
-
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
-
-import com.ethlo.http.processors.auth.RealmUser;
-
 import org.springframework.validation.annotation.Validated;
 
+import com.ethlo.http.processors.auth.RealmUser;
+import jakarta.validation.constraints.NotNull;
+
+@ConditionalOnProperty("http-logging.auth.basic")
 @Validated
 @Component
 @RefreshScope
-@ConditionalOnProperty("http-logging.auth.basic.enabled")
 public class BasicAuthorizationExtractor implements AuthorizationExtractor
 {
     private final BasicAuthorizationConfig config;

@@ -6,6 +6,7 @@ import static org.springframework.web.reactive.function.server.RouterFunctions.r
 
 import java.util.List;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.cloud.gateway.handler.predicate.RoutePredicateFactory;
 import org.springframework.cloud.gateway.support.ConfigurationService;
@@ -27,6 +28,7 @@ import com.ethlo.http.processors.LogPreProcessor;
 
 @Configuration
 @RefreshScope
+@ConditionalOnProperty("http-logging.capture.enabled")
 public class CaptureCfg
 {
     @Bean

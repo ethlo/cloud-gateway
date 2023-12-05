@@ -4,21 +4,19 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 
 import java.util.Optional;
 
-import com.ethlo.http.processors.auth.RealmUser;
-
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.http.HttpHeaders;
+import org.springframework.stereotype.Component;
 
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.exceptions.JWTDecodeException;
 import com.auth0.jwt.interfaces.DecodedJWT;
-
-import org.springframework.stereotype.Component;
+import com.ethlo.http.processors.auth.RealmUser;
 
 @RefreshScope
 @Component
-@ConditionalOnProperty("http-logging.auth.jwt.enabled")
+@ConditionalOnBean(JwtAuthorizationExtractor.class)
 public class JwtAuthorizationExtractor implements AuthorizationExtractor
 {
     private final JwtAuthorizationConfig config;
@@ -31,7 +29,7 @@ public class JwtAuthorizationExtractor implements AuthorizationExtractor
     @Override
     public Optional<RealmUser> getUser(HttpHeaders headers, final HttpHeaders responseHeaders)
     {
-        if (! config.isEnabled())
+        if (!config.isEnabled())
         {
             return Optional.empty();
         }

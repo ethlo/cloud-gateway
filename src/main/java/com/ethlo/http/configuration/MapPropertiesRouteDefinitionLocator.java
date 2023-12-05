@@ -11,15 +11,16 @@ import java.util.Map;
 @Component
 public class MapPropertiesRouteDefinitionLocator implements RouteDefinitionLocator
 {
-	private final UpstreamServiceProperties properties;
+	private final UpstreamServiceProperties upstreamServiceProperties;
 
-	public MapPropertiesRouteDefinitionLocator(UpstreamServiceProperties properties) {
-		this.properties = properties;
+	public MapPropertiesRouteDefinitionLocator(UpstreamServiceProperties upstreamServiceProperties)
+    {
+		this.upstreamServiceProperties = upstreamServiceProperties;
 	}
 
 	@Override
 	public Flux<RouteDefinition> getRouteDefinitions() {
-		return Flux.fromIterable(properties.getRoutes().entrySet()).map(this::processEntry);
+		return Flux.fromIterable(upstreamServiceProperties.getRoutes().entrySet()).map(this::processEntry);
 	}
 
 	private RouteDefinition processEntry(Map.Entry<String, RouteDefinition> entry) {

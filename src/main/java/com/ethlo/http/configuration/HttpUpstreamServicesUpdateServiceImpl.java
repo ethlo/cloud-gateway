@@ -3,12 +3,16 @@ package com.ethlo.http.configuration;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,8 +20,8 @@ import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.cloud.gateway.filter.FilterDefinition;
 import org.springframework.cloud.gateway.handler.predicate.PredicateDefinition;
 import org.springframework.cloud.gateway.route.RouteDefinition;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -28,18 +32,18 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import reactor.core.publisher.Mono;
 import reactor.netty.http.client.HttpClient;
 
-@Configuration
+@Component
 @RefreshScope
-public class HttpUpstreamServicesCfg
+public class HttpUpstreamServicesUpdateServiceImpl implements HttpUpstreamServicesUpdateService
 {
+    private static final Logger logger = LoggerFactory.getLogger(HttpUpstreamServicesUpdateServiceImpl.class);
     private final HttpClient httpClient;
     private final UpstreamServiceConfiguration upstreamServiceConfiguration;
-
     private final ObjectMapper mapper = new ObjectMapper(new YAMLFactory().enable(YAMLGenerator.Feature.MINIMIZE_QUOTES));
 
-    private static final Logger logger = LoggerFactory.getLogger(HttpUpstreamServicesCfg.class);
+    private final Map<String, LastModifiedRouteDefinition> lastModified = new LinkedHashMap<>();
 
-    public HttpUpstreamServicesCfg(final HttpClient httpClient, UpstreamServiceConfiguration upstreamServiceConfiguration)
+    public HttpUpstreamServicesUpdateServiceImpl(final HttpClient httpClient, UpstreamServiceConfiguration upstreamServiceConfiguration)
     {
         this.httpClient = httpClient;
         this.upstreamServiceConfiguration = upstreamServiceConfiguration;
@@ -77,12 +81,13 @@ public class HttpUpstreamServicesCfg
                                 }).orElse(List.of());
 
 
+                        final String routeId = configSourceData.name() + "_" + i;
                         final RouteDefinition route = new RouteDefinition();
                         route.setId(id);
                         route.setUri(URI.create(uri));
                         route.setPredicates(predicates);
                         route.setFilters(filters);
-                        result.put(configSourceData.name() + "_" + i, route);
+                        result.put(routeId, route);
                     }
                     return result;
                 }).orElseThrow(() -> new IllegalArgumentException("No routes in file"));
@@ -101,26 +106,76 @@ public class HttpUpstreamServicesCfg
         }).block();
     }
 
-    @Bean
-    @RefreshScope
-    public UpstreamServiceProperties upstreamServiceProperties()
+    @Scheduled(fixedDelayString = "${upstream.interval:30000}")
+    public void update()
     {
-        final Map<String, RouteDefinition> mappings = new ConcurrentHashMap<>();
+        updateAll();
+    }
 
+    @Override
+    public Map.Entry<Map<String, RouteDefinition>, Boolean> updateAll()
+    {
+        final AtomicBoolean refreshRequired = new AtomicBoolean(false);
         upstreamServiceConfiguration.getServices().forEach(upstreamService ->
         {
-            logger.info("Fetching upstream config: {}", upstreamService);
+            logger.debug("Fetching upstream config: {}", upstreamService);
+            final String uri = upstreamService.configUrl().toString();
+            ConfigSourceData configSourceData;
             try
             {
-                final ConfigSourceData configSourceData = fetchSourceData(upstreamService);
-                final Map<String, RouteDefinition> routeDefinitions = parse(configSourceData);
-                mappings.putAll(routeDefinitions);
+                configSourceData = fetchSourceData(upstreamService);
             }
             catch (Exception exc)
             {
-                logger.warn("Unable to process property source from {}: {}", upstreamService, exc.toString());
+                logger.warn("Unable to fetch config for upstream service {}: {}", upstreamService, exc.getCause().toString());
+                return;
             }
+
+            // Create hash of fetched data
+            final String hash = hash(configSourceData);
+
+            // Compare the payload hash to the previous payload hash
+            lastModified.compute(uri, (k, v) ->
+            {
+                if (v == null || !v.hash.equals(hash))
+                {
+                    // We have new data or no data previously
+                    try
+                    {
+                        final Map<String, RouteDefinition> routeDefinitions = parse(configSourceData);
+                        refreshRequired.set(true);
+                        logger.info("{} upstream config for {}", v == null ? "New" : "Updated", upstreamService);
+                        return new LastModifiedRouteDefinition(routeDefinitions, hash, OffsetDateTime.now());
+                    }
+                    catch (IOException e)
+                    {
+                        logger.warn("Unable to parse config for upstream service {}: {}", upstreamService, e.toString());
+                        return null;
+                    }
+                }
+                else
+                {
+                    // Old data matches hash
+                    return v;
+                }
+            });
         });
-        return new UpstreamServiceProperties(mappings);
+
+        final Map<String, RouteDefinition> collapsed = lastModified.entrySet().stream()
+                .filter(Objects::nonNull)
+                .flatMap(e -> e.getValue().routeDefinitions().entrySet().stream().map(en -> Map.entry(e.getKey() + "_" + en.getKey(), en.getValue())))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+        return Map.entry(collapsed, refreshRequired.get());
+    }
+
+    private String hash(ConfigSourceData configSourceData)
+    {
+        return Integer.toString(Arrays.hashCode(configSourceData.data()));
+    }
+
+    public record LastModifiedRouteDefinition(Map<String, RouteDefinition> routeDefinitions, String hash,
+                                              OffsetDateTime lastUpdated)
+    {
+
     }
 }

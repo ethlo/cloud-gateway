@@ -42,10 +42,6 @@ public class RoutePredicateLocator
                 logger.warn("A RoutePredicateFactory named {} already exists, class: {}. It will be overwritten.", key, this.predicateFactories.get(key));
             }
             this.predicateFactories.put(key, factory);
-            if (logger.isInfoEnabled())
-            {
-                logger.info("Loaded RoutePredicateFactory [{}]", key);
-            }
         });
     }
 

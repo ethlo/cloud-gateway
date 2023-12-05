@@ -22,7 +22,7 @@ public class CaptureConfiguration
 
     public void setEnabled(final Boolean enabled)
     {
-        this.enabled = Optional.ofNullable(enabled).orElse(true);
+        this.enabled = Optional.ofNullable(enabled).orElse(false);
         if (this.enabled)
         {
             logger.info("Capture is enabled");
@@ -45,7 +45,7 @@ public class CaptureConfiguration
 
     public boolean isEnabled()
     {
-        return enabled;
+        return Optional.ofNullable(enabled).orElse(false);
     }
 
     public void setTempDirectory(final Path tempDirectory)

@@ -5,9 +5,11 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 @ConfigurationPropertiesScan
 @EnableConfigurationProperties
+@EnableScheduling
 @SpringBootApplication(exclude = DataSourceAutoConfiguration.class)
 public class ReverseProxyApplication
 {

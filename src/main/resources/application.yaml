@@ -1,62 +1,9 @@
 server:
   port: 8888
-features:
-  control-panel-handlers:
-    enabled: false
-  body-handlers:
-    enabled: false
-http-logging:
-  auth:
-    jwt:
-      enabled: true
-      username-claim-name: sub
-      realm-claim-name: realm
-    basic:
-      enabled: true
-      realm-header-name: x-realm
-    response-header:
-      enabled: true
-      strip-headers: true
-      realm-header: x-realm
-      username-header: x-username
-  capture:
-    enabled: true
-    memory-buffer-size: 500KB
-    temp-directory: /tmp
-  providers:
-    #file:
-    #  enabled: true
-    #  pattern: '{{gateway_request_id}} {{realm_claim}} {{user_claim}} {{method}} {{path}} {{host}} {{request_headers["Content-Length"][0]}} {{status}} {{user_agent}} {{duration | numberformat("#.###") }}'
-    #  body-storage-directory: /tmp/cloud-gateway/bodies
-    clickhouse:
-      enabled: true
-      url: 'jdbc:ch://localhost:18123/default?compress=0;async_insert=1,wait_for_async_insert=0'
-  matchers:
-    - id: nope
-      predicates:
-        - Path=/nope
-        - NotHost=example.com
-        - NotPath=/yep
-        - NotMethod=GET
-      request:
-        body: STORE
-    - id: bar
-      predicates:
-        - Path=/anything/**
-        - Method=POST,PUT
-      request:
-        body: STORE
-      response:
-        body: SIZE
-    - id: baz
-      predicates:
-        - Path=/get/**
-        - Method=GET
-        - NotExtension=
 
 logging:
   level:
-    com.ethlo.http: debug
+    com.ethlo.http: INFO
     org.springframework.cloud.gateway: INFO
 
 management:
@@ -65,57 +12,6 @@ management:
       exposure:
         include: health,gateway,metrics,clickhouse,refresh
 spring:
-  cloud:
-    gateway:
-      #filter:
-      #  request-rate-limiter:
-      #    enabled: true
-      #    deny-empty-key: true
-      #    empty-key-status-code: 403
-      metrics:
-        tags:
-          path:
-            enabled: true
-        enabled: true
-      routes:
-        - id: non-existing
-          uri: '${rewrite.backend.uri:https://sdasdasdpopiwqhiqwndqlwdk.org}'
-          predicates:
-            - Path=/nope
-            - NotExtension=js,css,gif,png,jpg
-          filters:
-            - name: CircuitBreaker
-              args:
-                name: upstream-down
-                fallbackUri: 'forward:/upstream-down'
-        - id: http-bin-get
-          uri: '${rewrite.backend.uri:https://httpbin.org/get}'
-          predicates:
-            - Path=/get
-          filters:
-            - name: CircuitBreaker
-              args:
-                name: upstream-down
-                fallbackUri: 'forward:/upstream-down'
-            - name: RequestRateLimiter
-              args:
-                local-rate-limiter:
-                  replenish-rate: 10000
-                  refresh-period: PT10s
-        - id: http-bin-any
-          uri: '${rewrite.backend.uri:https://httpbin.org/anything}'
-          predicates:
-            - Path=/anything
-          filters:
-            - name: CircuitBreaker
-              args:
-                name: upstream-down
-                fallbackUri: 'forward:/upstream-down'
-            - name: RequestRateLimiter
-              args:
-                local-rate-limiter:
-                  replenish-rate: 2
-                  refresh-period: 10
   web:
     resources:
       static-locations:
@@ -123,3 +19,6 @@ spring:
 config-refresh:
   enabled: true
   interval: PT5S
+
+upstream:
+  interval: PT10S
