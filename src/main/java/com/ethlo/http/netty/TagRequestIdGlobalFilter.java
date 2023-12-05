@@ -48,6 +48,7 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
     @Override
     public @Nonnull Mono<Void> filter(@Nonnull ServerWebExchange exchange, GatewayFilterChain chain)
     {
+        final String requestId = exchange.getRequest().getId();
         return Flux.fromIterable(predicateConfigs)
                 .filterWhen(c -> (Publisher<Boolean>) c.predicate().apply(exchange))
                 .next()
@@ -59,39 +60,27 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
     {
         final long started = System.nanoTime();
         final String requestId = exchange.getRequest().getId();
-        exchange.getAttributes().put(TagRequestIdGlobalFilter.REQUEST_ID_ATTRIBUTE_NAME, requestId);
-
-        if (exchange.getAttribute(TagRequestIdGlobalFilter.LOG_CAPTURE_CONFIG_ATTRIBUTE_NAME) == null)
-        {
-            exchange.getAttributes().put(TagRequestIdGlobalFilter.LOG_CAPTURE_CONFIG_ATTRIBUTE_NAME, predicateConfig);
-            return chain.filter(exchange)
-                    .contextWrite(ctx ->
+        return chain.filter(exchange)
+                .contextWrite(ctx ->
+                {
+                    logger.debug("Tagging request {}: {}", requestId, predicateConfig);
+                    ctx.put(TagRequestIdGlobalFilter.REQUEST_ID_ATTRIBUTE_NAME, requestId);
+                    ctx.put(TagRequestIdGlobalFilter.LOG_CAPTURE_CONFIG_ATTRIBUTE_NAME, predicateConfig);
+                    return ctx;
+                })
+                .publishOn(Schedulers.boundedElastic())
+                .doFinally(st ->
+                {
+                    if (st.equals(SignalType.ON_COMPLETE) || st.equals(SignalType.ON_ERROR) || st.equals(SignalType.CANCEL))
                     {
-                        logger.debug("Tagging request {}: {}", requestId, predicateConfig);
-                        ctx.put(TagRequestIdGlobalFilter.LOG_CAPTURE_CONFIG_ATTRIBUTE_NAME, predicateConfig);
-                        return ctx;
-                    })
-                    .publishOn(Schedulers.boundedElastic())
-                    .doFinally(st ->
+                        handleCompletedRequest(exchange, requestId, Duration.ofNanos(System.nanoTime() - started));
+                    }
+                    else
                     {
-                        if (st.equals(SignalType.ON_COMPLETE) || st.equals(SignalType.ON_ERROR) || st.equals(SignalType.CANCEL))
-                        {
-                            handleCompletedRequest(exchange, requestId, Duration.ofNanos(System.nanoTime() - started));
-                        }
-                        else
-                        {
-                            logger.warn("Unhandled signal type {} - {}", requestId, st);
-                        }
-                    });
-        }
-        else
-        {
-            return chain.filter(exchange).contextWrite(ctx ->
-            {
-                ctx.put(REQUEST_ID_ATTRIBUTE_NAME, requestId);
-                return ctx;
-            });
-        }
+                        logger.warn("Unhandled signal type {} - {}", requestId, st);
+                    }
+                });
+        //.publishOn(Schedulers.boundedElastic());
     }
 
     private void handleCompletedRequest(ServerWebExchange exchange, String requestId, final Duration duration)

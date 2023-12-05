@@ -41,7 +41,7 @@ public class WebExchangeDataProvider
     public WebExchangeDataProvider(DataBufferRepository dataBufferRepository, final PredicateConfig predicateConfig)
     {
         this.dataBufferRepository = Objects.requireNonNull(dataBufferRepository);
-        this.predicateConfig = Objects.requireNonNull(predicateConfig);
+        this.predicateConfig = predicateConfig;
     }
 
     public WebExchangeDataProvider requestId(String requestId)
@@ -212,8 +212,8 @@ public class WebExchangeDataProvider
         return Optional.ofNullable(user);
     }
 
-    public PredicateConfig logOptions()
+    public Optional<PredicateConfig> getPredicateConfig()
     {
-        return predicateConfig;
+        return Optional.ofNullable(predicateConfig);
     }
 }

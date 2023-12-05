@@ -11,6 +11,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
@@ -41,7 +43,7 @@ public class HttpUpstreamServicesUpdateServiceImpl implements HttpUpstreamServic
     private final UpstreamServiceConfiguration upstreamServiceConfiguration;
     private final ObjectMapper mapper = new ObjectMapper(new YAMLFactory().enable(YAMLGenerator.Feature.MINIMIZE_QUOTES));
 
-    private final Map<String, LastModifiedRouteDefinition> lastModified = new LinkedHashMap<>();
+    private final ConcurrentMap<String, LastModifiedRouteDefinition> lastModified = new ConcurrentHashMap<>();
 
     public HttpUpstreamServicesUpdateServiceImpl(final HttpClient httpClient, UpstreamServiceConfiguration upstreamServiceConfiguration)
     {
@@ -118,7 +120,7 @@ public class HttpUpstreamServicesUpdateServiceImpl implements HttpUpstreamServic
         final AtomicBoolean refreshRequired = new AtomicBoolean(false);
         upstreamServiceConfiguration.getServices().forEach(upstreamService ->
         {
-            logger.debug("Fetching upstream config: {}", upstreamService);
+            logger.trace("Fetching upstream config: {}", upstreamService);
             final String uri = upstreamService.configUrl().toString();
             ConfigSourceData configSourceData;
             try
@@ -127,7 +129,7 @@ public class HttpUpstreamServicesUpdateServiceImpl implements HttpUpstreamServic
             }
             catch (Exception exc)
             {
-                logger.warn("Unable to fetch config for upstream service {}: {}", upstreamService, exc.getCause().toString());
+                logger.warn("Unable to fetch config for upstream service {}: {}", upstreamService, exc.toString());
                 return;
             }
 

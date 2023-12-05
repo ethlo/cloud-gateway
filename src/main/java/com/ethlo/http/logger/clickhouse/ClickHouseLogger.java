@@ -8,6 +8,7 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
 import com.ethlo.http.logger.HttpLogger;
 import com.ethlo.http.model.WebExchangeDataProvider;
+import com.ethlo.http.netty.PredicateConfig;
 import com.ethlo.http.util.IoUtil;
 
 public class ClickHouseLogger implements HttpLogger
@@ -44,13 +45,21 @@ public class ClickHouseLogger implements HttpLogger
 
         dataProvider.getRequestPayload().ifPresent(rp ->
         {
-            params.put("request_body", dataProvider.logOptions().isLogRequestBody() ? IoUtil.readAllBytes(rp.data()) : null);
+            final boolean storeRequestData = dataProvider.getPredicateConfig()
+                    .map(PredicateConfig::isLogRequestBody)
+                    .orElse(false);
+
+            params.put("request_body", storeRequestData ? IoUtil.readAllBytes(rp.data()) : null);
             params.put("request_body_size", rp.bodyLength());
             params.put("request_total_size", rp.totalLength());
         });
         dataProvider.getResponsePayload().ifPresent(rp ->
         {
-            params.put("response_body", dataProvider.logOptions().isLogResponseBody() ? IoUtil.readAllBytes(rp.data()) : null);
+            final boolean storeResponseData = dataProvider.getPredicateConfig()
+                    .map(PredicateConfig::isLogResponseBody)
+                    .orElse(false);
+
+            params.put("response_body", storeResponseData ? IoUtil.readAllBytes(rp.data()) : null);
             params.put("response_body_size", rp.bodyLength());
             params.put("response_total_size", rp.totalLength());
         });

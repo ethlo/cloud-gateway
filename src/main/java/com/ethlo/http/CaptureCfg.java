@@ -12,6 +12,7 @@ import org.springframework.cloud.gateway.handler.predicate.RoutePredicateFactory
 import org.springframework.cloud.gateway.support.ConfigurationService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.filter.reactive.ServerWebExchangeContextFilter;
 import org.springframework.web.reactive.function.server.RequestPredicates;
 import org.springframework.web.reactive.function.server.RouterFunction;
 import org.springframework.web.reactive.function.server.ServerResponse;
@@ -41,6 +42,12 @@ public class CaptureCfg
     public CircuitBreakerHandler circuitBreakerHandler(DataBufferRepository dataBufferRepository)
     {
         return new CircuitBreakerHandler(dataBufferRepository);
+    }
+
+    @Bean
+    public ServerWebExchangeContextFilter serverWebExchangeContextFilter()
+    {
+        return new ServerWebExchangeContextFilter();
     }
 
     @Bean

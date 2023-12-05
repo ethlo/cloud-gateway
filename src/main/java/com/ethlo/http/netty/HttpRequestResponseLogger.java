@@ -52,15 +52,14 @@ public class HttpRequestResponseLogger extends LoggingHandler
     private String format(ChannelHandlerContext ctx, String eventName, ByteBuf msg)
     {
         final ServerDirection operation = WRITE.equalsIgnoreCase(eventName) ? REQUEST : RESPONSE;
-        getRequestId(ctx).ifPresent(requestId ->
-        {
-            final int bytesAvailable = msg.readableBytes();
-            dataBufferRepository.appendSizeAvailable(operation, requestId, bytesAvailable);
-        });
 
         return getLoggingConfig(ctx).map(pattern ->
         {
             final String requestId = getRequestId(ctx).orElseThrow();
+
+            final int bytesAvailable = msg.readableBytes();
+            dataBufferRepository.appendSizeAvailable(operation, requestId, bytesAvailable);
+
             final boolean isRequestAndShouldStore = pattern.request().body().mustParse() && operation == REQUEST;
             final boolean isResponseAndShouldStore = pattern.response().body().mustParse() && operation == RESPONSE;
             if (isRequestAndShouldStore || isResponseAndShouldStore)
