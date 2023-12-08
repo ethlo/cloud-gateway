@@ -7,7 +7,6 @@ import java.util.List;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
-import org.springframework.cloud.gateway.support.ShortcutConfigurable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
@@ -32,7 +31,7 @@ public class InjectBasicAuthGatewayFilterFactory extends AbstractGatewayFilterFa
             @Override
             public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain)
             {
-                final String authValue = Base64.getEncoder().encodeToString((config.getUsername() + ":" + config.getPassword()).getBytes(StandardCharsets.UTF_8));
+                final String authValue = "Basic " + Base64.getEncoder().encodeToString((config.getUsername() + ":" + config.getPassword()).getBytes(StandardCharsets.UTF_8));
                 final ServerHttpRequest request = exchange.getRequest().mutate().headers(httpHeaders -> httpHeaders.set(HttpHeaders.AUTHORIZATION, authValue)).build();
                 return chain.filter(exchange.mutate().request(request).build());
             }
