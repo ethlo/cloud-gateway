@@ -18,16 +18,16 @@ http-logging:
       realm-header-name: baz-realm
   capture:
     enabled: true
-    memory-buffer-size: 2KB
+    memory-buffer-size: 500B
     temp-directory: /tmp
   providers:
     file:
-      enabled: true
+      enabled: false
       pattern: '{{gateway_request_id}} {{realm_claim}} {{user_claim}} {{method}} {{path}} {{host}} {{request_headers["Content-Length"][0]}} {{status}} {{user_agent}} {{duration | numberformat("#.###") }}'
       body-storage-directory: /tmp/cloud-gateway/bodies
-    #clickhouse:
-    #  enabled: true
-    #  url: 'jdbc:ch://localhost:18123/default?compress=0;async_insert=1,wait_for_async_insert=0'
+    clickhouse:
+      enabled: true
+      url: 'jdbc:ch://localhost:18123/default?compress=0;async_insert=1,wait_for_async_insert=0'
   matchers:
     - id: nope
       predicates:
@@ -47,14 +47,14 @@ http-logging:
         body: SIZE
     - id: baz
       predicates:
-        - Path=/get/**
+        - Path=/get2/**
         - Method=GET
-        - NotExtension=js
+        - NotExtension=
       response:
         body: NONE
 logging:
   level:
-    com.ethlo.http: INFO
+    com.ethlo.http: DEBUG
     org.springframework.cloud.gateway: INFO
 management:
   endpoints:
@@ -79,18 +79,20 @@ spring:
         enabled: true
       routes:
         - id: http-bin-get
-          uri: '${rewrite.backend.uri:https://httpbin.org/get}'
+          uri: https://httpbin.org/get
           predicates:
             - Path=/get
+          filters:
+            - name: InjectBasicAuth
+              args:
+                username: foo
+                password: bar
+            - SetRequestHeader=x-realm,baz
         - id: http-bin-anything
-          uri: '${rewrite.backend.uri:https://httpbin.org/anything}'
+          uri: https://httpbin.org/anything
           predicates:
             - Path=/anything
           filters:
-            - name: CircuitBreaker
-              args:
-                name: upstream-down
-                fallbackUri: 'forward:/upstream-down'
             - name: RequestRateLimiter
               args:
                 local-rate-limiter:
@@ -104,4 +106,4 @@ upstream:
   interval: PT10S
   services:
     - name: my-service
-      config-url: http://localhost:8000/config.yaml?5
+      config-url: http://localhost:8000/config.yaml
