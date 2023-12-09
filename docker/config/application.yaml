@@ -56,6 +56,7 @@ logging:
   level:
     com.ethlo.http: DEBUG
     org.springframework.cloud.gateway: INFO
+    com.ethlo.qjc: TRACE
 management:
   endpoints:
     web:
@@ -78,6 +79,30 @@ spring:
             enabled: true
         enabled: true
       routes:
+        - id: codes
+          uri: https://core-server.snapshot.kezzler.net/ssp
+          predicates:
+            - Path=/api/**
+            - name: Java
+              args:
+                expression: >
+                  public boolean test(ServerWebExchange exchange) {
+                      System.out.println("Hello from a custom predicate: " + exchange.getRequest().getId());
+                      return "bar".equalsIgnoreCase(exchange.getRequest().getQueryParams().getFirst("foo"));
+                  }
+          filters:
+            - name: Java
+              args:
+                expression: >
+                  public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
+                      System.out.println("Hello from a custom filter: " + exchange.getRequest().getId());
+                      return chain.filter(exchange);
+                  }
+            - name: InjectBasicAuth
+              args:
+                username: foo
+                password: bar
+            - SetRequestHeader=x-realm,my-realm
         - id: http-bin-get
           uri: https://httpbin.org/get
           predicates:

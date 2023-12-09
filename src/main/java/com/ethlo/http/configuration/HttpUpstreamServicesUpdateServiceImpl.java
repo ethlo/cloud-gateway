@@ -129,6 +129,7 @@ public class HttpUpstreamServicesUpdateServiceImpl implements HttpUpstreamServic
             }
             catch (Exception exc)
             {
+                lastModified.remove(uri);
                 logger.warn("Unable to fetch config for upstream service {}: {}", upstreamService, exc.toString());
                 return;
             }
