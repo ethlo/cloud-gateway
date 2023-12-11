@@ -9,11 +9,13 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystem;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 
 import com.ethlo.qjc.Compiler;
@@ -25,10 +27,12 @@ public class JavaCompiledExpressionUtil
 {
     private static final Logger logger = LoggerFactory.getLogger(JavaCompiledExpressionUtil.class);
 
-    public static <T> T load(Resource resource, final String expression, final Class<T> type)
+    public static <T> T load(JavaExpressionConfig config, final Class<T> type)
     {
         final String className = "Random" + UUID.randomUUID().toString().replace("-", "");
-        final String classExpression = getClassExpression(resource, className, expression);
+        final String classExpression = Optional.ofNullable(config.getTemplate())
+                .map(tpl -> getClassExpression(new ClassPathResource(tpl), className, config.getExpression()))
+                .orElseGet(config::getExpression);
 
         try (FileSystem fs = Jimfs.newFileSystem(Configuration.unix()))
         {
@@ -71,7 +75,9 @@ public class JavaCompiledExpressionUtil
         try
         {
             final String tplExpression = new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-            return tplExpression.replace("$className", className).replace("$expression", expression);
+            return tplExpression
+                    .replace("$className", className)
+                    .replace("$expression", expression);
         }
         catch (IOException e)
         {

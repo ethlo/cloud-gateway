@@ -1,40 +1,26 @@
 package com.ethlo.http.filters;
 
+import java.util.Optional;
+
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
-import org.springframework.validation.annotation.Validated;
 
 import com.ethlo.http.util.JavaCompiledExpressionUtil;
+import com.ethlo.http.util.JavaExpressionConfig;
 
 @Component
-public class JavaGatewayFilterFactory extends AbstractGatewayFilterFactory<JavaGatewayFilterFactory.Config>
+public class JavaGatewayFilterFactory extends AbstractGatewayFilterFactory<JavaExpressionConfig>
 {
     public JavaGatewayFilterFactory()
     {
-        super(JavaGatewayFilterFactory.Config.class);
+        super(JavaExpressionConfig.class);
     }
 
     @Override
-    public GatewayFilter apply(Config config)
+    public GatewayFilter apply(JavaExpressionConfig config)
     {
-        return JavaCompiledExpressionUtil.load(new ClassPathResource("/java/GatewayFilterTemplate.java"), config.getExpression(), GatewayFilter.class);
-    }
-
-    @Validated
-    public static class Config
-    {
-        private final String expression;
-
-        public Config(final String expression)
-        {
-            this.expression = expression;
-        }
-
-        public String getExpression()
-        {
-            return expression;
-        }
+        return JavaCompiledExpressionUtil.load(config, GatewayFilter.class);
     }
 }
