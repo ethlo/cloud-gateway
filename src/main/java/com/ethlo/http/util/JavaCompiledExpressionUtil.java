@@ -29,9 +29,9 @@ public class JavaCompiledExpressionUtil
 
     public static <T> T load(JavaExpressionConfig config, final Class<T> type)
     {
-        final String className = "Random" + UUID.randomUUID().toString().replace("-", "");
+        final String className = "Class" + UUID.randomUUID().toString().replace("-", "");
         final String classExpression = Optional.ofNullable(config.getTemplate())
-                .map(tpl -> getClassExpression(new ClassPathResource(tpl), className, config.getExpression()))
+                .map(tpl -> getClassExpression(new ClassPathResource("java/" + tpl + ".java"), className, config.getExpression()))
                 .orElseGet(config::getExpression);
 
         try (FileSystem fs = Jimfs.newFileSystem(Configuration.unix()))

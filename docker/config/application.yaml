@@ -54,9 +54,9 @@ http-logging:
         body: NONE
 logging:
   level:
-    com.ethlo.http: DEBUG
+    com.ethlo.http: INFO
     org.springframework.cloud.gateway: INFO
-    com.ethlo.qjc: TRACE
+    com.ethlo.qjc: INFO
 management:
   endpoints:
     web:
@@ -85,7 +85,7 @@ spring:
             - Path=/api/**
             - name: Java
               args:
-                template: java/JavaRoutePredicateTemplate.java
+                template: SimpleRoutePredicateTemplate
                 expression: >
                   public boolean test(ServerWebExchange exchange) {
                       System.out.println("Hello from a custom predicate: " + exchange.getRequest().getId());
@@ -94,7 +94,7 @@ spring:
           filters:
             - name: Java
               args:
-                template: java/JavaGatewayFilterTemplate.java
+                template: SimpleGatewayFilterTemplate
                 expression: >
                   public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
                       System.out.println("Hello from a custom filter: " + exchange.getRequest().getId());
