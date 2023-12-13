@@ -30,7 +30,7 @@ public class PathHostGatewayFilterFactory extends AbstractChangeRequestUriGatewa
         final String serviceName = originalParts[config.serviceIndex];
         if (config.allowedRegexp == null || config.allowedRegexp.matcher(serviceName).matches())
         {
-            final String subPath = "/" + Arrays.stream(originalParts).skip(config.serviceIndex + 1).collect(Collectors.joining());
+            final String subPath = "/" + Arrays.stream(originalParts).skip(config.serviceIndex + 1).collect(Collectors.joining("/"));
             final String newUri = req.getURI().getScheme() + "://" + serviceName + subPath;
             return Optional.of(URI.create(newUri));
         }
