@@ -1,9 +1,11 @@
 package com.ethlo.http.filters;
 
 import java.net.URI;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import org.springframework.cloud.gateway.filter.factory.AbstractChangeRequestUriGatewayFilterFactory;
 import org.springframework.http.server.reactive.ServerHttpRequest;
@@ -28,7 +30,9 @@ public class PathHostGatewayFilterFactory extends AbstractChangeRequestUriGatewa
         final String serviceName = originalParts[config.serviceIndex];
         if (config.allowedRegexp == null || config.allowedRegexp.matcher(serviceName).matches())
         {
-            return Optional.of(URI.create(req.getURI().getScheme() + "://" + serviceName));
+            final String subPath = "/" + Arrays.stream(originalParts).skip(config.serviceIndex + 1).collect(Collectors.joining());
+            final String newUri = req.getURI().getScheme() + "://" + serviceName + subPath;
+            return Optional.of(URI.create(newUri));
         }
         return Optional.empty();
     }
