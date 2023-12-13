@@ -26,7 +26,7 @@ public class PathHostGatewayFilterFactory extends AbstractChangeRequestUriGatewa
         final String path = req.getURI().getRawPath();
         final String[] originalParts = StringUtils.tokenizeToStringArray(path, "/");
         final String serviceName = originalParts[config.serviceIndex];
-        if (config.allowedRegexp.matcher(serviceName).matches())
+        if (config.allowedRegexp == null || config.allowedRegexp.matcher(serviceName).matches())
         {
             return Optional.of(URI.create(req.getURI().getScheme() + "://" + serviceName));
         }
