@@ -79,8 +79,15 @@ spring:
             enabled: true
         enabled: true
       routes:
+        - id: dynamic-hosts
+          uri: http://default
+          predicates:
+            - Path=/services/**
+          filters:
+            - PathHost=1,[\w-]+
+
         - id: codes
-          uri: https://core-server.snapshot.kezzler.net/ssp
+          uri: https://httpbin.org
           predicates:
             - Path=/api/**
             - name: Java
@@ -129,6 +136,10 @@ spring:
     resources:
       static-locations:
         - file:/static
+  webflux:
+    problemdetails:
+      enabled: true
+
 upstream:
   interval: PT10S
   services:
