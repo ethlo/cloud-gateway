@@ -47,7 +47,6 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
     @Override
     public @Nonnull Mono<Void> filter(@Nonnull ServerWebExchange exchange, GatewayFilterChain chain)
     {
-        final String requestId = exchange.getRequest().getId();
         return Flux.fromIterable(predicateConfigs)
                 .filterWhen(c -> (Publisher<Boolean>) c.predicate().apply(exchange))
                 .next()
