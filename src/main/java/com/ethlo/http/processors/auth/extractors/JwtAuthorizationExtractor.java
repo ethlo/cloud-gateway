@@ -3,6 +3,7 @@ package com.ethlo.http.processors.auth.extractors;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 
 import java.util.Optional;
+import java.util.regex.Matcher;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
@@ -42,7 +43,10 @@ public class JwtAuthorizationExtractor implements AuthorizationExtractor
                 if (h.toLowerCase().startsWith("bearer "))
                 {
                     final DecodedJWT decodedJWT = JWT.decode(h.substring(7));
-                    return new RealmUser(decodedJWT.getClaim(config.getRealmClaimName()).asString(), decodedJWT.getClaim(config.getUsernameClaimName()).asString());
+                    final String realmClaimValue = decodedJWT.getClaim(config.getRealmClaimName()).asString();
+                    final Matcher matcher = config.getRealmExpression().matcher(realmClaimValue);
+                    final String realm = matcher.find() ? matcher.group() : null;
+                    return new RealmUser(realm, decodedJWT.getClaim(config.getUsernameClaimName()).asString());
                 }
                 return null;
             });
