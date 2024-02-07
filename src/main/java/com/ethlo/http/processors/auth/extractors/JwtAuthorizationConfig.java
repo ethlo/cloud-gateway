@@ -1,12 +1,13 @@
 package com.ethlo.http.processors.auth.extractors;
 
+import java.util.Optional;
+import java.util.regex.Pattern;
+
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.validation.annotation.Validated;
 
 import com.ethlo.http.processors.FeatureToggle;
-
-import java.util.regex.Pattern;
 
 /**
  * Capture authentication information from the JWT contained in 'Authorization: Bearer ey...' header
@@ -25,7 +26,7 @@ public class JwtAuthorizationConfig extends FeatureToggle
      * The claim that holds the username
      */
     private String usernameClaimName;
-    private Pattern realmExpression = Pattern.compile("(.*)");
+    private Pattern realmExpression;
 
     public String getRealmClaimName()
     {
@@ -37,9 +38,9 @@ public class JwtAuthorizationConfig extends FeatureToggle
         return usernameClaimName;
     }
 
-    public Pattern getRealmExpression()
+    public Optional<Pattern> getRealmExpression()
     {
-        return realmExpression;
+        return Optional.ofNullable(realmExpression);
     }
 
     public void setRealmClaimName(final String realmClaimName)
@@ -54,6 +55,8 @@ public class JwtAuthorizationConfig extends FeatureToggle
 
     public void setRealmExpression(String regex)
     {
-        this.realmExpression = Pattern.compile(regex);
+        this.realmExpression = Optional.ofNullable(regex)
+                .map(Pattern::compile)
+                .orElse(null);
     }
 }

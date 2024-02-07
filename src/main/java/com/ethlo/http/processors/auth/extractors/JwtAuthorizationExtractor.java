@@ -44,8 +44,12 @@ public class JwtAuthorizationExtractor implements AuthorizationExtractor
                 {
                     final DecodedJWT decodedJWT = JWT.decode(h.substring(7));
                     final String realmClaimValue = decodedJWT.getClaim(config.getRealmClaimName()).asString();
-                    final Matcher matcher = config.getRealmExpression().matcher(realmClaimValue);
-                    final String realm = matcher.find() ? matcher.group() : null;
+                    final String realm = config.getRealmExpression().map(p ->
+                    {
+                        final Matcher matcher = p.matcher(realmClaimValue);
+                        return matcher.find() ? matcher.group() : null;
+                    }).orElse(realmClaimValue);
+
                     return new RealmUser(realm, decodedJWT.getClaim(config.getUsernameClaimName()).asString());
                 }
                 return null;
