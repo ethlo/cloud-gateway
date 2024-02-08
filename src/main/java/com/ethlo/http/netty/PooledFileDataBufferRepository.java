@@ -146,8 +146,8 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
             if (!stream.isFlushedToUnderlyingStream())
             {
                 final byte[] data = stream.getBuffer();
-                logger.debug("Using data directly from memory for {} {}", serverDirection, requestId);
-                return Optional.of(extractBody(new ByteArrayInputStream(data), serverDirection == ServerDirection.REQUEST, stream.getTotalBytesWritten()));
+                logger.debug("Using data from memory of size {} for {} {}", data.length, serverDirection, requestId);
+                return Optional.of(extractBody(requestId, new ByteArrayInputStream(data), serverDirection == ServerDirection.REQUEST, stream.getTotalBytesWritten()));
             }
 
             stream.forceFlush();
@@ -156,8 +156,8 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
             try
             {
                 final long fileSize = Files.size(file);
-                logger.debug("Size of file {} is {} bytes", file, fileSize);
-                return Optional.of(extractBody(new BufferedInputStream(Files.newInputStream(file)), serverDirection == ServerDirection.REQUEST, fileSize));
+                logger.debug("Using data from buffer file {} of size {} for {} {}", file, fileSize, serverDirection, requestId);
+                return Optional.of(extractBody(requestId, new BufferedInputStream(Files.newInputStream(file)), serverDirection == ServerDirection.REQUEST, fileSize));
             }
             catch (IOException e)
             {
@@ -184,7 +184,7 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
         });
     }
 
-    private static PayloadProvider extractBody(final InputStream fullMessage, boolean isRequest, final long totalBytesWritten)
+    private static PayloadProvider extractBody(final String requestId, final InputStream fullMessage, boolean isRequest, final long totalBytesWritten)
     {
         try
         {
@@ -199,7 +199,11 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
                 {
                     throw new UncheckedIOException(exc);
                 }
-            }).orElse(new byte[0]);
+            }).orElseGet(() ->
+            {
+                logger.debug("Request {} has no body, returning empty byte array", requestId);
+                return new byte[0];
+            });
             return new PayloadProvider(new ByteArrayInputStream(bodyBytes), (long) bodyBytes.length, totalBytesWritten);
         }
         catch (IOException exc)
