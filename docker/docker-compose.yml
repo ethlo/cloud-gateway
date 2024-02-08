@@ -5,8 +5,6 @@ services:
     image: yandex/clickhouse-server
     hostname: clickhouse-cloud-gateway
     container_name: clickhouse-cloud-gateway
-    volumes:
-      - ./clickhouse/init_schema.sql:/docker-entrypoint-initdb.d/init_schema.sql
     ports:
       - '18123:8123'
     ulimits:
@@ -16,12 +14,12 @@ services:
   cloud-gateway:
     hostname: cloud-gateway
     container_name: cloud-gateway
-    image: ethlocom/cloud-gateway:0.2.0-SNAPSHOT
+    image: ethlocom/cloud-gateway:latest
     restart: on-failure:5
     environment:
       - 'JAVA_OPTS="-XX:MaxDirectMemorySize=200M"'
       - 'SPRING_CONFIG_LOCATION=/config/application.yaml'
-      - "HTTPLOGGING_PROVIDERS_CLICKHOUSE_URL=jdbc:ch://clickhouse-cloud-gateway/default?compress=0;async_insert=1,wait_for_async_insert=0"
+      - "HTTPLOGGING_PROVIDERS_CLICKHOUSE_URL=jdbc:ch://clickhouse-cloud-gateway/default?async_insert=1,wait_for_async_insert=0"
     volumes:
       - ./config:/config
       - ./static:/static

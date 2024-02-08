@@ -1,13 +1,18 @@
 package com.ethlo.http.logger.clickhouse;
 
+import java.sql.SQLException;
+import java.util.Properties;
+
 import javax.sql.DataSource;
 
+import org.flywaydb.core.Flyway;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.relational.core.dialect.Dialect;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
+import com.clickhouse.jdbc.internal.ClickHouseJdbcUrlParser;
 import com.ethlo.http.logger.BodyContentRepository;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
@@ -16,6 +21,34 @@ import com.zaxxer.hikari.HikariDataSource;
 @Configuration
 public class ClickhouseLogCfg
 {
+    @Bean
+    Flyway flyway(ClickHouseProviderConfig clickHouseProviderConfig)
+    {
+        final Flyway flyway = Flyway.configure()
+                .defaultSchema(extractSchema(clickHouseProviderConfig.getUrl()))
+                .locations("db/clickhouse/migration")
+                .dataSource(
+                        clickHouseProviderConfig.getUrl(),
+                        clickHouseProviderConfig.getUsername(),
+                        clickHouseProviderConfig.getPassword()
+                ).load();
+        flyway.migrate();
+        return flyway;
+    }
+
+    private String extractSchema(String url)
+    {
+        try
+        {
+            final ClickHouseJdbcUrlParser.ConnectionInfo ch = ClickHouseJdbcUrlParser.parse(url, new Properties());
+            return ch.getServer().getDatabase().orElseThrow();
+        }
+        catch (SQLException e)
+        {
+            throw new RuntimeException(e);
+        }
+    }
+
     @Bean
     public NamedParameterJdbcTemplate namedParameterJdbcTemplate(ClickHouseProviderConfig clickHouseProviderConfig)
     {
