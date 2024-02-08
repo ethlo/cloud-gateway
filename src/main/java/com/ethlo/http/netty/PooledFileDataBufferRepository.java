@@ -7,7 +7,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
-import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -131,40 +130,42 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
     @Override
     public Optional<PayloadProvider> get(final ServerDirection serverDirection, final String requestId)
     {
+        final String key = requestId + "_" + serverDirection.name();
+        final Optional<Long> size = Optional.ofNullable(sizePool.get(key)).map(AtomicLong::get);
+
+        if (size.isEmpty())
+        {
+            return Optional.empty();
+        }
+
         final Path file = getFilename(basePath, serverDirection, requestId);
-        return Optional.ofNullable(sizePool.get(requestId + "_" + serverDirection.name())).map(AtomicLong::get)
-                .flatMap(size ->
-                        Optional.of(Optional.ofNullable(pool.get(file))
-                                .map(stream ->
-                                {
-                                    if (!stream.isFlushedToUnderlyingStream())
-                                    {
-                                        final byte[] data = stream.getBuffer();
-                                        logger.debug("Using data directly from memory for {} {}", serverDirection, requestId);
-                                        return extractBody(new ByteArrayInputStream(data), serverDirection == ServerDirection.REQUEST, stream.getTotalBytesWritten());
-                                    }
-                                    stream.forceFlush();
-                                    stream.forceClose();
-                                    return new PayloadProvider(InputStream.nullInputStream(), null, size);
-                                }).orElseGet(
-                                        () ->
-                                        {
-                                            try
-                                            {
-                                                final long fileSize = Files.size(file);
-                                                logger.debug("Size of file {} is {} bytes", file, fileSize);
-                                                return extractBody(new BufferedInputStream(Files.newInputStream(file)), serverDirection == ServerDirection.REQUEST, fileSize);
-                                            }
-                                            catch (NoSuchFileException exc)
-                                            {
-                                                return new PayloadProvider(InputStream.nullInputStream(), null, size);
-                                            }
-                                            catch (IOException e)
-                                            {
-                                                throw new UncheckedIOException(e);
-                                            }
-                                        }
-                                )));
+        final Optional<InspectableBufferedOutputStream> streamOpt = Optional.ofNullable(pool.get(file));
+        if (streamOpt.isPresent())
+        {
+            final InspectableBufferedOutputStream stream = streamOpt.get();
+            if (!stream.isFlushedToUnderlyingStream())
+            {
+                final byte[] data = stream.getBuffer();
+                logger.debug("Using data directly from memory for {} {}", serverDirection, requestId);
+                return Optional.of(extractBody(new ByteArrayInputStream(data), serverDirection == ServerDirection.REQUEST, stream.getTotalBytesWritten()));
+            }
+
+            stream.forceFlush();
+            stream.forceClose();
+
+            try
+            {
+                final long fileSize = Files.size(file);
+                logger.debug("Size of file {} is {} bytes", file, fileSize);
+                return Optional.of(extractBody(new BufferedInputStream(Files.newInputStream(file)), serverDirection == ServerDirection.REQUEST, fileSize));
+            }
+            catch (IOException e)
+            {
+                throw new UncheckedIOException(e);
+            }
+        }
+
+        return Optional.of(new PayloadProvider(InputStream.nullInputStream(), null, size.get()));
     }
 
     @Override
