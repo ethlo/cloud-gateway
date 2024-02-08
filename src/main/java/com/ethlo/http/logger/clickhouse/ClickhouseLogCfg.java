@@ -27,6 +27,7 @@ public class ClickhouseLogCfg
         final Flyway flyway = Flyway.configure()
                 .defaultSchema(extractSchema(clickHouseProviderConfig.getUrl()))
                 .locations("db/clickhouse/migration")
+                .baselineOnMigrate(true)
                 .dataSource(
                         clickHouseProviderConfig.getUrl(),
                         clickHouseProviderConfig.getUsername(),
