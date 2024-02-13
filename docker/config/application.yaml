@@ -19,7 +19,7 @@ http-logging:
       realm-header-name: x-realm
   capture:
     enabled: true
-    memory-buffer-size: 5KB
+    memory-buffer-size: 100KB
     temp-directory: /tmp
   providers:
     file:
@@ -28,7 +28,7 @@ http-logging:
       body-storage-directory: /tmp/cloud-gateway/bodies
     clickhouse:
       enabled: true
-      url: 'jdbc:clickhouse://localhost:8123/default?async_insert=1,wait_for_async_insert=0'
+      url: jdbc:clickhouse://localhost:8123/default
   matchers:
     - id: nope
       predicates:
@@ -112,5 +112,5 @@ upstream:
     - name: my-service
       config-url: http://localhost:8000/config.yaml
 
-workaround:
-  double-encoded-url: true
+workarounds:
+  avoid-double-encoded-url: true
