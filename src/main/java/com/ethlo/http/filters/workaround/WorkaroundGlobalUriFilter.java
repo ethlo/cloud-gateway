@@ -16,7 +16,7 @@ import org.springframework.web.server.ServerWebExchange;
 
 import reactor.core.publisher.Mono;
 
-@ConditionalOnProperty("workaround.double-encoded-url")
+@ConditionalOnProperty("workarounds.avoid-double-encoded-url")
 @Component
 public class WorkaroundGlobalUriFilter implements GlobalFilter, Ordered
 {
