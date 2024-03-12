@@ -18,6 +18,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.util.unit.DataSize;
 
 import ch.qos.logback.core.util.CloseUtil;
+import com.ethlo.http.BodyDecodeException;
 import com.ethlo.http.logger.CaptureConfiguration;
 import com.ethlo.http.model.PayloadProvider;
 import com.ethlo.http.util.InspectableBufferedOutputStream;
@@ -35,6 +36,7 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
     private final Path basePath;
     private final ConcurrentMap<Path, InspectableBufferedOutputStream> pool;
     private final ConcurrentMap<String, AtomicLong> sizePool;
+
     public PooledFileDataBufferRepository(CaptureConfiguration captureConfiguration)
     {
         this.bufferSize = captureConfiguration.getMemoryBufferSize();
@@ -46,6 +48,7 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
     private static RawHttpOptions getConfig()
     {
         final RawHttpOptions.Builder b = RawHttpOptions.newBuilder();
+        b.allowContentLengthMismatch();
         b.withHttpHeadersOptions().withMaxHeaderValueLength(Integer.MAX_VALUE).withMaxHeaderNameLength(255);
         return b.build();
     }
@@ -68,7 +71,7 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
                 }
                 catch (IOException exc)
                 {
-                    throw new UncheckedIOException(exc);
+                    throw new BodyDecodeException("Unable to decode " + (isRequest ? "request" : "response") + "body for request " + requestId, exc);
                 }
             }).orElseGet(() ->
             {

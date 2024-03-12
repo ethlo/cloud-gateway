@@ -43,7 +43,7 @@ public class ClickhouseLogCfg
         try
         {
             final ClickHouseJdbcUrlParser.ConnectionInfo ch = ClickHouseJdbcUrlParser.parse(url, new Properties());
-            return ch.getNodes().getNodes().get(0).getDatabase().orElseThrow(() -> new IllegalStateException("No database selected"));
+            return ch.getNodes().getNodes().get(0).getDatabase().orElseThrow(() -> new IllegalStateException("No database defined in url: " + url));
         }
         catch (SQLException e)
         {

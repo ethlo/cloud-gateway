@@ -31,7 +31,7 @@ public class FileMetadataContentRepository implements MetadataContentRepository
 
     public FileMetadataContentRepository(final Path directory)
     {
-        logger.info("Meta content files stored in directory: {}", directory);
+        logger.info("Request metadata stored in directory: {}", directory);
         this.directory = directory;
         try
         {

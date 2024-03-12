@@ -108,12 +108,12 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
 
         final StopWatch stopWatch = new StopWatch();
         stopWatch.start();
-        logger.debug("Logging HTTP data");
+        logger.debug("Logging HTTP data for {}", requestId);
 
         httpLogger.accessLog(processed);
 
         stopWatch.stop();
-        logger.debug("Logging of HTTP data completed in {} ms", stopWatch.lastTaskInfo().getTimeMillis());
+        logger.debug("Logging of HTTP data for request {} completed in {} ms", requestId, stopWatch.lastTaskInfo().getTimeMillis());
     }
 
     @Override
