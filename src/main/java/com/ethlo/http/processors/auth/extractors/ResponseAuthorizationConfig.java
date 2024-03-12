@@ -31,24 +31,24 @@ public class ResponseAuthorizationConfig extends FeatureToggle
         return realmHeader;
     }
 
-    public String getUsernameHeader()
-    {
-        return usernameHeader;
-    }
-
-    public boolean isStripHeaders()
-    {
-        return stripHeaders;
-    }
-
     public void setRealmHeader(final String realmHeader)
     {
         this.realmHeader = realmHeader;
     }
 
+    public String getUsernameHeader()
+    {
+        return usernameHeader;
+    }
+
     public void setUsernameHeader(final String usernameHeader)
     {
         this.usernameHeader = usernameHeader;
+    }
+
+    public boolean isStripHeaders()
+    {
+        return stripHeaders;
     }
 
     public void setStripHeaders(final boolean stripHeaders)

@@ -33,24 +33,24 @@ public class JwtAuthorizationConfig extends FeatureToggle
         return realmClaimName;
     }
 
-    public String getUsernameClaimName()
-    {
-        return usernameClaimName;
-    }
-
-    public Optional<Pattern> getRealmExpression()
-    {
-        return Optional.ofNullable(realmExpression);
-    }
-
     public void setRealmClaimName(final String realmClaimName)
     {
         this.realmClaimName = realmClaimName;
     }
 
+    public String getUsernameClaimName()
+    {
+        return usernameClaimName;
+    }
+
     public void setUsernameClaimName(final String usernameClaimName)
     {
         this.usernameClaimName = usernameClaimName;
+    }
+
+    public Optional<Pattern> getRealmExpression()
+    {
+        return Optional.ofNullable(realmExpression);
     }
 
     public void setRealmExpression(String regex)

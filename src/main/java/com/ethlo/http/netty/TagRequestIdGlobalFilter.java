@@ -14,6 +14,7 @@ import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
 import org.springframework.core.Ordered;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
+import org.springframework.util.StopWatch;
 import org.springframework.web.server.ServerWebExchange;
 
 import com.ethlo.http.logger.HttpLogger;
@@ -22,8 +23,7 @@ import com.ethlo.http.processors.LogPreProcessor;
 import jakarta.annotation.Nonnull;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.publisher.SignalType;
-import reactor.core.scheduler.Schedulers;
+import reactor.core.scheduler.Scheduler;
 
 public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
 {
@@ -35,13 +35,15 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
     private final DataBufferRepository dataBufferRepository;
     private final LogPreProcessor logPreProcessor;
     private final List<PredicateConfig> predicateConfigs;
+    private final Scheduler ioScheduler;
 
-    public TagRequestIdGlobalFilter(final HttpLogger httpLogger, final DataBufferRepository dataBufferRepository, final LogPreProcessor logPreProcessor, List<PredicateConfig> predicateConfigs)
+    public TagRequestIdGlobalFilter(final HttpLogger httpLogger, final DataBufferRepository dataBufferRepository, final LogPreProcessor logPreProcessor, List<PredicateConfig> predicateConfigs, Scheduler ioScheduler)
     {
         this.httpLogger = httpLogger;
         this.dataBufferRepository = dataBufferRepository;
         this.logPreProcessor = logPreProcessor;
         this.predicateConfigs = predicateConfigs;
+        this.ioScheduler = ioScheduler;
     }
 
     @Override
@@ -61,16 +63,20 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
         logger.debug("Tagging request {}: {}", requestId, predicateConfig);
         exchange.getAttributes().put(TagRequestIdGlobalFilter.LOG_CAPTURE_CONFIG_ATTRIBUTE_NAME, predicateConfig);
         return chain.filter(exchange)
-                .publishOn(Schedulers.boundedElastic())
-                .doFinally(st ->
+                .publishOn(ioScheduler)
+                .doFinally(signalType ->
                 {
-                    if (st.equals(SignalType.ON_COMPLETE) || st.equals(SignalType.ON_ERROR) || st.equals(SignalType.CANCEL))
+                    try
                     {
                         handleCompletedRequest(exchange, requestId, predicateConfig, Duration.ofNanos(System.nanoTime() - started));
                     }
-                    else
+                    catch (Exception exc)
                     {
-                        logger.warn("Unhandled signal type {} - {}", requestId, st);
+                        logger.error("Error processing finished request {} with signal type {}", requestId, signalType, exc);
+                        throw exc;
+                    } finally
+                    {
+                        dataBufferRepository.cleanup(requestId);
                     }
                 });
     }
@@ -97,12 +103,17 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
                 .duration(duration)
                 .remoteAddress(req.getRemoteAddress());
 
+        logger.debug("Preprocessing HTTP data");
         final WebExchangeDataProvider processed = logPreProcessor.process(data);
+
+        final StopWatch stopWatch = new StopWatch();
+        stopWatch.start();
+        logger.debug("Logging HTTP data");
 
         httpLogger.accessLog(processed);
 
-        // NOT in finally, as we do not want to delete data if it has not been properly processed
-        dataBufferRepository.cleanup(requestId);
+        stopWatch.stop();
+        logger.debug("Logging of HTTP data completed in {} ms", stopWatch.lastTaskInfo().getTimeMillis());
     }
 
     @Override

@@ -39,6 +39,23 @@ public class CircuitBreakerHandler implements HandlerFunction<ServerResponse>
         this.dataBufferRepository = dataBufferRepository;
     }
 
+    private static byte[] extractHeaders(ServerHttpRequest request)
+    {
+        RawHttpHeaders.Builder builder = RawHttpHeaders.newBuilder();
+        request.getHeaders().forEach((name, values) -> values.forEach(value -> builder.with(name, value)));
+        final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try
+        {
+            final RawHttpHeaders headers = builder.build();
+            headers.writeTo(baos);
+            return baos.toByteArray();
+        }
+        catch (IOException e)
+        {
+            throw new UncheckedIOException(e);
+        }
+    }
+
     @Override
     public @Nonnull Mono<ServerResponse> handle(@Nonnull ServerRequest serverRequest)
     {
@@ -82,23 +99,6 @@ public class CircuitBreakerHandler implements HandlerFunction<ServerResponse>
         catch (IOException exc)
         {
             return Mono.error(exc);
-        }
-    }
-
-    private static byte[] extractHeaders(ServerHttpRequest request)
-    {
-        RawHttpHeaders.Builder builder = RawHttpHeaders.newBuilder();
-        request.getHeaders().forEach((name, values) -> values.forEach(value -> builder.with(name, value)));
-        final ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        try
-        {
-            final RawHttpHeaders headers = builder.build();
-            headers.writeTo(baos);
-            return baos.toByteArray();
-        }
-        catch (IOException e)
-        {
-            throw new UncheckedIOException(e);
         }
     }
 }

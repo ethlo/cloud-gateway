@@ -9,13 +9,13 @@ public abstract class FeatureToggle
      */
     private Boolean enabled;
 
-    public void setEnabled(final Boolean enabled)
-    {
-        this.enabled = enabled;
-    }
-
     public boolean isEnabled()
     {
         return Optional.ofNullable(enabled).orElse(true);
+    }
+
+    public void setEnabled(final Boolean enabled)
+    {
+        this.enabled = enabled;
     }
 }

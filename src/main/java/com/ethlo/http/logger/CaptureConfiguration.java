@@ -20,6 +20,31 @@ public class CaptureConfiguration
     private Path tempDirectory;
     private DataSize memoryBufferSize;
 
+    public Path getTempDirectory()
+    {
+        return tempDirectory;
+    }
+
+    public void setTempDirectory(final Path tempDirectory)
+    {
+        this.tempDirectory = tempDirectory;
+    }
+
+    public DataSize getMemoryBufferSize()
+    {
+        return memoryBufferSize;
+    }
+
+    public void setMemoryBufferSize(final DataSize memoryBufferSize)
+    {
+        this.memoryBufferSize = memoryBufferSize;
+    }
+
+    public boolean isEnabled()
+    {
+        return Optional.ofNullable(enabled).orElse(false);
+    }
+
     public void setEnabled(final Boolean enabled)
     {
         this.enabled = Optional.ofNullable(enabled).orElse(false);
@@ -31,30 +56,5 @@ public class CaptureConfiguration
         {
             logger.warn("Capture is disabled");
         }
-    }
-
-    public Path getTempDirectory()
-    {
-        return tempDirectory;
-    }
-
-    public DataSize getMemoryBufferSize()
-    {
-        return memoryBufferSize;
-    }
-
-    public boolean isEnabled()
-    {
-        return Optional.ofNullable(enabled).orElse(false);
-    }
-
-    public void setTempDirectory(final Path tempDirectory)
-    {
-        this.tempDirectory = tempDirectory;
-    }
-
-    public void setMemoryBufferSize(final DataSize memoryBufferSize)
-    {
-        this.memoryBufferSize = memoryBufferSize;
     }
 }

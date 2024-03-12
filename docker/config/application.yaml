@@ -22,13 +22,14 @@ http-logging:
     memory-buffer-size: 100KB
     temp-directory: /tmp
   providers:
-    file:
-      enabled: false
-      pattern: '{{gateway_request_id}} {{realm_claim}} {{user_claim}} {{method}} {{path}} {{host}} {{request_headers["Content-Length"][0]}} {{status}} {{user_agent}} {{duration | numberformat("#.###") }}'
-      body-storage-directory: /tmp/cloud-gateway/bodies
     clickhouse:
       enabled: true
       url: jdbc:clickhouse://localhost:8123/default
+    file:
+      enabled: true
+      pattern: '{{gateway_request_id}} {{realm_claim}} {{user_claim}} {{method}} {{path}} {{host}} {{request_headers["Content-Length"][0]}} {{status}} {{user_agent}} {{duration | numberformat("#.###") }}'
+      storage-directory: /tmp/cloud-gateway/logs
+
   matchers:
     - id: nope
       predicates:
@@ -78,6 +79,10 @@ spring:
             - Path=/hosts/**
           filters:
             - PathHost=1
+        - id: http-bin-delay
+          uri: https://httpbin.org/delay
+          predicates:
+            - Path=/delay/**
         - id: http-bin-get
           uri: https://httpbin.org/get
           predicates:
@@ -106,11 +111,11 @@ spring:
     problemdetails:
       enabled: true
 
-upstream:
-  interval: PT10S
-  services:
-    - name: my-service
-      config-url: http://localhost:8000/config.yaml
+#upstream:
+#  interval: PT10S
+#  services:
+#    - name: my-service
+#      config-url: http://localhost:8000/config.yaml
 
 workarounds:
   avoid-double-encoded-url: true

@@ -1,10 +1,7 @@
 package com.ethlo.http.filters;
 
-import java.util.Optional;
-
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
 import com.ethlo.http.util.JavaCompiledExpressionUtil;

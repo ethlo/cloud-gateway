@@ -24,6 +24,7 @@ import com.ethlo.http.processors.auth.RealmUser;
 public class WebExchangeDataProvider
 {
     private final DataBufferRepository dataBufferRepository;
+    private final PredicateConfig predicateConfig;
     private String requestId;
     private Route route;
     private HttpMethod method;
@@ -36,7 +37,6 @@ public class WebExchangeDataProvider
     private Duration duration;
     private InetSocketAddress remoteAddress;
     private RealmUser user;
-    private final PredicateConfig predicateConfig;
 
     public WebExchangeDataProvider(DataBufferRepository dataBufferRepository, final PredicateConfig predicateConfig)
     {

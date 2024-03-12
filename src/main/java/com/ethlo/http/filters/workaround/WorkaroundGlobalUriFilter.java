@@ -20,6 +20,12 @@ import reactor.core.publisher.Mono;
 @Component
 public class WorkaroundGlobalUriFilter implements GlobalFilter, Ordered
 {
+    private static boolean isUriEncoded(URI uri)
+    {
+        return (uri.getRawQuery() != null && uri.getRawQuery().contains("%"))
+                || (uri.getRawPath() != null && uri.getRawPath().contains("%"));
+    }
+
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain)
     {
@@ -48,12 +54,6 @@ public class WorkaroundGlobalUriFilter implements GlobalFilter, Ordered
         final var rawPath = balanceUrl.getRawPath() != null ? balanceUrl.getRawPath() : "";
         final var query = incomingUri.getRawQuery() != null ? "?" + incomingUri.getRawQuery() : "";
         return URI.create(balanceUrl.getScheme() + "://" + balanceUrl.getHost() + port + rawPath + query);
-    }
-
-    private static boolean isUriEncoded(URI uri)
-    {
-        return (uri.getRawQuery() != null && uri.getRawQuery().contains("%"))
-                || (uri.getRawPath() != null && uri.getRawPath().contains("%"));
     }
 
     @Override

@@ -9,6 +9,7 @@ import org.flywaydb.core.Flyway;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.data.relational.core.dialect.Dialect;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
@@ -42,11 +43,11 @@ public class ClickhouseLogCfg
         try
         {
             final ClickHouseJdbcUrlParser.ConnectionInfo ch = ClickHouseJdbcUrlParser.parse(url, new Properties());
-            return ch.getServer().getDatabase().orElseThrow();
+            return ch.getNodes().getNodes().get(0).getDatabase().orElseThrow(() -> new IllegalStateException("No database selected"));
         }
         catch (SQLException e)
         {
-            throw new RuntimeException(e);
+            throw new DataAccessResourceFailureException("Unable to extract schema from connection info", e);
         }
     }
 

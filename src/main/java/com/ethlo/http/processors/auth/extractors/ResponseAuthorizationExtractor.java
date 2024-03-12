@@ -5,10 +5,9 @@ import java.util.Optional;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.http.HttpHeaders;
+import org.springframework.stereotype.Component;
 
 import com.ethlo.http.processors.auth.RealmUser;
-
-import org.springframework.stereotype.Component;
 
 @Component
 @RefreshScope

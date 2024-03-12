@@ -11,15 +11,19 @@ import org.springframework.stereotype.Component;
 import com.ethlo.http.logger.HttpLogger;
 import com.ethlo.http.model.WebExchangeDataProvider;
 
+/**
+ * This logger will log to the delegate loggers in order.
+ * An attempt is made to let subsequent loggers log even if one delegate logger fails.
+ */
 @Primary
 @Component
 @ConditionalOnProperty("http-logging.capture.enabled")
-public class DelegateLogger implements HttpLogger
+public class SequentialDelegateLogger implements HttpLogger
 {
-    private static final Logger logger = LoggerFactory.getLogger(DelegateLogger.class);
+    private static final Logger logger = LoggerFactory.getLogger(SequentialDelegateLogger.class);
     private final List<HttpLogger> loggers;
 
-    public DelegateLogger(final List<HttpLogger> loggers)
+    public SequentialDelegateLogger(final List<HttpLogger> loggers)
     {
         this.loggers = loggers;
         if (loggers.isEmpty())
@@ -36,6 +40,16 @@ public class DelegateLogger implements HttpLogger
     @Override
     public void accessLog(final WebExchangeDataProvider dataProvider)
     {
-        loggers.forEach(l -> l.accessLog(dataProvider));
+        for (final HttpLogger httpLogger : loggers)
+        {
+            try
+            {
+                httpLogger.accessLog(dataProvider);
+            }
+            catch (Exception exc)
+            {
+                logger.error("An error occurred when logging request " + dataProvider.getRequestId() + " with logger " + httpLogger.getClass().getSimpleName(), exc);
+            }
+        }
     }
 }

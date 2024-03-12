@@ -61,15 +61,15 @@ public class ExtensionRoutePredicateFactory extends AbstractRoutePredicateFactor
     {
         private List<String> extensions = new ArrayList<>(0);
 
+        public List<String> getExtensions()
+        {
+            return extensions;
+        }
+
         public ExtensionRoutePredicateFactory.Config setExtensions(List<String> extensions)
         {
             this.extensions = extensions;
             return this;
-        }
-
-        public List<String> getExtensions()
-        {
-            return extensions;
         }
     }
 }

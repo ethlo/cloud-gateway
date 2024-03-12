@@ -16,8 +16,14 @@ import jakarta.validation.Valid;
 @ConfigurationProperties(prefix = "http-logging")
 public class HttpLoggingConfiguration
 {
+    public static final Integer DEFAULT_QUEUE_SIZE = 20;
+    public static final Integer DEFAULT_THREAD_COUNT = 5;
+
     @Valid
     private List<RequestMatchingProcessor> matchers;
+
+    private Integer maxIoThreads;
+    private Integer maxQueueSize;
 
     public List<RequestMatchingProcessor> getMatchers()
     {
@@ -27,5 +33,25 @@ public class HttpLoggingConfiguration
     public void setMatchers(final List<RequestMatchingProcessor> matchers)
     {
         this.matchers = matchers;
+    }
+
+    public Integer getMaxIoThreads()
+    {
+        return maxIoThreads;
+    }
+
+    public void setMaxIoThreads(final Integer maxIoThreads)
+    {
+        this.maxIoThreads = maxIoThreads;
+    }
+
+    public Integer getMaxQueueSize()
+    {
+        return maxQueueSize;
+    }
+
+    public void setMaxQueueSize(final Integer maxQueueSize)
+    {
+        this.maxQueueSize = maxQueueSize;
     }
 }

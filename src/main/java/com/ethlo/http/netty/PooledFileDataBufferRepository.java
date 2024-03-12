@@ -31,19 +31,10 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
     private static final Logger logger = LoggerFactory.getLogger(PooledFileDataBufferRepository.class);
 
     private static final RawHttp rawHttp = new RawHttp(getConfig());
-
-    private static RawHttpOptions getConfig()
-    {
-        final RawHttpOptions.Builder b = RawHttpOptions.newBuilder();
-        b.withHttpHeadersOptions().withMaxHeaderValueLength(Integer.MAX_VALUE).withMaxHeaderNameLength(255);
-        return b.build();
-    }
-
     private final DataSize bufferSize;
     private final Path basePath;
     private final ConcurrentMap<Path, InspectableBufferedOutputStream> pool;
     private final ConcurrentMap<String, AtomicLong> sizePool;
-
     public PooledFileDataBufferRepository(CaptureConfiguration captureConfiguration)
     {
         this.bufferSize = captureConfiguration.getMemoryBufferSize();
@@ -52,9 +43,44 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
         this.sizePool = new ConcurrentHashMap<>();
     }
 
+    private static RawHttpOptions getConfig()
+    {
+        final RawHttpOptions.Builder b = RawHttpOptions.newBuilder();
+        b.withHttpHeadersOptions().withMaxHeaderValueLength(Integer.MAX_VALUE).withMaxHeaderNameLength(255);
+        return b.build();
+    }
+
     public static Path getFilename(final Path basePath, ServerDirection operation, String id)
     {
-        return basePath.resolve(operation.name().toLowerCase() + "_" + id);
+        return basePath.resolve(id + "_" + operation.name().toLowerCase() + ".raw");
+    }
+
+    private static PayloadProvider extractBody(final String requestId, final InputStream fullMessage, boolean isRequest, final long totalBytesWritten)
+    {
+        try
+        {
+            final HttpMessage message = isRequest ? rawHttp.parseRequest(fullMessage) : rawHttp.parseResponse(fullMessage);
+            final byte[] bodyBytes = message.getBody().map(b ->
+            {
+                try
+                {
+                    return b.decodeBody();
+                }
+                catch (IOException exc)
+                {
+                    throw new UncheckedIOException(exc);
+                }
+            }).orElseGet(() ->
+            {
+                logger.debug("Request {} has no body, returning empty byte array", requestId);
+                return new byte[0];
+            });
+            return new PayloadProvider(new ByteArrayInputStream(bodyBytes), (long) bodyBytes.length, totalBytesWritten);
+        }
+        catch (IOException exc)
+        {
+            throw new UncheckedIOException(exc);
+        }
     }
 
     @Override
@@ -135,6 +161,7 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
 
         if (size.isEmpty())
         {
+            logger.debug("sizePool for {} is empty for request {}", serverDirection.name(), requestId);
             return Optional.empty();
         }
 
@@ -182,33 +209,5 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
             logger.trace("{} size: {}", operation, newSize);
             return size;
         });
-    }
-
-    private static PayloadProvider extractBody(final String requestId, final InputStream fullMessage, boolean isRequest, final long totalBytesWritten)
-    {
-        try
-        {
-            final HttpMessage message = isRequest ? rawHttp.parseRequest(fullMessage) : rawHttp.parseResponse(fullMessage);
-            final byte[] bodyBytes = message.getBody().map(b ->
-            {
-                try
-                {
-                    return b.decodeBody();
-                }
-                catch (IOException exc)
-                {
-                    throw new UncheckedIOException(exc);
-                }
-            }).orElseGet(() ->
-            {
-                logger.debug("Request {} has no body, returning empty byte array", requestId);
-                return new byte[0];
-            });
-            return new PayloadProvider(new ByteArrayInputStream(bodyBytes), (long) bodyBytes.length, totalBytesWritten);
-        }
-        catch (IOException exc)
-        {
-            throw new UncheckedIOException(exc);
-        }
     }
 }
