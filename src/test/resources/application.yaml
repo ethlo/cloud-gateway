@@ -1,0 +1,63 @@
+http-logging:
+  auth:
+    jwt:
+      enabled: true
+      user-claim: preferred_username
+      realm-claim: iss
+      realm-expression: ([^/]+)/?$
+    basic:
+      enabled: false
+      realm-header-name: x-realm
+  capture:
+    enabled: true
+    memory-buffer-size: 100KB
+    temp-directory: /tmp
+  providers:
+    clickhouse:
+      enabled: true
+      url: jdbc:clickhouse://localhost:8123?database=default&async_insert=1,wait_for_async_insert=1
+    file:
+      enabled: true
+      pattern: '{{gateway_request_id}} {{realm_claim}} {{user_claim}} {{method}} {{path}} {{host}} {{request_headers["Content-Length"][0]}} {{status}} {{user_agent}} {{duration | numberformat("#.###") }}'
+      storage-directory: /tmp/cloud-gateway/logs
+  matchers:
+    - id: All
+      predicates:
+        - Path=/**
+      request:
+        body: STORE
+        raw: STORE
+      response:
+        body: STORE
+        raw: STORE
+logging:
+  level:
+    com.ethlo.http: INFO
+    org.springframework.cloud.gateway: INFO
+    com.ethlo.qjc: INFO
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,clickhouse,env
+  endpoint:
+    env:
+      show-values: when_authorized
+spring:
+  cloud:
+    gateway:
+      routes:
+        - id: http-bin-get
+          uri: http://localhost:11117
+          predicates:
+            - Path=/get
+          filters:
+            - name: InjectBasicAuth
+              args:
+                username: foo
+                password: bar
+            - SetRequestHeader=x-realm,baz
+  web:
+    resources:
+      static-locations:
+        - file:/static
