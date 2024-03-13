@@ -24,22 +24,14 @@ http-logging:
   providers:
     clickhouse:
       enabled: true
-      url: jdbc:clickhouse://localhost:8123/default
+      url: jdbc:clickhouse://localhost:8123?database=default&async_insert=1,wait_for_async_insert=1
     file:
       enabled: true
       pattern: '{{gateway_request_id}} {{realm_claim}} {{user_claim}} {{method}} {{path}} {{host}} {{request_headers["Content-Length"][0]}} {{status}} {{user_agent}} {{duration | numberformat("#.###") }}'
       storage-directory: /tmp/cloud-gateway/logs
 
   matchers:
-    - id: nope
-      predicates:
-        - Path=/nope
-        - NotHost=example.com
-        - NotPath=/yep
-        - NotMethod=GET
-      request:
-        body: STORE
-    - id: bar
+    - id: All
       predicates:
         - Path=/**
       request:
@@ -111,11 +103,13 @@ spring:
     problemdetails:
       enabled: true
 
+# Link to other services' own routes configuration
 #upstream:
 #  interval: PT10S
 #  services:
 #    - name: my-service
 #      config-url: http://localhost:8000/config.yaml
 
-workarounds:
-  avoid-double-encoded-url: true
+# These are workarounds for issues
+#workarounds:
+#  avoid-double-encoded-url: true
