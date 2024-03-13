@@ -40,16 +40,6 @@ public class SequentialDelegateLogger implements HttpLogger
     @Override
     public void accessLog(final WebExchangeDataProvider dataProvider)
     {
-        for (final HttpLogger httpLogger : loggers)
-        {
-            try
-            {
-                httpLogger.accessLog(dataProvider);
-            }
-            catch (Exception exc)
-            {
-                logger.error("An error occurred when logging request " + dataProvider.getRequestId() + " with logger " + httpLogger.getClass().getSimpleName(), exc);
-            }
-        }
+        loggers.forEach(logger -> logger.accessLog(dataProvider));
     }
 }

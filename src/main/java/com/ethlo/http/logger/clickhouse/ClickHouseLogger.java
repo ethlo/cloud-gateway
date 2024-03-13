@@ -23,6 +23,8 @@ import com.ethlo.http.netty.PredicateConfig;
 import com.ethlo.http.netty.ServerDirection;
 import com.ethlo.http.util.HttpBodyUtil;
 import com.ethlo.http.util.IoUtil;
+import com.google.common.base.Stopwatch;
+import reactor.core.publisher.Flux;
 
 public class ClickHouseLogger implements HttpLogger
 {
@@ -66,12 +68,17 @@ public class ClickHouseLogger implements HttpLogger
         params.put("response_body_size", null);
         params.put("response_total_size", null);
 
-        params.putAll(processContent(logConfig.request(), dataProvider.getRawRequest().orElse(null), ServerDirection.REQUEST));
-        params.putAll(processContent(logConfig.response(), dataProvider.getRawResponse().orElse(null), ServerDirection.RESPONSE));
-
         params.put("request_headers", flattenMap(dataProvider.getRequestHeaders()));
         params.put("response_headers", flattenMap(dataProvider.getResponseHeaders()));
 
+        final Map<String, Object> requestResult = processContent(logConfig.request(), dataProvider.getRawRequest().orElse(null), ServerDirection.REQUEST).blockFirst();
+        final Map<String, Object> responseResult = processContent(logConfig.response(), dataProvider.getRawResponse().orElse(null), ServerDirection.RESPONSE).blockFirst();
+
+        params.putAll(requestResult);
+        params.putAll(responseResult);
+
+        logger.debug("Inserting data into ClickHouse for request {}", dataProvider.getRequestId());
+        final Stopwatch stopwatch = Stopwatch.createStarted();
         tpl.update("""
                 INSERT INTO log (
                   timestamp, route_id, route_uri, gateway_request_id, method, path,
@@ -86,40 +93,46 @@ public class ClickHouseLogger implements HttpLogger
                   :host, :request_content_type, :response_content_type, :user_agent,
                   :request_headers, :response_headers,
                   :request_body, :response_body, :request_raw, :response_raw)""", params);
+        logger.debug("Finished inserting data into ClickHouse for request {} in {}", dataProvider.getRequestId(), stopwatch.elapsed());
     }
 
-    private static Map<String, Object> processContent(LogOptions logConfig, RawProvider rawResponse, final ServerDirection serverDirection)
+
+    private static Flux<Map<String, Object>> processContent(LogOptions logConfig, RawProvider rawProvider, final ServerDirection serverDirection)
     {
         final String keyPrefix = serverDirection.name().toLowerCase();
-        final Map<String, Object> params = new LinkedHashMap<>();
-        if ((logConfig.raw() == STORE || logConfig.body() == STORE || logConfig.body() == SIZE) && rawResponse != null)
+
+        if ((logConfig.raw() == STORE || logConfig.body() == STORE || logConfig.body() == SIZE) && rawProvider != null)
         {
-            final byte[] responseData = IoUtil.readAllBytes(rawResponse.data());
-
-            if (logConfig.raw() == STORE)
+            return rawProvider.asDataBuffer().map(dataBuffer ->
             {
-                params.put(keyPrefix + "_raw", responseData);
-                params.put(keyPrefix + "_total_size", rawResponse.totalLength());
-            }
-
-            if (logConfig.body() == STORE || logConfig.body() == SIZE)
-            {
-                try
+                final Map<String, Object> params = new LinkedHashMap<>();
+                final byte[] responseData = IoUtil.readAllBytes(dataBuffer.asInputStream());
+                params.put(keyPrefix + "_total_size", rawProvider.size());
+                if (logConfig.raw() == STORE)
                 {
-                    final BodyProvider bodyProvider = HttpBodyUtil.extractBody(new ByteArrayInputStream(responseData), serverDirection);
-                    params.put(keyPrefix + "_body_size", bodyProvider.bodyLength());
-                    if (logConfig.body() == STORE)
+                    params.put(keyPrefix + "_raw", responseData);
+                }
+
+                if (logConfig.body() == STORE || logConfig.body() == SIZE)
+                {
+                    try
                     {
-                        params.put(keyPrefix + "_body", IoUtil.readAllBytes(bodyProvider.data()));
+                        final BodyProvider bodyProvider = HttpBodyUtil.extractBody(new ByteArrayInputStream(responseData), serverDirection);
+                        params.put(keyPrefix + "_body_size", bodyProvider.bodyLength());
+                        if (logConfig.body() == STORE)
+                        {
+                            params.put(keyPrefix + "_body", IoUtil.readAllBytes(bodyProvider.data()));
+                        }
+                    }
+                    catch (BodyDecodeException exc)
+                    {
+                        logger.warn("Could not decode body content", exc);
                     }
                 }
-                catch (BodyDecodeException exc)
-                {
-                    logger.warn("Could not decode body content", exc);
-                }
-            }
+                return params;
+            });
         }
-        return params;
+        return Flux.just(Map.of());
     }
 
     private Map<String, Object> flattenMap(HttpHeaders headers)

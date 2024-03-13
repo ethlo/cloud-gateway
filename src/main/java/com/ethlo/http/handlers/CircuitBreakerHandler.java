@@ -4,6 +4,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.AsynchronousFileChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
@@ -19,7 +21,6 @@ import org.springframework.web.reactive.function.server.HandlerFunction;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
 
-import com.ethlo.http.match.LogOptions;
 import com.ethlo.http.netty.ContextUtil;
 import com.ethlo.http.netty.DataBufferRepository;
 import com.ethlo.http.netty.PredicateConfig;
@@ -78,8 +79,8 @@ public class CircuitBreakerHandler implements HandlerFunction<ServerResponse>
         final HttpMethod method = request.getMethod();
 
         final byte[] fakeRequestLine = (method.name() + " / HTTP/1.1\r\n").getBytes(StandardCharsets.UTF_8);
-        dataBufferRepository.write(ServerDirection.REQUEST, requestId, fakeRequestLine);
-        dataBufferRepository.write(ServerDirection.REQUEST, requestId, extractHeaders(request));
+        dataBufferRepository.write(ServerDirection.REQUEST, requestId, ByteBuffer.wrap(fakeRequestLine));
+        dataBufferRepository.write(ServerDirection.REQUEST, requestId, ByteBuffer.wrap(extractHeaders(request)));
 
         return serverRequest.exchange().getRequest().getBody()
                 .publishOn(Schedulers.boundedElastic())
@@ -89,16 +90,24 @@ public class CircuitBreakerHandler implements HandlerFunction<ServerResponse>
 
     private Mono<Integer> saveDataChunk(String requestId, DataBuffer dataBuffer)
     {
-        try (final InputStream in = dataBuffer.asInputStream())
+        throw new UnsupportedOperationException("Not implemented");
+        /*try (final InputStream in = dataBuffer.asInputStream(true); final AsynchronousFileChannel target = dataBufferRepository.getAsyncFileChannel(ServerDirection.REQUEST, requestId))
         {
-            final int copied = StreamUtils.copy(in, dataBufferRepository.getOutputStream(ServerDirection.REQUEST, requestId));
             dataBufferRepository.appendSizeAvailable(ServerDirection.REQUEST, requestId, copied);
             DataBufferUtils.release(dataBuffer);
             return Mono.just(copied);
         }
+        catch (IOException e)
+        {
+            throw new UncheckedIOException(e);
+        }
+        try (final InputStream in = dataBuffer.asInputStream())
+        {
+
+        }
         catch (IOException exc)
         {
             return Mono.error(exc);
-        }
+        }*/
     }
 }

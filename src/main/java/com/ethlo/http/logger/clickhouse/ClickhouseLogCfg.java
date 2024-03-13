@@ -14,7 +14,6 @@ import org.springframework.data.relational.core.dialect.Dialect;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
 import com.clickhouse.jdbc.internal.ClickHouseJdbcUrlParser;
-import com.ethlo.http.logger.BodyContentRepository;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
@@ -58,12 +57,6 @@ public class ClickhouseLogCfg
         config.setJdbcUrl(clickHouseProviderConfig.getUrl());
         final DataSource dataSource = new HikariDataSource(config);
         return new NamedParameterJdbcTemplate(dataSource);
-    }
-
-    @Bean
-    public BodyContentRepository bodyContentRepository(NamedParameterJdbcTemplate tpl)
-    {
-        return new ClickHouseBodyContentRepository(tpl);
     }
 
     @Bean

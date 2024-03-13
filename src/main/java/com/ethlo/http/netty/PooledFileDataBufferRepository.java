@@ -1,41 +1,36 @@
 package com.ethlo.http.netty;
 
-import java.io.BufferedInputStream;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.io.UncheckedIOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.AsynchronousFileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.util.unit.DataSize;
 
 import ch.qos.logback.core.util.CloseUtil;
 import com.ethlo.http.logger.CaptureConfiguration;
 import com.ethlo.http.model.RawProvider;
-import com.ethlo.http.util.InspectableBufferedOutputStream;
-import com.ethlo.http.util.LazyFileOutputStream;
 
 public class PooledFileDataBufferRepository implements DataBufferRepository
 {
     private static final Logger logger = LoggerFactory.getLogger(PooledFileDataBufferRepository.class);
 
-    private final DataSize bufferSize;
     private final Path basePath;
-    private final ConcurrentMap<Path, InspectableBufferedOutputStream> pool;
+    private final ConcurrentMap<Path, AsynchronousFileChannel> pool;
     private final ConcurrentMap<String, AtomicLong> sizePool;
 
     public PooledFileDataBufferRepository(CaptureConfiguration captureConfiguration)
     {
-        this.bufferSize = captureConfiguration.getMemoryBufferSize();
-        this.basePath = captureConfiguration.getTempDirectory();
+        this.basePath = captureConfiguration.getLogDirectory();
         this.pool = new ConcurrentHashMap<>();
         this.sizePool = new ConcurrentHashMap<>();
     }
@@ -48,9 +43,14 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
     @Override
     public void cleanup(final String requestId)
     {
+        //close(requestId);
+
+        logger.debug("Cleaning up buffer files for request {}", requestId);
+
         sizePool.remove(requestId + "_" + ServerDirection.REQUEST.name());
-        sizePool.remove(requestId + "_" + ServerDirection.RESPONSE.name());
         cleanup(getFilename(basePath, ServerDirection.REQUEST, requestId));
+
+        sizePool.remove(requestId + "_" + ServerDirection.RESPONSE.name());
         cleanup(getFilename(basePath, ServerDirection.RESPONSE, requestId));
     }
 
@@ -58,11 +58,8 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
     {
         Optional.ofNullable(pool.remove(file)).ifPresent(requestBuffer ->
         {
-            if (requestBuffer.isFlushedToUnderlyingStream())
-            {
-                logger.debug("Deleting buffer file {}", file);
-                deleteSilently(file);
-            }
+            logger.debug("Deleting buffer file {}", file);
+            deleteSilently(file);
         });
     }
 
@@ -79,13 +76,13 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
     }
 
     @Override
-    public void write(final ServerDirection operation, final String requestId, final byte[] data)
+    public Future<Integer> write(final ServerDirection operation, final String requestId, final ByteBuffer data)
     {
-        final OutputStream out = getOutputStream(operation, requestId);
+        final AsynchronousFileChannel out = getAsyncFileChannel(operation, requestId);
         try
         {
-            out.write(data);
-            logger.trace("Wrote {} bytes to buffer for {} {}", data.length, operation, requestId);
+            logger.trace("Writing data for {} for request {}", operation, requestId);
+            return out.write(data, out.size());
         }
         catch (IOException e)
         {
@@ -94,25 +91,43 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
     }
 
     @Override
-    public OutputStream getOutputStream(final ServerDirection operation, final String requestId)
+    public AsynchronousFileChannel getAsyncFileChannel(final ServerDirection operation, final String requestId)
     {
         final Path file = getFilename(basePath, operation, requestId);
-        return pool.compute(file, (f, outputStream) ->
+        return pool.compute(file, (f, channel) ->
         {
-            if (outputStream == null)
+            if (channel == null)
             {
-                outputStream = new InspectableBufferedOutputStream(new LazyFileOutputStream(f), Math.toIntExact(bufferSize.toBytes()));
-                logger.debug("Opened buffer for {} for {}", operation, requestId);
+                try
+                {
+                    channel = AsynchronousFileChannel.open(file, StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.READ);
+                    logger.debug("Opened buffer for {} for {}", operation, requestId);
+                }
+                catch (IOException e)
+                {
+                    throw new UncheckedIOException(e);
+                }
             }
-            return outputStream;
+            return channel;
         });
     }
 
     @Override
-    public void finished(final String requestId)
+    public void close(final String requestId)
     {
-        Optional.ofNullable(pool.get(getFilename(basePath, ServerDirection.REQUEST, requestId))).ifPresent(CloseUtil::closeQuietly);
-        Optional.ofNullable(pool.get(getFilename(basePath, ServerDirection.RESPONSE, requestId))).ifPresent(CloseUtil::closeQuietly);
+        final Path requestFile = getFilename(basePath, ServerDirection.REQUEST, requestId);
+        Optional.ofNullable(pool.get(requestFile)).ifPresent(fc ->
+        {
+            logger.debug("Closing request file {} used by request {}", requestFile, requestId);
+            CloseUtil.closeQuietly(fc);
+        });
+
+        final Path responseFile = getFilename(basePath, ServerDirection.RESPONSE, requestId);
+        Optional.ofNullable(pool.get(responseFile)).ifPresent(fc ->
+        {
+            logger.debug("Closing response file {} used by request {}", responseFile, requestId);
+            CloseUtil.closeQuietly(fc);
+        });
     }
 
     @Override
@@ -128,33 +143,12 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
         }
 
         final Path file = getFilename(basePath, serverDirection, requestId);
-        final Optional<InspectableBufferedOutputStream> streamOpt = Optional.ofNullable(pool.get(file));
-        if (streamOpt.isPresent())
-        {
-            final InspectableBufferedOutputStream stream = streamOpt.get();
-            if (!stream.isFlushedToUnderlyingStream())
-            {
-                final byte[] data = stream.getBuffer();
-                logger.debug("Using data from memory of size {} for {} {}", data.length, serverDirection, requestId);
-                return Optional.of(new RawProvider(new ByteArrayInputStream(data), stream.getTotalBytesWritten()));
-            }
-
-            stream.forceFlush();
-            stream.forceClose();
-
-            try
-            {
-                final long fileSize = Files.size(file);
-                logger.debug("Using data from buffer file {} of size {} for {} {}", file, fileSize, serverDirection, requestId);
-                return Optional.of(new RawProvider(new BufferedInputStream(Files.newInputStream(file)), fileSize));
-            }
-            catch (IOException e)
-            {
-                throw new UncheckedIOException(e);
-            }
-        }
-
-        return Optional.of(new RawProvider(InputStream.nullInputStream(), 0));
+        return Optional.ofNullable(pool.get(file))
+                .map(stream ->
+                {
+                    logger.debug("Using data from buffer file {} of size {} for {} {}", file, size.get(), serverDirection, requestId);
+                    return Optional.of(new RawProvider(stream));
+                }).orElse(Optional.empty());
     }
 
     @Override

@@ -28,17 +28,21 @@ public class HandleDifferentResponseTypesTest
     @Test
     public void testSimpleGet() throws IOException
     {
+        final int iterations = 10;
         try (final MockWebServer server = new MockWebServer())
         {
-            server.enqueue(new MockResponse()
-                    .addHeader("Content-Type", "application/json")
-                    .addHeader("Transfer-Encoding", "chunked")
-                    .setBody("8\r\n" +
-                            "Mozilla \r\n" +
-                            "11\r\n" +
-                            "Developer Network\r\n" +
-                            "0\r\n" +
-                            "\r\n"));
+            for (int i = 0; i < iterations; i++)
+            {
+                server.enqueue(new MockResponse()
+                        .addHeader("Content-Type", "application/json")
+                        .addHeader("Transfer-Encoding", "chunked")
+                        .setBody("8\r\n" +
+                                "Mozilla \r\n" +
+                                "11\r\n" +
+                                "Developer Network\r\n" +
+                                "0\r\n" +
+                                "\r\n"));
+            }
 
             // Start the server.
             server.start(port);
@@ -46,15 +50,18 @@ public class HandleDifferentResponseTypesTest
             // Ask the server for its URL. You'll need this to make HTTP requests.
             final HttpUrl url = server.url("/get");
 
-            final EntityExchangeResult<String> body = client.get()
-                    .uri(url.uri().getPath())
-                    .exchange()
-                    .expectStatus()
-                    .isOk()
-                    .expectBody(String.class).returnResult();
+            for (int i = 0; i < iterations; i++)
+            {
+                final EntityExchangeResult<String> body = client.get()
+                        .uri(url.uri().getPath())
+                        .exchange()
+                        .expectStatus()
+                        .isOk()
+                        .expectBody(String.class).returnResult();
 
-            final String bodyContent = body.getResponseBody();
-            assertThat(bodyContent).isEqualTo("Mozilla Developer Network");
+                final String bodyContent = body.getResponseBody();
+                assertThat(bodyContent).isEqualTo("Mozilla Developer Network");
+            }
         }
     }
 }

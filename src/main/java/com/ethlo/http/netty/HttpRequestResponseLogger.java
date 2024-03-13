@@ -5,6 +5,8 @@ import static com.ethlo.http.netty.ContextUtil.getRequestId;
 import static com.ethlo.http.netty.ServerDirection.REQUEST;
 import static com.ethlo.http.netty.ServerDirection.RESPONSE;
 
+import java.util.concurrent.ExecutionException;
+
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.ChannelHandlerContext;
@@ -53,22 +55,24 @@ public class HttpRequestResponseLogger extends LoggingHandler
     {
         final ServerDirection operation = WRITE.equalsIgnoreCase(eventName) ? REQUEST : RESPONSE;
 
-        return getLoggingConfig(ctx).map(pattern ->
+        return getLoggingConfig(ctx).map(predicateConfig ->
         {
             final String requestId = getRequestId(ctx).orElseThrow();
 
             final int bytesAvailable = msg.readableBytes();
             dataBufferRepository.appendSizeAvailable(operation, requestId, bytesAvailable);
-
-            final boolean isRequestAndShouldStore = pattern.request().mustBuffer() && operation == REQUEST;
-            final boolean isResponseAndShouldStore = pattern.response().mustBuffer() && operation == RESPONSE;
+            final boolean isRequestAndShouldStore = predicateConfig.request().mustBuffer() && operation == REQUEST;
+            final boolean isResponseAndShouldStore = predicateConfig.response().mustBuffer() && operation == RESPONSE;
             if (isRequestAndShouldStore || isResponseAndShouldStore)
             {
-                // Store the contentProcessing if requested
-                final byte[] data = getBytes(msg);
-                if (data.length > 0)
+                try
                 {
-                    dataBufferRepository.write(operation, requestId, data);
+                    dataBufferRepository.write(operation, requestId, msg.nioBuffer()).get();
+                }
+                catch (InterruptedException | ExecutionException e)
+                {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException(e);
                 }
             }
             return requestId;

@@ -7,8 +7,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
-import org.springframework.util.unit.DataSize;
 import org.springframework.validation.annotation.Validated;
+
+import jakarta.validation.constraints.NotNull;
 
 @Validated
 @RefreshScope
@@ -17,27 +18,28 @@ public class CaptureConfiguration
 {
     private static final Logger logger = LoggerFactory.getLogger(CaptureConfiguration.class);
     private Boolean enabled;
-    private Path tempDirectory;
-    private DataSize memoryBufferSize;
+    @NotNull
+    private Path logDirectory;
 
-    public Path getTempDirectory()
+    public Path getLogDirectory()
     {
-        return tempDirectory;
+        return logDirectory;
     }
 
-    public void setTempDirectory(final Path tempDirectory)
+    public void setLogDirectory(final Path logDirectory)
     {
-        this.tempDirectory = tempDirectory;
+        this.logDirectory = logDirectory;
     }
 
-    public DataSize getMemoryBufferSize()
+    /**
+     * Use {@link #setLogDirectory(Path)} instead
+     *
+     * @param logDirectory The directory to store the logs
+     */
+    @Deprecated
+    public void setTempDirectory(final Path logDirectory)
     {
-        return memoryBufferSize;
-    }
-
-    public void setMemoryBufferSize(final DataSize memoryBufferSize)
-    {
-        this.memoryBufferSize = memoryBufferSize;
+        this.logDirectory = logDirectory;
     }
 
     public boolean isEnabled()

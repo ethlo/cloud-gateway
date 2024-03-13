@@ -51,9 +51,9 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
     {
         return Flux.fromIterable(predicateConfigs)
                 .filterWhen(c -> (Publisher<Boolean>) c.predicate().apply(exchange))
-                .next()
                 .flatMap(c -> prepareForLoggingIfApplicable(exchange, chain, c))
-                .switchIfEmpty(chain.filter(exchange));
+                .switchIfEmpty(chain.filter(exchange))
+                .next();
     }
 
     private Mono<Void> prepareForLoggingIfApplicable(ServerWebExchange exchange, GatewayFilterChain chain, PredicateConfig predicateConfig)
@@ -65,20 +65,11 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
         return chain.filter(exchange)
                 .publishOn(ioScheduler)
                 .doFinally(signalType ->
-                {
-                    try
-                    {
-                        handleCompletedRequest(exchange, requestId, predicateConfig, Duration.ofNanos(System.nanoTime() - started));
-                    }
-                    catch (Exception exc)
-                    {
-                        logger.error("Error processing finished request {} with signal type {}", requestId, signalType, exc);
-                        throw exc;
-                    } finally
-                    {
-                        dataBufferRepository.cleanup(requestId);
-                    }
-                });
+                        ioScheduler.schedule(() ->
+                        {
+                            handleCompletedRequest(exchange, requestId, predicateConfig, Duration.ofNanos(System.nanoTime() - started));
+                            dataBufferRepository.cleanup(requestId);
+                        }));
     }
 
     private void handleCompletedRequest(ServerWebExchange exchange, String requestId, final PredicateConfig predicateConfig, final Duration duration)
@@ -88,7 +79,6 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
         final Route route = exchange.getAttribute(ServerWebExchangeUtils.GATEWAY_ROUTE_ATTR);
 
         logger.debug("Completed request {} in {}: {}", requestId, duration, predicateConfig);
-        dataBufferRepository.finished(requestId);
 
         final WebExchangeDataProvider data = new WebExchangeDataProvider(dataBufferRepository, predicateConfig)
                 .route(route)
@@ -108,12 +98,9 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
 
         final StopWatch stopWatch = new StopWatch();
         stopWatch.start();
-        logger.debug("Logging HTTP data for {}", requestId);
-
+        logger.debug("Logging HTTP data for request {}", requestId);
         httpLogger.accessLog(processed);
-
-        stopWatch.stop();
-        logger.debug("Logging of HTTP data for request {} completed in {} ms", requestId, stopWatch.lastTaskInfo().getTimeMillis());
+        dataBufferRepository.close(requestId);
     }
 
     @Override

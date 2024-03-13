@@ -1,7 +1,9 @@
 package com.ethlo.http.netty;
 
-import java.io.OutputStream;
+import java.nio.ByteBuffer;
+import java.nio.channels.AsynchronousFileChannel;
 import java.util.Optional;
+import java.util.concurrent.Future;
 
 import com.ethlo.http.model.RawProvider;
 
@@ -9,11 +11,11 @@ public interface DataBufferRepository
 {
     void cleanup(String requestId);
 
-    void write(final ServerDirection operation, final String id, byte[] data);
+    Future<Integer> write(final ServerDirection operation, final String id, ByteBuffer data);
 
-    OutputStream getOutputStream(final ServerDirection operation, final String id);
+    AsynchronousFileChannel getAsyncFileChannel(final ServerDirection operation, final String id);
 
-    void finished(String requestId);
+    void close(String requestId);
 
     Optional<RawProvider> get(final ServerDirection serverDirection, final String id);
 

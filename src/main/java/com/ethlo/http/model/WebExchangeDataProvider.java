@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.TreeMap;
 
 import org.springframework.cloud.gateway.route.Route;
 import org.springframework.http.HttpHeaders;
@@ -166,7 +167,7 @@ public class WebExchangeDataProvider
 
     public Map<String, Object> asMetaMap()
     {
-        final Map<String, Object> params = new HashMap<>();
+        final Map<String, Object> params = new TreeMap<>();
         params.put("route_id", route.getId());
         params.put("route_uri", route.getUri());
         params.put("realm_claim", getUser().map(RealmUser::realm).orElse(null));
