@@ -1,9 +1,8 @@
 package com.ethlo.http;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 
-public class BodyDecodeException extends UncheckedIOException
+public class BodyDecodeException extends IOException
 {
     public BodyDecodeException(final String message, IOException cause)
     {

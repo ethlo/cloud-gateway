@@ -20,13 +20,13 @@ public class ClickHouseBodyContentRepository implements BodyContentRepository
     }
 
     @Override
-    public void saveRequestBody(final String requestId, final Resource requestBody)
+    public void saveRequest(final String requestId, final Resource requestBody)
     {
         // Handled via logger
     }
 
     @Override
-    public void saveResponseBody(final String requestId, final Resource responseBody)
+    public void saveResponse(final String requestId, final Resource responseBody)
     {
         // Handled via logger
     }

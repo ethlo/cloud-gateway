@@ -3,7 +3,7 @@ package com.ethlo.http.netty;
 import java.io.OutputStream;
 import java.util.Optional;
 
-import com.ethlo.http.model.PayloadProvider;
+import com.ethlo.http.model.RawProvider;
 
 public interface DataBufferRepository
 {
@@ -15,7 +15,7 @@ public interface DataBufferRepository
 
     void finished(String requestId);
 
-    Optional<PayloadProvider> get(final ServerDirection serverDirection, final String id);
+    Optional<RawProvider> get(final ServerDirection serverDirection, final String id);
 
     void appendSizeAvailable(ServerDirection operation, String requestId, int byteCount);
 }

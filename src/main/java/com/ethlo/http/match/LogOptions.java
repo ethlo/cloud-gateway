@@ -2,21 +2,25 @@ package com.ethlo.http.match;
 
 import java.util.Optional;
 
-public record LogOptions(Boolean headers, BodyProcessing body)
+public record LogOptions(Boolean headers, ContentProcessing raw, ContentProcessing body)
 {
-    public LogOptions(final Boolean headers, final BodyProcessing body)
+    public LogOptions(final Boolean headers, final ContentProcessing raw, final ContentProcessing body)
     {
         this.headers = Optional.ofNullable(headers).orElse(true);
-        this.body = Optional.ofNullable(body).orElse(BodyProcessing.NONE);
+        this.raw = Optional.ofNullable(raw).orElse(ContentProcessing.NONE);
+        this.body = Optional.ofNullable(body).orElse(ContentProcessing.NONE);
     }
 
-    public enum BodyProcessing
+    public boolean mustBuffer()
+    {
+        return raw == ContentProcessing.SIZE
+                || raw == ContentProcessing.STORE
+                || body == ContentProcessing.SIZE
+                || body == ContentProcessing.STORE;
+    }
+
+    public enum ContentProcessing
     {
         NONE, SIZE, STORE;
-
-        public boolean mustParse()
-        {
-            return this == SIZE || this == STORE;
-        }
     }
 }

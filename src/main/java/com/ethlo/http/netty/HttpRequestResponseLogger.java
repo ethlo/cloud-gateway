@@ -60,11 +60,11 @@ public class HttpRequestResponseLogger extends LoggingHandler
             final int bytesAvailable = msg.readableBytes();
             dataBufferRepository.appendSizeAvailable(operation, requestId, bytesAvailable);
 
-            final boolean isRequestAndShouldStore = pattern.request().body().mustParse() && operation == REQUEST;
-            final boolean isResponseAndShouldStore = pattern.response().body().mustParse() && operation == RESPONSE;
+            final boolean isRequestAndShouldStore = pattern.request().mustBuffer() && operation == REQUEST;
+            final boolean isResponseAndShouldStore = pattern.response().mustBuffer() && operation == RESPONSE;
             if (isRequestAndShouldStore || isResponseAndShouldStore)
             {
-                // Store the body if requested
+                // Store the contentProcessing if requested
                 final byte[] data = getBytes(msg);
                 if (data.length > 0)
                 {

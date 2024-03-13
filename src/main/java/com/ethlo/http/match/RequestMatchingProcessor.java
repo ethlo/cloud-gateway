@@ -23,7 +23,7 @@ public record RequestMatchingProcessor(
     {
         this.id = id;
         this.predicates = predicates;
-        this.request = Optional.ofNullable(request).orElse(new LogOptions(null, null));
-        this.response = Optional.ofNullable(response).orElse(new LogOptions(null, null));
+        this.request = Optional.ofNullable(request).orElse(new LogOptions(null, null, null));
+        this.response = Optional.ofNullable(response).orElse(new LogOptions(null, null, null));
     }
 }

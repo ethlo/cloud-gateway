@@ -36,7 +36,7 @@ public class FileBodyContentRepository implements BodyContentRepository
     }
 
     @Override
-    public void saveRequestBody(final String requestId, final Resource requestBody)
+    public void saveRequest(final String requestId, final Resource requestBody)
     {
         save(requestId, ServerDirection.REQUEST, requestBody);
     }
@@ -55,7 +55,7 @@ public class FileBodyContentRepository implements BodyContentRepository
     }
 
     @Override
-    public void saveResponseBody(final String requestId, final Resource responseBody)
+    public void saveResponse(final String requestId, final Resource responseBody)
     {
         save(requestId, ServerDirection.RESPONSE, responseBody);
     }

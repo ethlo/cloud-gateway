@@ -65,7 +65,7 @@ public class CircuitBreakerHandler implements HandlerFunction<ServerResponse>
         final Optional<PredicateConfig> config = ContextUtil.getLoggingConfig(serverRequest);
         logger.debug("Reading logging config: {}", config.orElse(null));
         return config
-                .filter(predicateConfig -> predicateConfig.request().body() == LogOptions.BodyProcessing.STORE)
+                .filter(predicateConfig -> predicateConfig.request().mustBuffer())
                 .map(p -> saveIncomingRequest(serverRequest))
                 .orElse(ServerResponse.status(504)
                         .build());

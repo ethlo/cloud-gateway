@@ -1,18 +1,32 @@
 package com.ethlo.http.logger.clickhouse;
 
+import static com.ethlo.http.match.LogOptions.ContentProcessing.SIZE;
+import static com.ethlo.http.match.LogOptions.ContentProcessing.STORE;
+
+import java.io.ByteArrayInputStream;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
+import com.ethlo.http.BodyDecodeException;
 import com.ethlo.http.logger.HttpLogger;
+import com.ethlo.http.match.LogOptions;
+import com.ethlo.http.model.BodyProvider;
+import com.ethlo.http.model.RawProvider;
 import com.ethlo.http.model.WebExchangeDataProvider;
 import com.ethlo.http.netty.PredicateConfig;
+import com.ethlo.http.netty.ServerDirection;
+import com.ethlo.http.util.HttpBodyUtil;
 import com.ethlo.http.util.IoUtil;
 
 public class ClickHouseLogger implements HttpLogger
 {
+    private static final Logger logger = LoggerFactory.getLogger(ClickHouseLogger.class);
     private final NamedParameterJdbcTemplate tpl;
 
     public ClickHouseLogger(final NamedParameterJdbcTemplate tpl)
@@ -23,63 +37,89 @@ public class ClickHouseLogger implements HttpLogger
     @Override
     public void accessLog(final WebExchangeDataProvider dataProvider)
     {
+        final Optional<PredicateConfig> logConfigOpt = dataProvider.getPredicateConfig();
+        if (logConfigOpt.isEmpty())
+        {
+            return;
+        }
+
+        final PredicateConfig logConfig = logConfigOpt.get();
+
         final Map<String, Object> params = dataProvider.asMetaMap();
 
-        // Remove headers already captured in dedicated columns
         dataProvider.requestHeaders(HttpHeaders.writableHttpHeaders(dataProvider.getRequestHeaders()));
         dataProvider.responseHeaders(HttpHeaders.writableHttpHeaders(dataProvider.getResponseHeaders()));
 
+        // Remove headers already captured in dedicated columns
         dataProvider.getRequestHeaders().remove(HttpHeaders.HOST);
         dataProvider.getRequestHeaders().remove(HttpHeaders.AUTHORIZATION);
         dataProvider.getRequestHeaders().remove(HttpHeaders.USER_AGENT);
         dataProvider.getRequestHeaders().remove(HttpHeaders.CONTENT_TYPE);
 
-        dataProvider.getResponseHeaders().remove(HttpHeaders.CONTENT_TYPE);
-
+        params.put("request_raw", null);
         params.put("request_body", null);
         params.put("request_body_size", null);
         params.put("request_total_size", null);
+
+        params.put("response_raw", null);
         params.put("response_body", null);
         params.put("response_body_size", null);
         params.put("response_total_size", null);
 
-        dataProvider.getRequestPayload().ifPresent(rp ->
-        {
-            final boolean storeRequestData = dataProvider.getPredicateConfig()
-                    .map(PredicateConfig::isLogRequestBody)
-                    .orElse(false);
-
-            params.put("request_body", storeRequestData ? IoUtil.readAllBytes(rp.data()) : null);
-            params.put("request_body_size", rp.bodyLength());
-            params.put("request_total_size", rp.totalLength());
-        });
-        dataProvider.getResponsePayload().ifPresent(rp ->
-        {
-            final boolean storeResponseData = dataProvider.getPredicateConfig()
-                    .map(PredicateConfig::isLogResponseBody)
-                    .orElse(false);
-
-            params.put("response_body", storeResponseData ? IoUtil.readAllBytes(rp.data()) : null);
-            params.put("response_body_size", rp.bodyLength());
-            params.put("response_total_size", rp.totalLength());
-        });
+        params.putAll(processContent(logConfig.request(), dataProvider.getRawRequest().orElse(null), ServerDirection.REQUEST));
+        params.putAll(processContent(logConfig.response(), dataProvider.getRawResponse().orElse(null), ServerDirection.RESPONSE));
 
         params.put("request_headers", flattenMap(dataProvider.getRequestHeaders()));
         params.put("response_headers", flattenMap(dataProvider.getResponseHeaders()));
+
         tpl.update("""
                 INSERT INTO log (
                   timestamp, route_id, route_uri, gateway_request_id, method, path,
                   response_time, request_body_size, response_body_size, request_total_size,
                   response_total_size, status, is_error, user_claim, realm_claim, host,
                   request_content_type, response_content_type, user_agent,
-                  request_headers, response_headers, request_body, response_body)
+                  request_headers, response_headers, request_body, response_body, request_raw, response_raw)
                 VALUES(
                   :timestamp, :route_id, :route_uri, :gateway_request_id, :method, :path,
                   :duration, :request_body_size, :response_body_size,
                   :request_total_size, :response_total_size, :status, :is_error, :user_claim, :realm_claim,
                   :host, :request_content_type, :response_content_type, :user_agent,
                   :request_headers, :response_headers,
-                  :request_body, :response_body)""", params);
+                  :request_body, :response_body, :request_raw, :response_raw)""", params);
+    }
+
+    private static Map<String, Object> processContent(LogOptions logConfig, RawProvider rawResponse, final ServerDirection serverDirection)
+    {
+        final String keyPrefix = serverDirection.name().toLowerCase();
+        final Map<String, Object> params = new LinkedHashMap<>();
+        if ((logConfig.raw() == STORE || logConfig.body() == STORE || logConfig.body() == SIZE) && rawResponse != null)
+        {
+            final byte[] responseData = IoUtil.readAllBytes(rawResponse.data());
+
+            if (logConfig.raw() == STORE)
+            {
+                params.put(keyPrefix + "_raw", responseData);
+                params.put(keyPrefix + "_total_size", rawResponse.totalLength());
+            }
+
+            if (logConfig.body() == STORE || logConfig.body() == SIZE)
+            {
+                try
+                {
+                    final BodyProvider bodyProvider = HttpBodyUtil.extractBody(new ByteArrayInputStream(responseData), serverDirection);
+                    params.put(keyPrefix + "_body_size", bodyProvider.bodyLength());
+                    if (logConfig.body() == STORE)
+                    {
+                        params.put(keyPrefix + "_body", IoUtil.readAllBytes(bodyProvider.data()));
+                    }
+                }
+                catch (BodyDecodeException exc)
+                {
+                    logger.warn("Could not decode body content", exc);
+                }
+            }
+        }
+        return params;
     }
 
     private Map<String, Object> flattenMap(HttpHeaders headers)

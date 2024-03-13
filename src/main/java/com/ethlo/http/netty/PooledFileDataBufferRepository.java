@@ -18,20 +18,15 @@ import org.slf4j.LoggerFactory;
 import org.springframework.util.unit.DataSize;
 
 import ch.qos.logback.core.util.CloseUtil;
-import com.ethlo.http.BodyDecodeException;
 import com.ethlo.http.logger.CaptureConfiguration;
-import com.ethlo.http.model.PayloadProvider;
+import com.ethlo.http.model.RawProvider;
 import com.ethlo.http.util.InspectableBufferedOutputStream;
 import com.ethlo.http.util.LazyFileOutputStream;
-import rawhttp.core.HttpMessage;
-import rawhttp.core.RawHttp;
-import rawhttp.core.RawHttpOptions;
 
 public class PooledFileDataBufferRepository implements DataBufferRepository
 {
     private static final Logger logger = LoggerFactory.getLogger(PooledFileDataBufferRepository.class);
 
-    private static final RawHttp rawHttp = new RawHttp(getConfig());
     private final DataSize bufferSize;
     private final Path basePath;
     private final ConcurrentMap<Path, InspectableBufferedOutputStream> pool;
@@ -45,45 +40,9 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
         this.sizePool = new ConcurrentHashMap<>();
     }
 
-    private static RawHttpOptions getConfig()
-    {
-        final RawHttpOptions.Builder b = RawHttpOptions.newBuilder();
-        b.allowContentLengthMismatch();
-        b.withHttpHeadersOptions().withMaxHeaderValueLength(Integer.MAX_VALUE).withMaxHeaderNameLength(255);
-        return b.build();
-    }
-
     public static Path getFilename(final Path basePath, ServerDirection operation, String id)
     {
         return basePath.resolve(id + "_" + operation.name().toLowerCase() + ".raw");
-    }
-
-    private static PayloadProvider extractBody(final String requestId, final InputStream fullMessage, boolean isRequest, final long totalBytesWritten)
-    {
-        try
-        {
-            final HttpMessage message = isRequest ? rawHttp.parseRequest(fullMessage) : rawHttp.parseResponse(fullMessage);
-            final byte[] bodyBytes = message.getBody().map(b ->
-            {
-                try
-                {
-                    return b.decodeBody();
-                }
-                catch (IOException exc)
-                {
-                    throw new BodyDecodeException("Unable to decode " + (isRequest ? "request" : "response") + "body for request " + requestId, exc);
-                }
-            }).orElseGet(() ->
-            {
-                logger.debug("Request {} has no body, returning empty byte array", requestId);
-                return new byte[0];
-            });
-            return new PayloadProvider(new ByteArrayInputStream(bodyBytes), (long) bodyBytes.length, totalBytesWritten);
-        }
-        catch (IOException exc)
-        {
-            throw new UncheckedIOException(exc);
-        }
     }
 
     @Override
@@ -157,7 +116,7 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
     }
 
     @Override
-    public Optional<PayloadProvider> get(final ServerDirection serverDirection, final String requestId)
+    public Optional<RawProvider> get(final ServerDirection serverDirection, final String requestId)
     {
         final String key = requestId + "_" + serverDirection.name();
         final Optional<Long> size = Optional.ofNullable(sizePool.get(key)).map(AtomicLong::get);
@@ -177,7 +136,7 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
             {
                 final byte[] data = stream.getBuffer();
                 logger.debug("Using data from memory of size {} for {} {}", data.length, serverDirection, requestId);
-                return Optional.of(extractBody(requestId, new ByteArrayInputStream(data), serverDirection == ServerDirection.REQUEST, stream.getTotalBytesWritten()));
+                return Optional.of(new RawProvider(new ByteArrayInputStream(data), stream.getTotalBytesWritten()));
             }
 
             stream.forceFlush();
@@ -187,7 +146,7 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
             {
                 final long fileSize = Files.size(file);
                 logger.debug("Using data from buffer file {} of size {} for {} {}", file, fileSize, serverDirection, requestId);
-                return Optional.of(extractBody(requestId, new BufferedInputStream(Files.newInputStream(file)), serverDirection == ServerDirection.REQUEST, fileSize));
+                return Optional.of(new RawProvider(new BufferedInputStream(Files.newInputStream(file)), fileSize));
             }
             catch (IOException e)
             {
@@ -195,7 +154,7 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
             }
         }
 
-        return Optional.of(new PayloadProvider(InputStream.nullInputStream(), null, size.get()));
+        return Optional.of(new RawProvider(InputStream.nullInputStream(), 0));
     }
 
     @Override

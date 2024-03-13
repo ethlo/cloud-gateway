@@ -9,13 +9,5 @@ public record PredicateConfig(String id,
                               LogOptions request,
                               LogOptions response)
 {
-    public boolean isLogRequestBody()
-    {
-        return request.body() == LogOptions.BodyProcessing.STORE;
-    }
 
-    public boolean isLogResponseBody()
-    {
-        return response.body() == LogOptions.BodyProcessing.STORE;
-    }
 }

@@ -6,9 +6,9 @@ import org.springframework.core.io.Resource;
 
 public interface BodyContentRepository
 {
-    void saveRequestBody(final String requestId, Resource requestBody);
+    void saveRequest(final String requestId, Resource requestBody);
 
-    void saveResponseBody(final String requestId, Resource responseBody);
+    void saveResponse(final String requestId, Resource responseBody);
 
     Optional<Resource> getRequestData(final String requestId);
 
