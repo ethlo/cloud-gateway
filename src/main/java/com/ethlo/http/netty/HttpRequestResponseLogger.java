@@ -5,12 +5,6 @@ import static com.ethlo.http.netty.ContextUtil.getRequestId;
 import static com.ethlo.http.netty.ServerDirection.REQUEST;
 import static com.ethlo.http.netty.ServerDirection.RESPONSE;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.ChannelHandlerContext;
@@ -72,19 +66,11 @@ public class HttpRequestResponseLogger extends LoggingHandler
                 final byte[] data = getBytes(msg);
                 if (bytesAvailable > 0)
                 {
-                    try
+                    dataBufferRepository.write(serverDirection, requestId, data).thenApply(writtenBytes ->
                     {
-                        final int written = dataBufferRepository.write(serverDirection, requestId, data).get(10, TimeUnit.SECONDS);
-                        logger.debug("Wrote {} bytes for {} for request {}", written, serverDirection.name(), requestId);
-                    }
-                    catch (InterruptedException exc)
-                    {
-                        Thread.currentThread().notify();
-                    }
-                    catch (ExecutionException | TimeoutException exc)
-                    {
-                        throw new UncheckedIOException(new IOException(exc));
-                    }
+                        logger.debug("Wrote {} bytes for {} for request {}", writtenBytes, serverDirection.name(), requestId);
+                        return null;
+                    }).join();
                 }
             }
             return requestId;
@@ -93,6 +79,7 @@ public class HttpRequestResponseLogger extends LoggingHandler
 
     private byte[] getBytes(ByteBuf buf)
     {
-        return ByteBufUtil.getBytes(buf, buf.readerIndex(), buf.readableBytes(), false);
+        // IMPORTANT: We unfortunately need to copy as we write data async to disk
+        return ByteBufUtil.getBytes(buf, buf.readerIndex(), buf.readableBytes(), true);
     }
 }

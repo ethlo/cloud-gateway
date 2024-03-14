@@ -4,16 +4,19 @@ import static org.springframework.web.reactive.function.server.RequestPredicates
 import static org.springframework.web.reactive.function.server.RouterFunctions.nest;
 import static org.springframework.web.reactive.function.server.RouterFunctions.route;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.cloud.gateway.handler.predicate.RoutePredicateFactory;
@@ -28,12 +31,13 @@ import org.springframework.web.reactive.function.server.ServerResponse;
 import com.ethlo.http.configuration.HttpLoggingConfiguration;
 import com.ethlo.http.handlers.CircuitBreakerHandler;
 import com.ethlo.http.logger.CaptureConfiguration;
-import com.ethlo.http.logger.HttpLogger;
+import com.ethlo.http.logger.delegate.SequentialDelegateLogger;
 import com.ethlo.http.netty.DataBufferRepository;
-import com.ethlo.http.netty.PooledFileDataBufferRepository;
 import com.ethlo.http.netty.PredicateConfig;
 import com.ethlo.http.netty.TagRequestIdGlobalFilter;
 import com.ethlo.http.processors.LogPreProcessor;
+import com.ethlo.http.util.ObservableLinkedBlockingDeque;
+import com.ethlo.http.util.ObservableScheduler;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 
@@ -43,9 +47,9 @@ import reactor.core.scheduler.Schedulers;
 public class CaptureCfg
 {
     @Bean
-    public DataBufferRepository pooledFileDataBufferRepository(CaptureConfiguration captureConfiguration, final Scheduler ioScheduler)
+    public DataBufferRepository pooledFileDataBufferRepository(CaptureConfiguration captureConfiguration)
     {
-        return new PooledFileDataBufferRepository(captureConfiguration, ioScheduler);
+        return new DataBufferRepository(captureConfiguration);
     }
 
     @Bean
@@ -62,7 +66,7 @@ public class CaptureCfg
 
     @Bean
     @RefreshScope
-    public TagRequestIdGlobalFilter tagRequestIdGlobalFilter(final HttpLogger httpLogger,
+    public TagRequestIdGlobalFilter tagRequestIdGlobalFilter(final SequentialDelegateLogger httpLogger,
                                                              final DataBufferRepository dataBufferRepository,
                                                              final LogPreProcessor logPreProcessor,
                                                              final RoutePredicateLocator routePredicateLocator,
@@ -90,13 +94,15 @@ public class CaptureCfg
     }
 
     @Bean
-    public Scheduler ioScheduler(final HttpLoggingConfiguration httpLoggingConfiguration)
+    public ObservableScheduler ioScheduler(final HttpLoggingConfiguration httpLoggingConfiguration)
     {
-        final BlockingQueue<Runnable> linkedBlockingDeque = new LinkedBlockingDeque<>(Optional.ofNullable(httpLoggingConfiguration.getMaxQueueSize()).orElse(HttpLoggingConfiguration.DEFAULT_QUEUE_SIZE));
+        final int queueSize = Optional.ofNullable(httpLoggingConfiguration.getMaxQueueSize()).orElse(HttpLoggingConfiguration.DEFAULT_QUEUE_SIZE);
+        final BlockingQueue<Runnable> linkedBlockingDeque = new ObservableLinkedBlockingDeque<>(queueSize);
         final AtomicInteger threadNumber = new AtomicInteger(1);
         final int maxThreads = Optional.ofNullable(httpLoggingConfiguration.getMaxIoThreads()).orElse(HttpLoggingConfiguration.DEFAULT_THREAD_COUNT);
+        final WaitForCapacityPolicy queueBlockPolicy = new WaitForCapacityPolicy();
 
-        return Schedulers.fromExecutorService(new ThreadPoolExecutor(maxThreads, maxThreads, Integer.MAX_VALUE,
+        return new ObservableScheduler(Schedulers.fromExecutorService(new ThreadPoolExecutor(maxThreads, maxThreads, Integer.MAX_VALUE,
                 TimeUnit.SECONDS, linkedBlockingDeque,
                 (r ->
                 {
@@ -104,18 +110,30 @@ public class CaptureCfg
                     t.setName("log-io-" + threadNumber.getAndIncrement());
                     return t;
                 }),
-                new WaitForCapacityPolicy()
-        ));
+                queueBlockPolicy
+        )), linkedBlockingDeque, queueSize, queueBlockPolicy.rejectedDelayCounter, queueBlockPolicy.rejectedDelay);
     }
 
     static class WaitForCapacityPolicy implements RejectedExecutionHandler
     {
+        private static final Logger logger = LoggerFactory.getLogger(WaitForCapacityPolicy.class);
+        private final AtomicInteger rejectedDelayCounter = new AtomicInteger();
+        private final AtomicLong rejectedDelay = new AtomicLong();
+
+        private final Duration waitTimeout = Duration.ofSeconds(5);
+
         @Override
         public void rejectedExecution(Runnable runnable, ThreadPoolExecutor threadPoolExecutor)
         {
             try
             {
-                threadPoolExecutor.getQueue().put(runnable);
+                final long started = System.nanoTime();
+                if (!threadPoolExecutor.getQueue().offer(runnable, waitTimeout.toMillis(), TimeUnit.MILLISECONDS))
+                {
+                    rejectedDelayCounter.incrementAndGet();
+                    rejectedDelay.addAndGet(System.nanoTime() - started);
+                    rejectedExecution(runnable, threadPoolExecutor);
+                }
             }
             catch (InterruptedException e)
             {

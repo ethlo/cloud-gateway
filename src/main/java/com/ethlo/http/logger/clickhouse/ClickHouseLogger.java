@@ -9,11 +9,12 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpHeaders;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
@@ -32,7 +33,6 @@ import com.google.common.base.Stopwatch;
 
 public class ClickHouseLogger implements HttpLogger
 {
-    public static final String ERRORS_KEY = "errors";
     private static final Logger logger = LoggerFactory.getLogger(ClickHouseLogger.class);
     private final NamedParameterJdbcTemplate tpl;
 
@@ -41,44 +41,48 @@ public class ClickHouseLogger implements HttpLogger
         this.tpl = tpl;
     }
 
-    private static Map.Entry<Map<String, Object>, BodyDecodeException> processContent(LogOptions logConfig, RawProvider rawProvider, final ServerDirection serverDirection)
+    private static CompletableFuture<Map.Entry<Map<String, Object>, BodyDecodeException>> processContent(LogOptions logConfig, RawProvider rawProvider, final ServerDirection serverDirection)
     {
         final String keyPrefix = serverDirection.name().toLowerCase();
-        BodyDecodeException bodyDecodeException = null;
+        final AtomicReference<BodyDecodeException> bodyDecodeException = new AtomicReference<>();
         if ((logConfig.raw() == STORE || logConfig.body() == STORE || logConfig.body() == SIZE) && rawProvider != null)
         {
-            final DataBuffer dataBuffer = rawProvider.asDataBuffer();
-            final Map<String, Object> params = new LinkedHashMap<>();
-            final byte[] responseData = IoUtil.readAllBytes(dataBuffer.asInputStream());
-            params.put(keyPrefix + "_total_size", rawProvider.size());
-            if (logConfig.raw() == STORE)
+            return rawProvider.getBuffer().thenApply(buffer ->
             {
-                params.put(keyPrefix + "_raw", responseData);
-            }
-
-            if (logConfig.body() == STORE || logConfig.body() == SIZE)
-            {
-                try
+                final Map<String, Object> params = new LinkedHashMap<>();
+                final byte[] responseData = buffer.array();
+                params.put(keyPrefix + "_total_size", rawProvider.size());
+                if (logConfig.raw() == STORE)
                 {
-                    final BodyProvider bodyProvider = HttpBodyUtil.extractBody(new ByteArrayInputStream(responseData), serverDirection);
-                    params.put(keyPrefix + "_body_size", bodyProvider.bodyLength());
-                    if (logConfig.body() == STORE)
+                    params.put(keyPrefix + "_raw", responseData);
+                }
+
+                if (logConfig.body() == STORE || logConfig.body() == SIZE)
+                {
+                    try
                     {
-                        params.put(keyPrefix + "_body", IoUtil.readAllBytes(bodyProvider.data()));
+                        final BodyProvider bodyProvider = HttpBodyUtil.extractBody(new ByteArrayInputStream(responseData), serverDirection);
+                        params.put(keyPrefix + "_body_size", bodyProvider.bodyLength());
+                        if (logConfig.body() == STORE)
+                        {
+                            params.put(keyPrefix + "_body", IoUtil.readAllBytes(bodyProvider.data()));
+                        }
+                    }
+                    catch (BodyDecodeException exc)
+                    {
+                        bodyDecodeException.set(exc);
                     }
                 }
-                catch (BodyDecodeException exc)
-                {
-                    bodyDecodeException = exc;
-                }
-            }
-            return new AbstractMap.SimpleImmutableEntry<>(params, bodyDecodeException);
+                return new AbstractMap.SimpleImmutableEntry<>(params, bodyDecodeException.get());
+            });
         }
-        return new AbstractMap.SimpleImmutableEntry<>(Map.of(), null);
+        final CompletableFuture<Map.Entry<Map<String, Object>, BodyDecodeException>> empty = new CompletableFuture<>();
+        empty.complete(new AbstractMap.SimpleImmutableEntry<>(Map.of(), null));
+        return empty;
     }
 
     @Override
-    public AccessLogResult accessLog(final WebExchangeDataProvider dataProvider)
+    public CompletableFuture<AccessLogResult> accessLog(final WebExchangeDataProvider dataProvider)
     {
         final Optional<PredicateConfig> logConfigOpt = dataProvider.getPredicateConfig();
         if (logConfigOpt.isEmpty())
@@ -112,40 +116,46 @@ public class ClickHouseLogger implements HttpLogger
         params.put("request_headers", flattenMap(dataProvider.getRequestHeaders()));
         params.put("response_headers", flattenMap(dataProvider.getResponseHeaders()));
 
-        final Map.Entry<Map<String, Object>, BodyDecodeException> requestResult = processContent(logConfig.request(), dataProvider.getRawRequest().orElse(null), ServerDirection.REQUEST);
-        final Map.Entry<Map<String, Object>, BodyDecodeException> responseResult = processContent(logConfig.response(), dataProvider.getRawResponse().orElse(null), ServerDirection.RESPONSE);
+        final AtomicReference<BodyDecodeException> bodyDecodeRequestExc = new AtomicReference<>();
+        final AtomicReference<BodyDecodeException> bodyDecodeResponseExc = new AtomicReference<>();
 
-        params.putAll(requestResult.getKey());
-        params.putAll(responseResult.getKey());
+        return processContent(logConfig.request(), dataProvider.getRawRequest().orElse(null), ServerDirection.REQUEST)
+                .thenCompose(requestResult ->
+                        processContent(logConfig.response(), dataProvider.getRawResponse().orElse(null), ServerDirection.RESPONSE)
+                                .thenApply(responseResult ->
+                                {
+                                    bodyDecodeRequestExc.set(requestResult.getValue());
+                                    params.putAll(requestResult.getKey());
+                                    params.putAll(responseResult.getKey());
+                                    logger.debug("Query params map processed");
+                                    return null;
+                                }).thenApply(ignored ->
+                {
+                    logger.debug("Inserting data into ClickHouse for request {}: {}", dataProvider.getRequestId(), params.entrySet().stream().filter(e -> e.getValue() != null).toList());
+                    final Stopwatch stopwatch = Stopwatch.createStarted();
+                    tpl.update("""
+                            INSERT INTO log (
+                              timestamp, route_id, route_uri, gateway_request_id, method, path,
+                              response_time, request_body_size, response_body_size, request_total_size,
+                              response_total_size, status, is_error, user_claim, realm_claim, host,
+                              request_content_type, response_content_type, user_agent,
+                              request_headers, response_headers, request_body, response_body, request_raw, response_raw)
+                            VALUES(
+                              :timestamp, :route_id, :route_uri, :gateway_request_id, :method, :path,
+                              :duration, :request_body_size, :response_body_size,
+                              :request_total_size, :response_total_size, :status, :is_error, :user_claim, :realm_claim,
+                              :host, :request_content_type, :response_content_type, :user_agent,
+                              :request_headers, :response_headers,
+                              :request_body, :response_body, :request_raw, :response_raw)""", params);
+                    logger.debug("Finished inserting data into ClickHouse for request {} in {}", dataProvider.getRequestId(), stopwatch.elapsed());
 
-        logger.debug("Inserting data into ClickHouse for request {}", dataProvider.getRequestId());
-        final Stopwatch stopwatch = Stopwatch.createStarted();
-        tpl.update("""
-                INSERT INTO log (
-                  timestamp, route_id, route_uri, gateway_request_id, method, path,
-                  response_time, request_body_size, response_body_size, request_total_size,
-                  response_total_size, status, is_error, user_claim, realm_claim, host,
-                  request_content_type, response_content_type, user_agent,
-                  request_headers, response_headers, request_body, response_body, request_raw, response_raw)
-                VALUES(
-                  :timestamp, :route_id, :route_uri, :gateway_request_id, :method, :path,
-                  :duration, :request_body_size, :response_body_size,
-                  :request_total_size, :response_total_size, :status, :is_error, :user_claim, :realm_claim,
-                  :host, :request_content_type, :response_content_type, :user_agent,
-                  :request_headers, :response_headers,
-                  :request_body, :response_body, :request_raw, :response_raw)""", params);
-        logger.debug("Finished inserting data into ClickHouse for request {} in {}", dataProvider.getRequestId(), stopwatch.elapsed());
+                    if (bodyDecodeRequestExc.get() != null || bodyDecodeResponseExc.get() != null)
+                    {
+                        return AccessLogResult.error(logConfig, Stream.of(bodyDecodeRequestExc.get(), bodyDecodeResponseExc.get()).filter(Objects::nonNull).toList());
+                    }
 
-        final BodyDecodeException bodyDecodeRequestExc = requestResult.getValue();
-        final BodyDecodeException bodyDecodeResponseExc = responseResult.getValue();
-
-        if (bodyDecodeRequestExc != null || bodyDecodeResponseExc != null)
-        {
-            return AccessLogResult.error(logConfig, Stream.of(bodyDecodeRequestExc, bodyDecodeResponseExc).filter(Objects::nonNull).toList());
-        }
-
-
-        return AccessLogResult.ok(logConfig);
+                    return AccessLogResult.ok(logConfig);
+                }));
     }
 
     private Map<String, Object> flattenMap(HttpHeaders headers)
