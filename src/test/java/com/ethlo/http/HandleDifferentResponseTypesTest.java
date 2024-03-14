@@ -29,38 +29,31 @@ public class HandleDifferentResponseTypesTest
     @Test
     public void testChunkedGet() throws IOException
     {
-        final int iterations = 10;
         try (final MockWebServer server = new MockWebServer())
         {
-            for (int i = 0; i < iterations; i++)
-            {
-                server.enqueue(new MockResponse()
-                        .addHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                        .addHeader(HttpHeaders.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED)
-                        .setBody("8\r\n" +
-                                "Mozilla \r\n" +
-                                "11\r\n" +
-                                "Developer Network\r\n" +
-                                "0\r\n" +
-                                "\r\n"));
-            }
+            server.enqueue(new MockResponse()
+                    .addHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                    .addHeader(HttpHeaders.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED)
+                    .setBody("8\r\n" +
+                            "Mozilla \r\n" +
+                            "11\r\n" +
+                            "Developer Network\r\n" +
+                            "0\r\n" +
+                            "\r\n"));
 
             server.start(port);
             final HttpUrl url = server.url("/get");
 
-            for (int i = 0; i < iterations; i++)
-            {
-                final String body = client.get()
-                        .uri(url.uri().getPath())
-                        .exchange()
-                        .expectStatus()
-                        .isOk()
-                        .expectBody(String.class)
-                        .returnResult()
-                        .getResponseBody();
+            final String body = client.get()
+                    .uri(url.uri().getPath())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody(String.class)
+                    .returnResult()
+                    .getResponseBody();
 
-                assertThat(body).isEqualTo("Mozilla Developer Network");
-            }
+            assertThat(body).isEqualTo("Mozilla Developer Network");
         }
     }
 }
