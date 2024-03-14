@@ -39,7 +39,7 @@ public class HandleDifferentResponseTypesTest
                         .addHeader(HttpHeaders.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED)
                         .setBody("8\r\n" +
                                 "Mozilla \r\n" +
-                                "-11\r\n" +
+                                "11\r\n" +
                                 "Developer Network\r\n" +
                                 "0\r\n" +
                                 "\r\n"));
@@ -59,7 +59,7 @@ public class HandleDifferentResponseTypesTest
                         .returnResult()
                         .getResponseBody();
 
-                //assertThat(body).isEqualTo("Mozilla Developer Network");
+                assertThat(body).isEqualTo("Mozilla Developer Network");
             }
         }
     }
