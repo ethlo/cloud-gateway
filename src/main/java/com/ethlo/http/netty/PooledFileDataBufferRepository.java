@@ -107,7 +107,7 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
             {
                 try
                 {
-                    channel = AsynchronousFileChannel.open(file, StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.READ);
+                    channel = AsynchronousFileChannel.open(file, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE, StandardOpenOption.READ);
                     logger.debug("Opened buffer for {} for {}", operation, requestId);
                 }
                 catch (IOException e)
@@ -125,15 +125,21 @@ public class PooledFileDataBufferRepository implements DataBufferRepository
         final Path requestFile = getFilename(basePath, REQUEST, requestId);
         Optional.ofNullable(pool.get(requestFile)).ifPresent(fc ->
         {
-            logger.debug("Closing request file {} used by request {}", requestFile, requestId);
-            CloseUtil.closeQuietly(fc);
+            if (fc.isOpen())
+            {
+                logger.debug("Closing request file {} used by request {}", requestFile, requestId);
+                CloseUtil.closeQuietly(fc);
+            }
         });
 
         final Path responseFile = getFilename(basePath, RESPONSE, requestId);
         Optional.ofNullable(pool.get(responseFile)).ifPresent(fc ->
         {
-            logger.debug("Closing response file {} used by request {}", responseFile, requestId);
-            CloseUtil.closeQuietly(fc);
+            if (fc.isOpen())
+            {
+                logger.debug("Closing response file {} used by request {}", responseFile, requestId);
+                CloseUtil.closeQuietly(fc);
+            }
         });
     }
 

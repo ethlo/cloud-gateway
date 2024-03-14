@@ -3,6 +3,7 @@ package com.ethlo.http;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,7 +28,7 @@ public class HandleDifferentResponseTypesTest
     private WebTestClient client;
 
     @Test
-    public void testChunkedGet() throws IOException
+    public void testChunkedGet() throws IOException, InterruptedException
     {
         try (final MockWebServer server = new MockWebServer())
         {
@@ -54,6 +55,33 @@ public class HandleDifferentResponseTypesTest
                     .getResponseBody();
 
             assertThat(body).isEqualTo("Mozilla Developer Network");
+            Thread.sleep(1000);
+        }
+    }
+
+    @Test
+    void testSlowResponse() throws IOException, InterruptedException
+    {
+        try (final MockWebServer server = new MockWebServer())
+        {
+            server.enqueue(new MockResponse()
+                    .setBodyDelay(3, TimeUnit.SECONDS)
+                    .addHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                    .setBody("Mozilla Developer Network"));
+            server.start(port);
+            final HttpUrl url = server.url("/get");
+
+            final String body = client.get()
+                    .uri(url.uri().getPath())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody(String.class)
+                    .returnResult()
+                    .getResponseBody();
+
+            assertThat(body).isEqualTo("Mozilla Developer Network");
+            Thread.sleep(1000);
         }
     }
 }
