@@ -10,15 +10,15 @@ public class AccessLogResult
     private final PredicateConfig predicateConfig;
     private final List<? extends Exception> processingErrors;
 
-    public static AccessLogResult ok(PredicateConfig predicateConfig)
-    {
-        return new AccessLogResult(predicateConfig, List.of());
-    }
-
     private AccessLogResult(final PredicateConfig predicateConfig, final List<? extends Exception> processingErrors)
     {
         this.predicateConfig = predicateConfig;
         this.processingErrors = processingErrors;
+    }
+
+    public static AccessLogResult ok(PredicateConfig predicateConfig)
+    {
+        return new AccessLogResult(predicateConfig, List.of());
     }
 
     public static AccessLogResult error(PredicateConfig predicateConfig, List<? extends Exception> processingErrors)

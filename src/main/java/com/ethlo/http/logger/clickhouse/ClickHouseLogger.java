@@ -5,10 +5,7 @@ import static com.ethlo.http.match.LogOptions.ContentProcessing.STORE;
 
 import java.io.ByteArrayInputStream;
 import java.util.AbstractMap;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -35,13 +32,49 @@ import com.google.common.base.Stopwatch;
 
 public class ClickHouseLogger implements HttpLogger
 {
-    private static final Logger logger = LoggerFactory.getLogger(ClickHouseLogger.class);
     public static final String ERRORS_KEY = "errors";
+    private static final Logger logger = LoggerFactory.getLogger(ClickHouseLogger.class);
     private final NamedParameterJdbcTemplate tpl;
 
     public ClickHouseLogger(final NamedParameterJdbcTemplate tpl)
     {
         this.tpl = tpl;
+    }
+
+    private static Map.Entry<Map<String, Object>, BodyDecodeException> processContent(LogOptions logConfig, RawProvider rawProvider, final ServerDirection serverDirection)
+    {
+        final String keyPrefix = serverDirection.name().toLowerCase();
+        BodyDecodeException bodyDecodeException = null;
+        if ((logConfig.raw() == STORE || logConfig.body() == STORE || logConfig.body() == SIZE) && rawProvider != null)
+        {
+            final DataBuffer dataBuffer = rawProvider.asDataBuffer();
+            final Map<String, Object> params = new LinkedHashMap<>();
+            final byte[] responseData = IoUtil.readAllBytes(dataBuffer.asInputStream());
+            params.put(keyPrefix + "_total_size", rawProvider.size());
+            if (logConfig.raw() == STORE)
+            {
+                params.put(keyPrefix + "_raw", responseData);
+            }
+
+            if (logConfig.body() == STORE || logConfig.body() == SIZE)
+            {
+                try
+                {
+                    final BodyProvider bodyProvider = HttpBodyUtil.extractBody(new ByteArrayInputStream(responseData), serverDirection);
+                    params.put(keyPrefix + "_body_size", bodyProvider.bodyLength());
+                    if (logConfig.body() == STORE)
+                    {
+                        params.put(keyPrefix + "_body", IoUtil.readAllBytes(bodyProvider.data()));
+                    }
+                }
+                catch (BodyDecodeException exc)
+                {
+                    bodyDecodeException = exc;
+                }
+            }
+            return new AbstractMap.SimpleImmutableEntry<>(params, bodyDecodeException);
+        }
+        return new AbstractMap.SimpleImmutableEntry<>(Map.of(), null);
     }
 
     @Override
@@ -113,43 +146,6 @@ public class ClickHouseLogger implements HttpLogger
 
 
         return AccessLogResult.ok(logConfig);
-    }
-
-
-    private static Map.Entry<Map<String, Object>, BodyDecodeException> processContent(LogOptions logConfig, RawProvider rawProvider, final ServerDirection serverDirection)
-    {
-        final String keyPrefix = serverDirection.name().toLowerCase();
-        BodyDecodeException bodyDecodeException = null;
-        if ((logConfig.raw() == STORE || logConfig.body() == STORE || logConfig.body() == SIZE) && rawProvider != null)
-        {
-            final DataBuffer dataBuffer = rawProvider.asDataBuffer();
-            final Map<String, Object> params = new LinkedHashMap<>();
-            final byte[] responseData = IoUtil.readAllBytes(dataBuffer.asInputStream());
-            params.put(keyPrefix + "_total_size", rawProvider.size());
-            if (logConfig.raw() == STORE)
-            {
-                params.put(keyPrefix + "_raw", responseData);
-            }
-
-            if (logConfig.body() == STORE || logConfig.body() == SIZE)
-            {
-                try
-                {
-                    final BodyProvider bodyProvider = HttpBodyUtil.extractBody(new ByteArrayInputStream(responseData), serverDirection);
-                    params.put(keyPrefix + "_body_size", bodyProvider.bodyLength());
-                    if (logConfig.body() == STORE)
-                    {
-                        params.put(keyPrefix + "_body", IoUtil.readAllBytes(bodyProvider.data()));
-                    }
-                }
-                catch (BodyDecodeException exc)
-                {
-                    bodyDecodeException = exc;
-                }
-            }
-            return new AbstractMap.SimpleImmutableEntry<>(params, bodyDecodeException);
-        }
-        return new AbstractMap.SimpleImmutableEntry<>(Map.of(), null);
     }
 
     private Map<String, Object> flattenMap(HttpHeaders headers)

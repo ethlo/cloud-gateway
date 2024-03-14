@@ -2,8 +2,6 @@ package com.ethlo.http.logger.delegate;
 
 import java.util.List;
 
-import com.ethlo.http.model.AccessLogResult;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -11,6 +9,7 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
 import com.ethlo.http.logger.HttpLogger;
+import com.ethlo.http.model.AccessLogResult;
 import com.ethlo.http.model.WebExchangeDataProvider;
 
 /**

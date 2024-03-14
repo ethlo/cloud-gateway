@@ -1,6 +1,7 @@
-import org.springframework.web.server.ServerWebExchange;
 import java.util.function.Predicate;
-import org.springframework.http.server.reactive.*;
+
+import org.springframework.web.server.ServerWebExchange;
+
 public class $className implements Predicate<ServerWebExchange>
 {
     $expression
