@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.ethlo.http.logger.HttpLogger;
+import com.ethlo.http.model.AccessLogResult;
 import com.ethlo.http.model.WebExchangeDataProvider;
 
 public class FileLogger implements HttpLogger
@@ -20,10 +21,11 @@ public class FileLogger implements HttpLogger
     }
 
     @Override
-    public void accessLog(final WebExchangeDataProvider dataProvider)
+    public AccessLogResult accessLog(final WebExchangeDataProvider dataProvider)
     {
         final Map<String, Object> metaMap = dataProvider.asMetaMap();
         accessLogLogger.info(accessLogTemplateRenderer.render(metaMap));
+        return AccessLogResult.ok(dataProvider.getPredicateConfig().orElseThrow());
     }
 
     @Override

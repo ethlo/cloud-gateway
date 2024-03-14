@@ -2,10 +2,7 @@ package com.ethlo.http.handlers;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.UncheckedIOException;
-import java.nio.ByteBuffer;
-import java.nio.channels.AsynchronousFileChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
@@ -13,10 +10,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
 import org.springframework.core.io.buffer.DataBuffer;
-import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.server.reactive.ServerHttpRequest;
-import org.springframework.util.StreamUtils;
 import org.springframework.web.reactive.function.server.HandlerFunction;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
@@ -79,8 +74,8 @@ public class CircuitBreakerHandler implements HandlerFunction<ServerResponse>
         final HttpMethod method = request.getMethod();
 
         final byte[] fakeRequestLine = (method.name() + " / HTTP/1.1\r\n").getBytes(StandardCharsets.UTF_8);
-        dataBufferRepository.write(ServerDirection.REQUEST, requestId, ByteBuffer.wrap(fakeRequestLine));
-        dataBufferRepository.write(ServerDirection.REQUEST, requestId, ByteBuffer.wrap(extractHeaders(request)));
+        dataBufferRepository.write(ServerDirection.REQUEST, requestId, fakeRequestLine);
+        dataBufferRepository.write(ServerDirection.REQUEST, requestId, extractHeaders(request));
 
         return serverRequest.exchange().getRequest().getBody()
                 .publishOn(Schedulers.boundedElastic())

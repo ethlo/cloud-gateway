@@ -2,6 +2,8 @@ package com.ethlo.http.logger.delegate;
 
 import java.util.List;
 
+import com.ethlo.http.model.AccessLogResult;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -38,8 +40,13 @@ public class SequentialDelegateLogger implements HttpLogger
     }
 
     @Override
-    public void accessLog(final WebExchangeDataProvider dataProvider)
+    public AccessLogResult accessLog(final WebExchangeDataProvider dataProvider)
     {
-        loggers.forEach(logger -> logger.accessLog(dataProvider));
+        AccessLogResult result = AccessLogResult.ok(dataProvider.getPredicateConfig().orElseThrow());
+        for (final HttpLogger logger : loggers)
+        {
+            result = result.combine(logger.accessLog(dataProvider));
+        }
+        return result;
     }
 }

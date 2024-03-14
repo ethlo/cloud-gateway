@@ -12,12 +12,13 @@ import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.cloud.gateway.route.Route;
 import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
 import org.springframework.core.Ordered;
+import org.springframework.data.util.Pair;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
-import org.springframework.util.StopWatch;
 import org.springframework.web.server.ServerWebExchange;
 
 import com.ethlo.http.logger.HttpLogger;
+import com.ethlo.http.model.AccessLogResult;
 import com.ethlo.http.model.WebExchangeDataProvider;
 import com.ethlo.http.processors.LogPreProcessor;
 import jakarta.annotation.Nonnull;
@@ -67,12 +68,20 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
                 .doFinally(signalType ->
                         ioScheduler.schedule(() ->
                         {
-                            handleCompletedRequest(exchange, requestId, predicateConfig, Duration.ofNanos(System.nanoTime() - started));
-                            dataBufferRepository.cleanup(requestId);
+                            final AccessLogResult result = handleCompletedRequest(exchange, requestId, predicateConfig, Duration.ofNanos(System.nanoTime() - started));
+                            if (result.isOk())
+                            {
+                                dataBufferRepository.cleanup(requestId);
+                            }
+                            else
+                            {
+                                final Pair<String, String> filenames = dataBufferRepository.getBufferFileNames(requestId);
+                                logger.warn("There were problems storing data for request {}. The buffer files are left behind: {} {}. Details: {}", requestId, filenames.getFirst(), filenames.getSecond(), result.getProcessingErrors());
+                            }
                         }));
     }
 
-    private void handleCompletedRequest(ServerWebExchange exchange, String requestId, final PredicateConfig predicateConfig, final Duration duration)
+    private AccessLogResult handleCompletedRequest(ServerWebExchange exchange, String requestId, final PredicateConfig predicateConfig, final Duration duration)
     {
         final ServerHttpRequest req = exchange.getRequest();
         final ServerHttpResponse res = exchange.getResponse();
@@ -93,14 +102,16 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
                 .duration(duration)
                 .remoteAddress(req.getRemoteAddress());
 
-        logger.debug("Preprocessing HTTP data");
         final WebExchangeDataProvider processed = logPreProcessor.process(data);
 
-        final StopWatch stopWatch = new StopWatch();
-        stopWatch.start();
         logger.debug("Logging HTTP data for request {}", requestId);
-        httpLogger.accessLog(processed);
-        dataBufferRepository.close(requestId);
+        try
+        {
+            return httpLogger.accessLog(processed);
+        } finally
+        {
+            dataBufferRepository.close(requestId);
+        }
     }
 
     @Override

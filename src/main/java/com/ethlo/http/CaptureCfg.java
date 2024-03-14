@@ -43,9 +43,9 @@ import reactor.core.scheduler.Schedulers;
 public class CaptureCfg
 {
     @Bean
-    public DataBufferRepository pooledFileDataBufferRepository(CaptureConfiguration captureConfiguration)
+    public DataBufferRepository pooledFileDataBufferRepository(CaptureConfiguration captureConfiguration, final Scheduler ioScheduler)
     {
-        return new PooledFileDataBufferRepository(captureConfiguration);
+        return new PooledFileDataBufferRepository(captureConfiguration, ioScheduler);
     }
 
     @Bean

@@ -5,7 +5,11 @@ import static com.ethlo.http.netty.ContextUtil.getRequestId;
 import static com.ethlo.http.netty.ServerDirection.REQUEST;
 import static com.ethlo.http.netty.ServerDirection.RESPONSE;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
@@ -53,26 +57,34 @@ public class HttpRequestResponseLogger extends LoggingHandler
 
     private String format(ChannelHandlerContext ctx, String eventName, ByteBuf msg)
     {
-        final ServerDirection operation = WRITE.equalsIgnoreCase(eventName) ? REQUEST : RESPONSE;
+        final ServerDirection serverDirection = WRITE.equalsIgnoreCase(eventName) ? REQUEST : RESPONSE;
 
         return getLoggingConfig(ctx).map(predicateConfig ->
         {
             final String requestId = getRequestId(ctx).orElseThrow();
 
             final int bytesAvailable = msg.readableBytes();
-            dataBufferRepository.appendSizeAvailable(operation, requestId, bytesAvailable);
-            final boolean isRequestAndShouldStore = predicateConfig.request().mustBuffer() && operation == REQUEST;
-            final boolean isResponseAndShouldStore = predicateConfig.response().mustBuffer() && operation == RESPONSE;
+            dataBufferRepository.appendSizeAvailable(serverDirection, requestId, bytesAvailable);
+            final boolean isRequestAndShouldStore = predicateConfig.request().mustBuffer() && serverDirection == REQUEST;
+            final boolean isResponseAndShouldStore = predicateConfig.response().mustBuffer() && serverDirection == RESPONSE;
             if (isRequestAndShouldStore || isResponseAndShouldStore)
             {
-                try
+                final byte[] data = getBytes(msg);
+                if (bytesAvailable > 0)
                 {
-                    dataBufferRepository.write(operation, requestId, msg.nioBuffer()).get();
-                }
-                catch (InterruptedException | ExecutionException e)
-                {
-                    Thread.currentThread().interrupt();
-                    throw new RuntimeException(e);
+                    try
+                    {
+                        final int written = dataBufferRepository.write(serverDirection, requestId, data).get(10, TimeUnit.SECONDS);
+                        logger.debug("Wrote {} bytes for {} for request {}", written, serverDirection.name(), requestId);
+                    }
+                    catch (InterruptedException exc)
+                    {
+                        Thread.currentThread().notify();
+                    }
+                    catch (ExecutionException | TimeoutException exc)
+                    {
+                        throw new UncheckedIOException(new IOException(exc));
+                    }
                 }
             }
             return requestId;
