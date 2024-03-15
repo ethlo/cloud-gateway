@@ -8,6 +8,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -36,7 +37,6 @@ import com.ethlo.http.netty.DataBufferRepository;
 import com.ethlo.http.netty.PredicateConfig;
 import com.ethlo.http.netty.TagRequestIdGlobalFilter;
 import com.ethlo.http.processors.LogPreProcessor;
-import com.ethlo.http.util.ObservableLinkedBlockingDeque;
 import com.ethlo.http.util.ObservableScheduler;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
@@ -97,7 +97,7 @@ public class CaptureCfg
     public ObservableScheduler ioScheduler(final HttpLoggingConfiguration httpLoggingConfiguration)
     {
         final int queueSize = Optional.ofNullable(httpLoggingConfiguration.getMaxQueueSize()).orElse(HttpLoggingConfiguration.DEFAULT_QUEUE_SIZE);
-        final BlockingQueue<Runnable> linkedBlockingDeque = new ObservableLinkedBlockingDeque<>(queueSize);
+        final BlockingQueue<Runnable> linkedBlockingDeque = new LinkedBlockingDeque<>(queueSize);
         final AtomicInteger threadNumber = new AtomicInteger(1);
         final int maxThreads = Optional.ofNullable(httpLoggingConfiguration.getMaxIoThreads()).orElse(HttpLoggingConfiguration.DEFAULT_THREAD_COUNT);
         final WaitForCapacityPolicy queueBlockPolicy = new WaitForCapacityPolicy();
@@ -127,6 +127,7 @@ public class CaptureCfg
         {
             try
             {
+                logger.debug("Waiting for queue capacity");
                 final long started = System.nanoTime();
                 if (!threadPoolExecutor.getQueue().offer(runnable, waitTimeout.toMillis(), TimeUnit.MILLISECONDS))
                 {

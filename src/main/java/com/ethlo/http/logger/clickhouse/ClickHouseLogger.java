@@ -130,32 +130,32 @@ public class ClickHouseLogger implements HttpLogger
                                     logger.debug("Query params map processed");
                                     return null;
                                 }).thenApply(ignored ->
-                {
-                    logger.debug("Inserting data into ClickHouse for request {}: {}", dataProvider.getRequestId(), params.entrySet().stream().filter(e -> e.getValue() != null).toList());
-                    final Stopwatch stopwatch = Stopwatch.createStarted();
-                    tpl.update("""
-                            INSERT INTO log (
-                              timestamp, route_id, route_uri, gateway_request_id, method, path,
-                              response_time, request_body_size, response_body_size, request_total_size,
-                              response_total_size, status, is_error, user_claim, realm_claim, host,
-                              request_content_type, response_content_type, user_agent,
-                              request_headers, response_headers, request_body, response_body, request_raw, response_raw)
-                            VALUES(
-                              :timestamp, :route_id, :route_uri, :gateway_request_id, :method, :path,
-                              :duration, :request_body_size, :response_body_size,
-                              :request_total_size, :response_total_size, :status, :is_error, :user_claim, :realm_claim,
-                              :host, :request_content_type, :response_content_type, :user_agent,
-                              :request_headers, :response_headers,
-                              :request_body, :response_body, :request_raw, :response_raw)""", params);
-                    logger.debug("Finished inserting data into ClickHouse for request {} in {}", dataProvider.getRequestId(), stopwatch.elapsed());
+                                {
+                                    logger.debug("Inserting data into ClickHouse for request {}: {}", dataProvider.getRequestId(), params.entrySet().stream().filter(e -> e.getValue() != null).toList());
+                                    final Stopwatch stopwatch = Stopwatch.createStarted();
+                                    tpl.update("""
+                                            INSERT INTO log (
+                                              timestamp, route_id, route_uri, gateway_request_id, method, path,
+                                              response_time, request_body_size, response_body_size, request_total_size,
+                                              response_total_size, status, is_error, user_claim, realm_claim, host,
+                                              request_content_type, response_content_type, user_agent,
+                                              request_headers, response_headers, request_body, response_body, request_raw, response_raw)
+                                            VALUES(
+                                              :timestamp, :route_id, :route_uri, :gateway_request_id, :method, :path,
+                                              :duration, :request_body_size, :response_body_size,
+                                              :request_total_size, :response_total_size, :status, :is_error, :user_claim, :realm_claim,
+                                              :host, :request_content_type, :response_content_type, :user_agent,
+                                              :request_headers, :response_headers,
+                                              :request_body, :response_body, :request_raw, :response_raw)""", params);
+                                    logger.debug("Finished inserting data into ClickHouse for request {} in {}", dataProvider.getRequestId(), stopwatch.elapsed());
 
-                    if (bodyDecodeRequestExc.get() != null || bodyDecodeResponseExc.get() != null)
-                    {
-                        return AccessLogResult.error(logConfig, Stream.of(bodyDecodeRequestExc.get(), bodyDecodeResponseExc.get()).filter(Objects::nonNull).toList());
-                    }
+                                    if (bodyDecodeRequestExc.get() != null || bodyDecodeResponseExc.get() != null)
+                                    {
+                                        return AccessLogResult.error(logConfig, Stream.of(bodyDecodeRequestExc.get(), bodyDecodeResponseExc.get()).filter(Objects::nonNull).toList());
+                                    }
 
-                    return AccessLogResult.ok(logConfig);
-                }));
+                                    return AccessLogResult.ok(logConfig);
+                                }));
     }
 
     private Map<String, Object> flattenMap(HttpHeaders headers)

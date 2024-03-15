@@ -39,6 +39,12 @@ public class SequentialDelegateLogger
         }
     }
 
+    private static <T> CompletableFuture<List<T>> join(List<CompletableFuture<T>> executionPromises)
+    {
+        final CompletableFuture<Void> joinedPromise = CompletableFuture.allOf(executionPromises.toArray(CompletableFuture[]::new));
+        return joinedPromise.thenApply(it -> executionPromises.stream().map(CompletableFuture::join).toList());
+    }
+
     public CompletableFuture<AccessLogResult> accessLog(final WebExchangeDataProvider dataProvider)
     {
         return join(httpLoggers.stream().map(httpLogger -> httpLogger.accessLog(dataProvider)).toList())
@@ -51,11 +57,5 @@ public class SequentialDelegateLogger
                     }
                     return result;
                 });
-    }
-
-    private static <T> CompletableFuture<List<T>> join(List<CompletableFuture<T>> executionPromises)
-    {
-        final CompletableFuture<Void> joinedPromise = CompletableFuture.allOf(executionPromises.toArray(CompletableFuture[]::new));
-        return joinedPromise.thenApply(it -> executionPromises.stream().map(CompletableFuture::join).toList());
     }
 }
