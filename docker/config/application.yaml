@@ -39,7 +39,7 @@ http-logging:
         raw: STORE
 logging:
   level:
-    com.ethlo.http: INFO
+    com.ethlo.http: DEBUG
     org.springframework.cloud.gateway: INFO
     com.ethlo.qjc: INFO
 management:
@@ -94,6 +94,15 @@ spring:
                 local-rate-limiter:
                   replenish-rate: 2
                   refresh-period: 10
+        - id: http-upstream-missing
+          uri: http://192.0.0.255
+          predicates:
+            - Path=/504
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: upstream-down
+                fallbackUri: 'forward:/upstream-down'
   web:
     resources:
       static-locations:

@@ -58,12 +58,10 @@ public class HttpRequestResponseLogger extends LoggingHandler
             final String requestId = getRequestId(ctx).orElseThrow();
 
             final int bytesAvailable = msg.readableBytes();
-            dataBufferRepository.appendSizeAvailable(serverDirection, requestId, bytesAvailable);
             final boolean isRequestAndShouldStore = predicateConfig.request().mustBuffer() && serverDirection == REQUEST;
             final boolean isResponseAndShouldStore = predicateConfig.response().mustBuffer() && serverDirection == RESPONSE;
             if (isRequestAndShouldStore || isResponseAndShouldStore)
             {
-                //final byte[] data = getBytes(msg);
                 if (bytesAvailable > 0)
                 {
                     dataBufferRepository.write(serverDirection, requestId, msg.nioBuffer()).thenApply(writtenBytes ->
@@ -72,6 +70,10 @@ public class HttpRequestResponseLogger extends LoggingHandler
                         return null;
                     }).join();
                 }
+            }
+            else
+            {
+                dataBufferRepository.appendSizeAvailable(serverDirection, requestId, bytesAvailable);
             }
             return requestId;
         }).orElse(null);
