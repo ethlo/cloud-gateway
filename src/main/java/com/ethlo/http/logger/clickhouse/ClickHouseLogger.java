@@ -4,7 +4,6 @@ import static com.ethlo.http.match.LogOptions.ContentProcessing.SIZE;
 import static com.ethlo.http.match.LogOptions.ContentProcessing.STORE;
 
 import java.io.ByteArrayInputStream;
-import java.util.AbstractMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -15,8 +14,8 @@ import java.util.stream.Stream;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
 import com.ethlo.http.BodyDecodeException;
 import com.ethlo.http.logger.HttpLogger;
@@ -30,18 +29,33 @@ import com.ethlo.http.netty.ServerDirection;
 import com.ethlo.http.util.HttpBodyUtil;
 import com.ethlo.http.util.IoUtil;
 import com.google.common.base.Stopwatch;
+import io.r2dbc.spi.ConnectionFactory;
+import io.r2dbc.spi.Statement;
+import reactor.core.publisher.Mono;
 
 public class ClickHouseLogger implements HttpLogger
 {
     private static final Logger logger = LoggerFactory.getLogger(ClickHouseLogger.class);
-    private final NamedParameterJdbcTemplate tpl;
 
-    public ClickHouseLogger(final NamedParameterJdbcTemplate tpl)
-    {
-        this.tpl = tpl;
-    }
+    private static final String insertSql = """
+            INSERT INTO log (
+                timestamp, route_id, route_uri, gateway_request_id, method, path,
+                response_time, request_body_size, response_body_size, request_total_size,
+                response_total_size, status, is_error, user_claim, realm_claim, host,
+                request_content_type, response_content_type, user_agent,
+                request_headers, response_headers, request_body, response_body, request_raw, response_raw)
+            VALUES(
+                :timestamp, :route_id, :route_uri, :gateway_request_id, :method, :path,
+                :duration, :request_body_size, :response_body_size,
+                :request_total_size, :response_total_size, :status, :is_error, :user_claim, :realm_claim,
+                :host, :request_content_type, :response_content_type, :user_agent,
+                :request_headers, :response_headers,
+                :request_body, :response_body, :request_raw, :response_raw)""";
 
-    private static CompletableFuture<Map.Entry<Map<String, Object>, BodyDecodeException>> processContent(LogOptions logConfig, RawProvider rawProvider, final ServerDirection serverDirection)
+    @Autowired
+    private final ConnectionFactory connectionFactory;
+
+    private static CompletableFuture<BodyDecodeException> processContent(LogOptions logConfig, RawProvider rawProvider, final ServerDirection serverDirection, Statement statement)
     {
         final String keyPrefix = serverDirection.name().toLowerCase();
         final AtomicReference<BodyDecodeException> bodyDecodeException = new AtomicReference<>();
@@ -49,12 +63,11 @@ public class ClickHouseLogger implements HttpLogger
         {
             return rawProvider.getBuffer().thenApply(buffer ->
             {
-                final Map<String, Object> params = new LinkedHashMap<>();
                 final byte[] responseData = buffer.array();
-                params.put(keyPrefix + "_total_size", rawProvider.size());
+                statement.bind(keyPrefix + "_total_size", rawProvider.size());
                 if (logConfig.raw() == STORE)
                 {
-                    params.put(keyPrefix + "_raw", responseData);
+                    statement.bind(keyPrefix + "_raw", responseData);
                 }
 
                 if (logConfig.body() == STORE || logConfig.body() == SIZE)
@@ -62,10 +75,10 @@ public class ClickHouseLogger implements HttpLogger
                     try
                     {
                         final BodyProvider bodyProvider = HttpBodyUtil.extractBody(new ByteArrayInputStream(responseData), serverDirection);
-                        params.put(keyPrefix + "_body_size", bodyProvider.bodyLength());
+                        statement.bind(keyPrefix + "_body_size", bodyProvider.bodyLength());
                         if (logConfig.body() == STORE)
                         {
-                            params.put(keyPrefix + "_body", IoUtil.readAllBytes(bodyProvider.data()));
+                            statement.bind(keyPrefix + "_body", IoUtil.readAllBytes(bodyProvider.data()));
                         }
                     }
                     catch (BodyDecodeException exc)
@@ -73,26 +86,33 @@ public class ClickHouseLogger implements HttpLogger
                         bodyDecodeException.set(exc);
                     }
                 }
-                return new AbstractMap.SimpleImmutableEntry<>(params, bodyDecodeException.get());
+                return bodyDecodeException.get();
             });
         }
-        final CompletableFuture<Map.Entry<Map<String, Object>, BodyDecodeException>> empty = new CompletableFuture<>();
-        empty.complete(new AbstractMap.SimpleImmutableEntry<>(Map.of(), null));
+        final CompletableFuture<BodyDecodeException> empty = new CompletableFuture<>();
+        empty.complete(null);
         return empty;
     }
 
     @Override
     public CompletableFuture<AccessLogResult> accessLog(final WebExchangeDataProvider dataProvider)
     {
+        return Mono.from(connectionFactory.create())
+                .flatMap(conn ->
+                {
+                    final Statement statement = conn.createStatement(insertSql);
+                    return populateStatement(statement, dataProvider);
+                }).toFuture();
+    }
+
+    private Mono<AccessLogResult> populateStatement(final Statement statement, WebExchangeDataProvider dataProvider)
+    {
         final Optional<PredicateConfig> logConfigOpt = dataProvider.getPredicateConfig();
         if (logConfigOpt.isEmpty())
         {
-            return null;
+            return Mono.empty();
         }
-
         final PredicateConfig logConfig = logConfigOpt.get();
-
-        final Map<String, Object> params = dataProvider.asMetaMap();
 
         dataProvider.requestHeaders(HttpHeaders.writableHttpHeaders(dataProvider.getRequestHeaders()));
         dataProvider.responseHeaders(HttpHeaders.writableHttpHeaders(dataProvider.getResponseHeaders()));
@@ -103,50 +123,37 @@ public class ClickHouseLogger implements HttpLogger
         dataProvider.getRequestHeaders().remove(HttpHeaders.USER_AGENT);
         dataProvider.getRequestHeaders().remove(HttpHeaders.CONTENT_TYPE);
 
-        params.put("request_raw", null);
-        params.put("request_body", null);
-        params.put("request_body_size", null);
-        params.put("request_total_size", null);
+        statement.bindNull("request_raw", byte[].class);
+        statement.bindNull("request_body", byte[].class);
+        statement.bindNull("request_body_size", Long.class);
+        statement.bindNull("request_total_size", Long.class);
 
-        params.put("response_raw", null);
-        params.put("response_body", null);
-        params.put("response_body_size", null);
-        params.put("response_total_size", null);
+        statement.bindNull("response_raw", byte[].class);
+        statement.bindNull("response_body", byte[].class);
+        statement.bindNull("response_body_size", Long.class);
+        statement.bindNull("response_total_size", Long.class);
 
-        params.put("request_headers", flattenMap(dataProvider.getRequestHeaders()));
-        params.put("response_headers", flattenMap(dataProvider.getResponseHeaders()));
+        statement.bind("request_headers", flattenMap(dataProvider.getRequestHeaders()));
+        statement.bind("response_headers", flattenMap(dataProvider.getResponseHeaders()));
 
         final AtomicReference<BodyDecodeException> bodyDecodeRequestExc = new AtomicReference<>();
         final AtomicReference<BodyDecodeException> bodyDecodeResponseExc = new AtomicReference<>();
 
-        return processContent(logConfig.request(), dataProvider.getRawRequest().orElse(null), ServerDirection.REQUEST)
+        return processContent(logConfig.request(), dataProvider.getRawRequest().orElse(null), ServerDirection.REQUEST, statement)
                 .thenCompose(requestResult ->
-                        processContent(logConfig.response(), dataProvider.getRawResponse().orElse(null), ServerDirection.RESPONSE)
+                        processContent(logConfig.response(), dataProvider.getRawResponse().orElse(null), ServerDirection.RESPONSE, statement)
                                 .thenApply(responseResult ->
                                 {
-                                    bodyDecodeRequestExc.set(requestResult.getValue());
-                                    params.putAll(requestResult.getKey());
-                                    params.putAll(responseResult.getKey());
+                                    bodyDecodeRequestExc.set(requestResult);
                                     logger.debug("Query params map processed");
                                     return null;
                                 }).thenApply(ignored ->
                                 {
-                                    logger.debug("Inserting data into ClickHouse for request {}: {}", dataProvider.getRequestId(), params.entrySet().stream().filter(e -> e.getValue() != null).toList());
+                                    logger.debug("Inserting data into ClickHouse for request {}", dataProvider.getRequestId());
                                     final Stopwatch stopwatch = Stopwatch.createStarted();
-                                    tpl.update("""
-                                            INSERT INTO log (
-                                              timestamp, route_id, route_uri, gateway_request_id, method, path,
-                                              response_time, request_body_size, response_body_size, request_total_size,
-                                              response_total_size, status, is_error, user_claim, realm_claim, host,
-                                              request_content_type, response_content_type, user_agent,
-                                              request_headers, response_headers, request_body, response_body, request_raw, response_raw)
-                                            VALUES(
-                                              :timestamp, :route_id, :route_uri, :gateway_request_id, :method, :path,
-                                              :duration, :request_body_size, :response_body_size,
-                                              :request_total_size, :response_total_size, :status, :is_error, :user_claim, :realm_claim,
-                                              :host, :request_content_type, :response_content_type, :user_agent,
-                                              :request_headers, :response_headers,
-                                              :request_body, :response_body, :request_raw, :response_raw)""", params);
+                                    return Mono.from(statement.execute()).matoFuture();
+
+                                    });
                                     logger.debug("Finished inserting data into ClickHouse for request {} in {}", dataProvider.getRequestId(), stopwatch.elapsed());
 
                                     if (bodyDecodeRequestExc.get() != null || bodyDecodeResponseExc.get() != null)
