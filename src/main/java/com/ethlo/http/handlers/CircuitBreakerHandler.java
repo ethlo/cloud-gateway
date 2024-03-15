@@ -82,9 +82,7 @@ public class CircuitBreakerHandler implements HandlerFunction<ServerResponse>
         return serverRequest.exchange().getRequest().getBody()
                 .publishOn(Schedulers.boundedElastic())
                 .flatMapSequential(dataBuffer -> saveDataChunk(requestId, dataBuffer))
-                .then(ServerResponse
-                        .status(504)
-                        .body(Mono.just("Upstream service is unavailable"), String.class));
+                .then(Mono.empty());
     }
 
     private Mono<Long> saveDataChunk(String requestId, DataBuffer dataBuffer)
