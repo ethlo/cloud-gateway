@@ -163,7 +163,9 @@ public class DataBufferRepository
     public Optional<RawProvider> get(final ServerDirection serverDirection, final String requestId)
     {
         final Path key = getFilename(basePath, serverDirection, requestId);
-        return Optional.ofNullable(pool.get(key)).map(holder -> new RawProvider(requestId, serverDirection, key, holder.fileChannel));
+        return Optional.ofNullable(pool.get(key))
+                .filter(holder -> holder.fileChannel != null)
+                .map(holder -> new RawProvider(requestId, serverDirection, key, holder.fileChannel));
     }
 
     public void appendSizeAvailable(final ServerDirection serverDirection, final String requestId, final int byteCount)
