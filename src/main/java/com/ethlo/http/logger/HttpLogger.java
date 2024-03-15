@@ -1,8 +1,11 @@
 package com.ethlo.http.logger;
 
+import java.util.concurrent.CompletableFuture;
+
+import com.ethlo.http.model.AccessLogResult;
 import com.ethlo.http.model.WebExchangeDataProvider;
 
 public interface HttpLogger
 {
-    void accessLog(WebExchangeDataProvider dataProvider);
+    CompletableFuture<AccessLogResult> accessLog(WebExchangeDataProvider dataProvider);
 }

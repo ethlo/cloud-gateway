@@ -1,47 +1,34 @@
 package com.ethlo.http.logger.file;
 
 import java.util.Map;
-import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.core.io.InputStreamResource;
-import org.springframework.core.io.Resource;
 
-import com.ethlo.http.logger.BodyContentRepository;
 import com.ethlo.http.logger.HttpLogger;
-import com.ethlo.http.logger.MetadataContentRepository;
-import com.ethlo.http.model.RawProvider;
+import com.ethlo.http.model.AccessLogResult;
 import com.ethlo.http.model.WebExchangeDataProvider;
 
 public class FileLogger implements HttpLogger
 {
     private static final Logger accessLogLogger = LoggerFactory.getLogger("access-log");
 
-    private final MetadataContentRepository metadataContentRepository;
-    private final BodyContentRepository bodyContentRepository;
     private final AccessLogTemplateRenderer accessLogTemplateRenderer;
 
-    public FileLogger(MetadataContentRepository metadataContentRepository, final BodyContentRepository bodyContentRepository, final AccessLogTemplateRenderer accessLogTemplateRenderer)
+    public FileLogger(final AccessLogTemplateRenderer accessLogTemplateRenderer)
     {
-        this.metadataContentRepository = metadataContentRepository;
-        this.bodyContentRepository = bodyContentRepository;
         this.accessLogTemplateRenderer = accessLogTemplateRenderer;
     }
 
     @Override
-    public void accessLog(final WebExchangeDataProvider dataProvider)
+    public CompletableFuture<AccessLogResult> accessLog(final WebExchangeDataProvider dataProvider)
     {
         final Map<String, Object> metaMap = dataProvider.asMetaMap();
         accessLogLogger.info(accessLogTemplateRenderer.render(metaMap));
-
-        metadataContentRepository.save(dataProvider.getRequestId(), metaMap);
-
-        final Optional<Resource> reqResource = dataProvider.getRawRequest().map(RawProvider::data).map(InputStreamResource::new);
-        reqResource.ifPresent(res -> bodyContentRepository.saveRequest(dataProvider.getRequestId(), res));
-
-        final Optional<Resource> resResource = dataProvider.getRawResponse().map(RawProvider::data).map(InputStreamResource::new);
-        resResource.ifPresent(res -> bodyContentRepository.saveResponse(dataProvider.getRequestId(), res));
+        final CompletableFuture<AccessLogResult> cf = new CompletableFuture<>();
+        cf.complete(AccessLogResult.ok(dataProvider.getPredicateConfig().orElseThrow()));
+        return cf;
     }
 
     @Override

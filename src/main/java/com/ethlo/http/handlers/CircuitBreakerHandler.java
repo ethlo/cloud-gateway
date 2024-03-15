@@ -2,8 +2,8 @@ package com.ethlo.http.handlers;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
@@ -14,12 +14,10 @@ import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.server.reactive.ServerHttpRequest;
-import org.springframework.util.StreamUtils;
 import org.springframework.web.reactive.function.server.HandlerFunction;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
 
-import com.ethlo.http.match.LogOptions;
 import com.ethlo.http.netty.ContextUtil;
 import com.ethlo.http.netty.DataBufferRepository;
 import com.ethlo.http.netty.PredicateConfig;
@@ -39,7 +37,7 @@ public class CircuitBreakerHandler implements HandlerFunction<ServerResponse>
         this.dataBufferRepository = dataBufferRepository;
     }
 
-    private static byte[] extractHeaders(ServerHttpRequest request)
+    private static ByteBuffer extractHeaders(ServerHttpRequest request)
     {
         RawHttpHeaders.Builder builder = RawHttpHeaders.newBuilder();
         request.getHeaders().forEach((name, values) -> values.forEach(value -> builder.with(name, value)));
@@ -48,7 +46,7 @@ public class CircuitBreakerHandler implements HandlerFunction<ServerResponse>
         {
             final RawHttpHeaders headers = builder.build();
             headers.writeTo(baos);
-            return baos.toByteArray();
+            return ByteBuffer.wrap(baos.toByteArray());
         }
         catch (IOException e)
         {
@@ -60,7 +58,7 @@ public class CircuitBreakerHandler implements HandlerFunction<ServerResponse>
     public @Nonnull Mono<ServerResponse> handle(@Nonnull ServerRequest serverRequest)
     {
         final Optional<Exception> exc = serverRequest.attribute(ServerWebExchangeUtils.CIRCUITBREAKER_EXECUTION_EXCEPTION_ATTR).map(Exception.class::cast);
-        exc.ifPresent(e -> logger.info("An error occurred when routing upstream: {}", e, e));
+        exc.ifPresent(e -> logger.warn("An error occurred when routing request {} upstream: {}", serverRequest.exchange().getRequest().getId(), e.getMessage()));
 
         final Optional<PredicateConfig> config = ContextUtil.getLoggingConfig(serverRequest);
         logger.debug("Reading logging config: {}", config.orElse(null));
@@ -77,28 +75,30 @@ public class CircuitBreakerHandler implements HandlerFunction<ServerResponse>
         final String requestId = request.getId();
         final HttpMethod method = request.getMethod();
 
-        final byte[] fakeRequestLine = (method.name() + " / HTTP/1.1\r\n").getBytes(StandardCharsets.UTF_8);
+        final ByteBuffer fakeRequestLine = ByteBuffer.wrap((method.name() + " / HTTP/1.1\r\n").getBytes(StandardCharsets.UTF_8));
         dataBufferRepository.write(ServerDirection.REQUEST, requestId, fakeRequestLine);
         dataBufferRepository.write(ServerDirection.REQUEST, requestId, extractHeaders(request));
 
         return serverRequest.exchange().getRequest().getBody()
                 .publishOn(Schedulers.boundedElastic())
                 .flatMapSequential(dataBuffer -> saveDataChunk(requestId, dataBuffer))
-                .then(ServerResponse.status(504).build());
+                .then(Mono.empty());
     }
 
-    private Mono<Integer> saveDataChunk(String requestId, DataBuffer dataBuffer)
+    private Mono<Long> saveDataChunk(String requestId, DataBuffer dataBuffer)
     {
-        try (final InputStream in = dataBuffer.asInputStream())
+        try (final DataBuffer.ByteBufferIterator iter = dataBuffer.readableByteBuffers();)
         {
-            final int copied = StreamUtils.copy(in, dataBufferRepository.getOutputStream(ServerDirection.REQUEST, requestId));
-            dataBufferRepository.appendSizeAvailable(ServerDirection.REQUEST, requestId, copied);
+            long written = 0;
+            while (iter.hasNext())
+            {
+                final ByteBuffer byteBuffer = iter.next();
+                written += dataBufferRepository.write(ServerDirection.REQUEST, requestId, byteBuffer).join();
+            }
+            return Mono.just(written);
+        } finally
+        {
             DataBufferUtils.release(dataBuffer);
-            return Mono.just(copied);
-        }
-        catch (IOException exc)
-        {
-            return Mono.error(exc);
         }
     }
 }

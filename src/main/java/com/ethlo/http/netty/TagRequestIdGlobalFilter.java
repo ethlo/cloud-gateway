@@ -3,6 +3,7 @@ package com.ethlo.http.netty;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
@@ -12,12 +13,13 @@ import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.cloud.gateway.route.Route;
 import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
 import org.springframework.core.Ordered;
+import org.springframework.data.util.Pair;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
-import org.springframework.util.StopWatch;
 import org.springframework.web.server.ServerWebExchange;
 
-import com.ethlo.http.logger.HttpLogger;
+import com.ethlo.http.logger.delegate.SequentialDelegateLogger;
+import com.ethlo.http.model.AccessLogResult;
 import com.ethlo.http.model.WebExchangeDataProvider;
 import com.ethlo.http.processors.LogPreProcessor;
 import jakarta.annotation.Nonnull;
@@ -31,13 +33,13 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
 
     private static final Logger logger = LoggerFactory.getLogger(TagRequestIdGlobalFilter.class);
 
-    private final HttpLogger httpLogger;
+    private final SequentialDelegateLogger httpLogger;
     private final DataBufferRepository dataBufferRepository;
     private final LogPreProcessor logPreProcessor;
     private final List<PredicateConfig> predicateConfigs;
     private final Scheduler ioScheduler;
 
-    public TagRequestIdGlobalFilter(final HttpLogger httpLogger, final DataBufferRepository dataBufferRepository, final LogPreProcessor logPreProcessor, List<PredicateConfig> predicateConfigs, Scheduler ioScheduler)
+    public TagRequestIdGlobalFilter(final SequentialDelegateLogger httpLogger, final DataBufferRepository dataBufferRepository, final LogPreProcessor logPreProcessor, List<PredicateConfig> predicateConfigs, Scheduler ioScheduler)
     {
         this.httpLogger = httpLogger;
         this.dataBufferRepository = dataBufferRepository;
@@ -51,9 +53,9 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
     {
         return Flux.fromIterable(predicateConfigs)
                 .filterWhen(c -> (Publisher<Boolean>) c.predicate().apply(exchange))
-                .next()
                 .flatMap(c -> prepareForLoggingIfApplicable(exchange, chain, c))
-                .switchIfEmpty(chain.filter(exchange));
+                .switchIfEmpty(chain.filter(exchange))
+                .next();
     }
 
     private Mono<Void> prepareForLoggingIfApplicable(ServerWebExchange exchange, GatewayFilterChain chain, PredicateConfig predicateConfig)
@@ -63,32 +65,36 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
         logger.debug("Tagging request {}: {}", requestId, predicateConfig);
         exchange.getAttributes().put(TagRequestIdGlobalFilter.LOG_CAPTURE_CONFIG_ATTRIBUTE_NAME, predicateConfig);
         return chain.filter(exchange)
-                .publishOn(ioScheduler)
                 .doFinally(signalType ->
-                {
-                    try
-                    {
-                        handleCompletedRequest(exchange, requestId, predicateConfig, Duration.ofNanos(System.nanoTime() - started));
-                    }
-                    catch (Exception exc)
-                    {
-                        logger.error("Error processing finished request {} with signal type {}", requestId, signalType, exc);
-                        throw exc;
-                    } finally
-                    {
-                        dataBufferRepository.cleanup(requestId);
-                    }
-                });
+                        ioScheduler.schedule(() ->
+                                saveDataAndCleanupIfApplicable(exchange, predicateConfig, requestId, started)));
     }
 
-    private void handleCompletedRequest(ServerWebExchange exchange, String requestId, final PredicateConfig predicateConfig, final Duration duration)
+    private void saveDataAndCleanupIfApplicable(ServerWebExchange exchange, PredicateConfig predicateConfig, String requestId, long started)
+    {
+        final CompletableFuture<AccessLogResult> result = saveDataUsingProviders(exchange, requestId, predicateConfig, Duration.ofNanos(System.nanoTime() - started));
+        result.whenComplete((logResult, exc) ->
+        {
+            dataBufferRepository.close(requestId);
+            if (logResult.isOk())
+            {
+                dataBufferRepository.cleanup(requestId);
+            }
+            else
+            {
+                final Pair<String, String> filenames = dataBufferRepository.getBufferFileNames(requestId);
+                logger.warn("There were problems storing data for request {}. The buffer files are left behind: {} {}. Details: {}", requestId, filenames.getFirst(), filenames.getSecond(), logResult.getProcessingErrors());
+            }
+        });
+    }
+
+    private CompletableFuture<AccessLogResult> saveDataUsingProviders(ServerWebExchange exchange, String requestId, final PredicateConfig predicateConfig, final Duration duration)
     {
         final ServerHttpRequest req = exchange.getRequest();
         final ServerHttpResponse res = exchange.getResponse();
         final Route route = exchange.getAttribute(ServerWebExchangeUtils.GATEWAY_ROUTE_ATTR);
 
         logger.debug("Completed request {} in {}: {}", requestId, duration, predicateConfig);
-        dataBufferRepository.finished(requestId);
 
         final WebExchangeDataProvider data = new WebExchangeDataProvider(dataBufferRepository, predicateConfig)
                 .route(route)
@@ -103,17 +109,10 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
                 .duration(duration)
                 .remoteAddress(req.getRemoteAddress());
 
-        logger.debug("Preprocessing HTTP data");
         final WebExchangeDataProvider processed = logPreProcessor.process(data);
 
-        final StopWatch stopWatch = new StopWatch();
-        stopWatch.start();
-        logger.debug("Logging HTTP data for {}", requestId);
-
-        httpLogger.accessLog(processed);
-
-        stopWatch.stop();
-        logger.debug("Logging of HTTP data for request {} completed in {} ms", requestId, stopWatch.lastTaskInfo().getTimeMillis());
+        logger.debug("Logging HTTP data for request {}", requestId);
+        return httpLogger.accessLog(processed);
     }
 
     @Override

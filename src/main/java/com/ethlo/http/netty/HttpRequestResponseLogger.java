@@ -51,25 +51,29 @@ public class HttpRequestResponseLogger extends LoggingHandler
 
     private String format(ChannelHandlerContext ctx, String eventName, ByteBuf msg)
     {
-        final ServerDirection operation = WRITE.equalsIgnoreCase(eventName) ? REQUEST : RESPONSE;
+        final ServerDirection serverDirection = WRITE.equalsIgnoreCase(eventName) ? REQUEST : RESPONSE;
 
-        return getLoggingConfig(ctx).map(pattern ->
+        return getLoggingConfig(ctx).map(predicateConfig ->
         {
             final String requestId = getRequestId(ctx).orElseThrow();
 
             final int bytesAvailable = msg.readableBytes();
-            dataBufferRepository.appendSizeAvailable(operation, requestId, bytesAvailable);
-
-            final boolean isRequestAndShouldStore = pattern.request().mustBuffer() && operation == REQUEST;
-            final boolean isResponseAndShouldStore = pattern.response().mustBuffer() && operation == RESPONSE;
+            final boolean isRequestAndShouldStore = predicateConfig.request().mustBuffer() && serverDirection == REQUEST;
+            final boolean isResponseAndShouldStore = predicateConfig.response().mustBuffer() && serverDirection == RESPONSE;
             if (isRequestAndShouldStore || isResponseAndShouldStore)
             {
-                // Store the contentProcessing if requested
-                final byte[] data = getBytes(msg);
-                if (data.length > 0)
+                if (bytesAvailable > 0)
                 {
-                    dataBufferRepository.write(operation, requestId, data);
+                    dataBufferRepository.write(serverDirection, requestId, msg.nioBuffer()).thenApply(writtenBytes ->
+                    {
+                        logger.debug("Wrote {} bytes for {} for request {}", writtenBytes, serverDirection.name(), requestId);
+                        return null;
+                    }).join();
                 }
+            }
+            else
+            {
+                dataBufferRepository.appendSizeAvailable(serverDirection, requestId, bytesAvailable);
             }
             return requestId;
         }).orElse(null);

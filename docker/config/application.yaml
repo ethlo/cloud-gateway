@@ -12,15 +12,14 @@ http-logging:
     jwt:
       enabled: true
       user-claim: preferred_username
-      realm-claim: iss
+      realm-claim-name: iss
       realm-expression: ([^/]+)/?$
     basic:
       enabled: false
       realm-header-name: x-realm
   capture:
     enabled: true
-    memory-buffer-size: 100KB
-    temp-directory: /tmp
+    log-directory: /tmp/cloud-gateway/raw
   providers:
     clickhouse:
       enabled: true
@@ -28,16 +27,16 @@ http-logging:
     file:
       enabled: true
       pattern: '{{gateway_request_id}} {{realm_claim}} {{user_claim}} {{method}} {{path}} {{host}} {{request_headers["Content-Length"][0]}} {{status}} {{user_agent}} {{duration | numberformat("#.###") }}'
-      storage-directory: /tmp/cloud-gateway/logs
-
   matchers:
     - id: All
       predicates:
         - Path=/**
       request:
+        raw: STORE
         body: STORE
       response:
         body: STORE
+        raw: STORE
 logging:
   level:
     com.ethlo.http: INFO
@@ -47,7 +46,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,metrics,clickhouse,env
+        include: health,metrics,clickhouse,env,logio
   endpoint:
     env:
       show-values: when_authorized
@@ -95,6 +94,15 @@ spring:
                 local-rate-limiter:
                   replenish-rate: 2
                   refresh-period: 10
+        - id: http-upstream-missing
+          uri: http://192.0.0.255
+          predicates:
+            - Path=/504
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: upstream-down
+                fallbackUri: 'forward:/upstream-down'
   web:
     resources:
       static-locations:

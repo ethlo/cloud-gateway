@@ -3,14 +3,17 @@ package com.ethlo.http;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
-import org.springframework.test.web.reactive.server.EntityExchangeResult;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
+import io.netty.handler.codec.http.HttpHeaderValues;
 import okhttp3.HttpUrl;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
@@ -18,7 +21,6 @@ import okhttp3.mockwebserver.MockWebServer;
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
 public class HandleDifferentResponseTypesTest
 {
-
     // NOTE: Needs to match the config in test/resources/application.yaml
     private static final int port = 11117;
 
@@ -26,13 +28,13 @@ public class HandleDifferentResponseTypesTest
     private WebTestClient client;
 
     @Test
-    public void testSimpleGet() throws IOException
+    public void testChunkedGet() throws IOException, InterruptedException
     {
         try (final MockWebServer server = new MockWebServer())
         {
             server.enqueue(new MockResponse()
-                    .addHeader("Content-Type", "application/json")
-                    .addHeader("Transfer-Encoding", "chunked")
+                    .addHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                    .addHeader(HttpHeaders.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED)
                     .setBody("8\r\n" +
                             "Mozilla \r\n" +
                             "11\r\n" +
@@ -40,21 +42,46 @@ public class HandleDifferentResponseTypesTest
                             "0\r\n" +
                             "\r\n"));
 
-            // Start the server.
             server.start(port);
-
-            // Ask the server for its URL. You'll need this to make HTTP requests.
             final HttpUrl url = server.url("/get");
 
-            final EntityExchangeResult<String> body = client.get()
+            final String body = client.get()
                     .uri(url.uri().getPath())
                     .exchange()
                     .expectStatus()
                     .isOk()
-                    .expectBody(String.class).returnResult();
+                    .expectBody(String.class)
+                    .returnResult()
+                    .getResponseBody();
 
-            final String bodyContent = body.getResponseBody();
-            assertThat(bodyContent).isEqualTo("Mozilla Developer Network");
+            assertThat(body).isEqualTo("Mozilla Developer Network");
+            Thread.sleep(1000);
+        }
+    }
+
+    @Test
+    void testSlowResponse() throws IOException, InterruptedException
+    {
+        try (final MockWebServer server = new MockWebServer())
+        {
+            server.enqueue(new MockResponse()
+                    .setBodyDelay(3, TimeUnit.SECONDS)
+                    .addHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                    .setBody("Mozilla Developer Network"));
+            server.start(port);
+            final HttpUrl url = server.url("/get");
+
+            final String body = client.get()
+                    .uri(url.uri().getPath())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody(String.class)
+                    .returnResult()
+                    .getResponseBody();
+
+            assertThat(body).isEqualTo("Mozilla Developer Network");
+            Thread.sleep(1000);
         }
     }
 }
