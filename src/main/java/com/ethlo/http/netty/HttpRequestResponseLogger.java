@@ -63,10 +63,10 @@ public class HttpRequestResponseLogger extends LoggingHandler
             final boolean isResponseAndShouldStore = predicateConfig.response().mustBuffer() && serverDirection == RESPONSE;
             if (isRequestAndShouldStore || isResponseAndShouldStore)
             {
-                final byte[] data = getBytes(msg);
+                //final byte[] data = getBytes(msg);
                 if (bytesAvailable > 0)
                 {
-                    dataBufferRepository.write(serverDirection, requestId, data).thenApply(writtenBytes ->
+                    dataBufferRepository.write(serverDirection, requestId, msg.nioBuffer()).thenApply(writtenBytes ->
                     {
                         logger.debug("Wrote {} bytes for {} for request {}", writtenBytes, serverDirection.name(), requestId);
                         return null;
@@ -79,7 +79,6 @@ public class HttpRequestResponseLogger extends LoggingHandler
 
     private byte[] getBytes(ByteBuf buf)
     {
-        // IMPORTANT: We unfortunately need to copy as we write data async to disk
-        return ByteBufUtil.getBytes(buf, buf.readerIndex(), buf.readableBytes(), true);
+        return ByteBufUtil.getBytes(buf, buf.readerIndex(), buf.readableBytes(), false);
     }
 }

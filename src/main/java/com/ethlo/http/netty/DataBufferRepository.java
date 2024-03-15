@@ -30,14 +30,12 @@ public class DataBufferRepository
     private static final Logger logger = LoggerFactory.getLogger(DataBufferRepository.class);
 
     private final Path basePath;
-    private final ConcurrentMap<Path, AsynchronousFileChannel> pool;
-    private final ConcurrentMap<String, AtomicLong> sizePool;
+    private final ConcurrentMap<Path, Holder> pool;
 
     public DataBufferRepository(CaptureConfiguration captureConfiguration)
     {
         this.basePath = captureConfiguration.getLogDirectory();
         this.pool = new ConcurrentHashMap<>();
-        this.sizePool = new ConcurrentHashMap<>();
     }
 
     public static Path getFilename(final Path basePath, ServerDirection operation, String id)
@@ -50,11 +48,7 @@ public class DataBufferRepository
         close(requestId);
 
         logger.debug("Cleaning up buffer files for request {}", requestId);
-
-        sizePool.remove(requestId + "_" + REQUEST.name());
         cleanup(getFilename(basePath, REQUEST, requestId));
-
-        sizePool.remove(requestId + "_" + RESPONSE.name());
         cleanup(getFilename(basePath, RESPONSE, requestId));
     }
 
@@ -62,7 +56,18 @@ public class DataBufferRepository
     {
         Optional.ofNullable(pool.remove(file)).ifPresent(requestBuffer ->
         {
-            logger.debug("Deleting buffer file {}", file);
+            if (logger.isDebugEnabled())
+            {
+                try
+                {
+                    logger.debug("Deleting buffer file {} with size of {} bytes", file, Files.size(file));
+                }
+                catch (IOException ignored)
+                {
+                    logger.debug("Ignored: File size calculation failed");
+                }
+            }
+
             deleteSilently(file);
         });
     }
@@ -79,14 +84,14 @@ public class DataBufferRepository
         }
     }
 
-    public CompletableFuture<Integer> write(final ServerDirection operation, final String requestId, final byte[] data)
+    public CompletableFuture<Integer> write(final ServerDirection operation, final String requestId, final ByteBuffer data)
     {
-        final AsynchronousFileChannel channel = getAsyncFileChannel(operation, requestId);
+        final Holder holder = getAsyncFileChannel(operation, requestId);
         final CompletableFuture<Integer> completableFuture = new CompletableFuture<>();
         long fileSize;
         try
         {
-            fileSize = channel.size();
+            fileSize = holder.fileChannel.size();
         }
         catch (IOException e)
         {
@@ -94,8 +99,7 @@ public class DataBufferRepository
             return completableFuture;
         }
 
-        final ByteBuffer buffer = ByteBuffer.wrap(data);
-        channel.write(buffer, fileSize, null, new CompletionHandler<Integer, Void>()
+        holder.fileChannel.write(data, fileSize, null, new CompletionHandler<Integer, Void>()
         {
             @Override
             public void completed(Integer result, Void attachment)
@@ -112,82 +116,79 @@ public class DataBufferRepository
         return completableFuture;
     }
 
-    public AsynchronousFileChannel getAsyncFileChannel(final ServerDirection operation, final String requestId)
+    private Holder getAsyncFileChannel(final ServerDirection serverDirection, final String requestId)
     {
-        final Path file = getFilename(basePath, operation, requestId);
-        return pool.compute(file, (f, channel) ->
+        final Path file = getFilename(basePath, serverDirection, requestId);
+        return pool.compute(file, (f, holder) ->
         {
-            if (channel == null)
+            if (holder == null)
             {
                 try
                 {
-                    channel = AsynchronousFileChannel.open(file, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE, StandardOpenOption.READ);
-                    logger.debug("Opened buffer for {} for {}", operation, requestId);
+                    holder = new Holder(new AtomicLong(0), AsynchronousFileChannel.open(file, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE, StandardOpenOption.READ));
+                    logger.debug("Opened buffer for {} for {}", serverDirection, requestId);
                 }
                 catch (IOException e)
                 {
                     throw new UncheckedIOException(e);
                 }
             }
-            return channel;
+            return holder;
         });
     }
 
     public void close(final String requestId)
     {
         final Path requestFile = getFilename(basePath, REQUEST, requestId);
-        Optional.ofNullable(pool.get(requestFile)).ifPresent(fc ->
+        Optional.ofNullable(pool.get(requestFile)).ifPresent(holder ->
         {
-            if (fc.isOpen())
+            if (holder.fileChannel.isOpen())
             {
                 logger.debug("Closing request file {} used by request {}", requestFile, requestId);
-                CloseUtil.closeQuietly(fc);
+                CloseUtil.closeQuietly(holder.fileChannel);
             }
         });
 
         final Path responseFile = getFilename(basePath, RESPONSE, requestId);
-        Optional.ofNullable(pool.get(responseFile)).ifPresent(fc ->
+        Optional.ofNullable(pool.get(responseFile)).ifPresent(holder ->
         {
-            if (fc.isOpen())
+            if (holder.fileChannel.isOpen())
             {
                 logger.debug("Closing response file {} used by request {}", responseFile, requestId);
-                CloseUtil.closeQuietly(fc);
+                CloseUtil.closeQuietly(holder.fileChannel);
             }
         });
     }
 
     public Optional<RawProvider> get(final ServerDirection serverDirection, final String requestId)
     {
-        final String key = requestId + "_" + serverDirection.name();
-        final Optional<Long> size = Optional.ofNullable(sizePool.get(key)).map(AtomicLong::get);
-
-        if (size.isEmpty())
-        {
-            logger.debug("sizePool for {} is empty for request {}", serverDirection.name(), requestId);
-            return Optional.empty();
-        }
-
-        final Path file = getFilename(basePath, serverDirection, requestId);
-        return Optional.ofNullable(pool.get(file)).map(channel -> new RawProvider(requestId, serverDirection, file, channel));
+        final Path key = getFilename(basePath, serverDirection, requestId);
+        return Optional.ofNullable(pool.get(key)).map(holder -> new RawProvider(requestId, serverDirection, key, holder.fileChannel));
     }
 
-    public void appendSizeAvailable(final ServerDirection operation, final String requestId, final int byteCount)
+    public void appendSizeAvailable(final ServerDirection serverDirection, final String requestId, final int byteCount)
     {
-        sizePool.compute(requestId + "_" + operation.name(), (reqId, size) ->
+        final Path key = getFilename(basePath, serverDirection, requestId);
+        pool.compute(key, (reqId, holder) ->
         {
-            if (size == null)
+            if (holder == null)
             {
-                size = new AtomicLong();
-                logger.trace("Opened size calculation counter for {} for {}", operation, requestId);
+                holder = new Holder(new AtomicLong(), null);
+                logger.debug("Opened size calculation counter for {} for {}", serverDirection, requestId);
             }
-            final long newSize = size.addAndGet(byteCount);
-            logger.trace("{} size: {}", operation, newSize);
-            return size;
+            final long newSize = holder.size.addAndGet(byteCount);
+            logger.debug("{} size: {}", serverDirection, newSize);
+            return holder;
         });
     }
 
     public Pair<String, String> getBufferFileNames(final String requestId)
     {
         return Pair.of(getFilename(basePath, REQUEST, requestId).getFileName().toString(), getFilename(basePath, RESPONSE, requestId).getFileName().toString());
+    }
+
+    private record Holder(AtomicLong size, AsynchronousFileChannel fileChannel)
+    {
+
     }
 }

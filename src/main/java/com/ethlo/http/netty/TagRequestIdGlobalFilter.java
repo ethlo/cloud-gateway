@@ -67,25 +67,28 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
         return chain.filter(exchange)
                 .doFinally(signalType ->
                         ioScheduler.schedule(() ->
-                        {
-                            final CompletableFuture<AccessLogResult> result = handleCompletedRequest(exchange, requestId, predicateConfig, Duration.ofNanos(System.nanoTime() - started));
-                            result.whenComplete((logResult, exc) ->
-                            {
-                                dataBufferRepository.close(requestId);
-                                if (logResult.isOk())
-                                {
-                                    dataBufferRepository.cleanup(requestId);
-                                }
-                                else
-                                {
-                                    final Pair<String, String> filenames = dataBufferRepository.getBufferFileNames(requestId);
-                                    logger.warn("There were problems storing data for request {}. The buffer files are left behind: {} {}. Details: {}", requestId, filenames.getFirst(), filenames.getSecond(), logResult.getProcessingErrors());
-                                }
-                            });
-                        }));
+                                saveDataAndCleanupIfApplicable(exchange, predicateConfig, requestId, started)));
     }
 
-    private CompletableFuture<AccessLogResult> handleCompletedRequest(ServerWebExchange exchange, String requestId, final PredicateConfig predicateConfig, final Duration duration)
+    private void saveDataAndCleanupIfApplicable(ServerWebExchange exchange, PredicateConfig predicateConfig, String requestId, long started)
+    {
+        final CompletableFuture<AccessLogResult> result = saveDataUsingProviders(exchange, requestId, predicateConfig, Duration.ofNanos(System.nanoTime() - started));
+        result.whenComplete((logResult, exc) ->
+        {
+            dataBufferRepository.close(requestId);
+            if (logResult.isOk())
+            {
+                dataBufferRepository.cleanup(requestId);
+            }
+            else
+            {
+                final Pair<String, String> filenames = dataBufferRepository.getBufferFileNames(requestId);
+                logger.warn("There were problems storing data for request {}. The buffer files are left behind: {} {}. Details: {}", requestId, filenames.getFirst(), filenames.getSecond(), logResult.getProcessingErrors());
+            }
+        });
+    }
+
+    private CompletableFuture<AccessLogResult> saveDataUsingProviders(ServerWebExchange exchange, String requestId, final PredicateConfig predicateConfig, final Duration duration)
     {
         final ServerHttpRequest req = exchange.getRequest();
         final ServerHttpResponse res = exchange.getResponse();
