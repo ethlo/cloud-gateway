@@ -30,7 +30,7 @@ public class DataBufferRepository
     private static final Logger logger = LoggerFactory.getLogger(DataBufferRepository.class);
 
     private final Path basePath;
-    private final ConcurrentMap<Path, Holder> pool;
+    private final ConcurrentMap<Path, BufferHolder> pool;
 
     public DataBufferRepository(CaptureConfiguration captureConfiguration)
     {
@@ -86,7 +86,7 @@ public class DataBufferRepository
 
     public CompletableFuture<Integer> write(final ServerDirection operation, final String requestId, final ByteBuffer data)
     {
-        final Holder holder = getAsyncFileChannel(operation, requestId);
+        final BufferHolder holder = getAsyncFileChannel(operation, requestId);
         final CompletableFuture<Integer> completableFuture = new CompletableFuture<>();
         long fileSize;
         try
@@ -116,7 +116,7 @@ public class DataBufferRepository
         return completableFuture;
     }
 
-    private Holder getAsyncFileChannel(final ServerDirection serverDirection, final String requestId)
+    private BufferHolder getAsyncFileChannel(final ServerDirection serverDirection, final String requestId)
     {
         final Path file = getFilename(basePath, serverDirection, requestId);
         return pool.compute(file, (f, holder) ->
@@ -125,7 +125,7 @@ public class DataBufferRepository
             {
                 try
                 {
-                    holder = new Holder(new AtomicLong(0), AsynchronousFileChannel.open(file, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE, StandardOpenOption.READ));
+                    holder = new BufferHolder(new AtomicLong(0), AsynchronousFileChannel.open(file, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE, StandardOpenOption.READ));
                     logger.debug("Opened buffer for {} for {}", serverDirection, requestId);
                 }
                 catch (IOException e)
@@ -175,7 +175,7 @@ public class DataBufferRepository
         {
             if (holder == null)
             {
-                holder = new Holder(new AtomicLong(), null);
+                holder = new BufferHolder(new AtomicLong(), null);
                 logger.debug("Opened size calculation counter for {} for {}", serverDirection, requestId);
             }
             final long newSize = holder.size.addAndGet(byteCount);
@@ -189,7 +189,7 @@ public class DataBufferRepository
         return Pair.of(getFilename(basePath, REQUEST, requestId).getFileName().toString(), getFilename(basePath, RESPONSE, requestId).getFileName().toString());
     }
 
-    private record Holder(AtomicLong size, AsynchronousFileChannel fileChannel)
+    private record BufferHolder(AtomicLong size, AsynchronousFileChannel fileChannel)
     {
 
     }
