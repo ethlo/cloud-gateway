@@ -10,7 +10,7 @@
     </parent>
     <groupId>com.ethlo.http</groupId>
     <artifactId>reverse-proxy</artifactId>
-    <version>1.1.0</version>
+    <version>1.1.1-SNAPSHOT</version>
     <name>reverse-proxy</name>
     <description>Spring Cloud Gateway powered reverse proxy</description>
     <properties>

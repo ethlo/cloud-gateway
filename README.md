@@ -45,7 +45,7 @@ http-logging:
       pattern: '{{gateway_request_id}} {{method}} {{path}} {{request_headers["Content-Length"][0]}} {{status}}'
     clickhouse:
       enabled: true
-      url: jdbc:ch://localhost:18123/default?compress=0;async_insert=1,wait_for_async_insert=0
+      url: jdbc:ch://localhost:18123?database=default&async_insert=1,wait_for_async_insert=0
 ```
 
 NOTE: The file log appender can be configured with the logger name `access_log`.
