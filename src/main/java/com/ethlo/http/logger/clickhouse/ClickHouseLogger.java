@@ -43,39 +43,45 @@ public class ClickHouseLogger implements HttpLogger
     private static CompletableFuture<BodyDecodeException> processContent(LogOptions logConfig, RawProvider rawProvider, final ServerDirection serverDirection, final Map<String, Object> params)
     {
         final String keyPrefix = serverDirection.name().toLowerCase();
-        if ((logConfig.raw() == STORE || logConfig.body() == STORE || logConfig.body() == SIZE) && rawProvider != null)
+        if (rawProvider != null)
         {
-            return rawProvider.getBuffer().thenApply(buffer ->
-            {
-                final byte[] responseData = buffer.array();
-                params.put(keyPrefix + "_total_size", rawProvider.size());
-                if (logConfig.raw() == STORE)
-                {
-                    params.put(keyPrefix + "_raw", responseData);
-                }
-
-                if (logConfig.body() == STORE || logConfig.body() == SIZE)
-                {
-                    try
+            logger.debug("Setting total size: {}", serverDirection);
+            params.put(keyPrefix + "_total_size", rawProvider.size());
+            return rawProvider.getBuffer()
+                    .map(future -> future.thenApply(b ->
                     {
-                        final BodyProvider bodyProvider = HttpBodyUtil.extractBody(new ByteArrayInputStream(responseData), serverDirection);
-                        params.put(keyPrefix + "_body_size", bodyProvider.bodyLength());
-                        if (logConfig.body() == STORE)
+                        final byte[] responseData = b.array();
+                        if (logConfig.raw() == STORE)
                         {
-                            params.put(keyPrefix + "_body", IoUtil.readAllBytes(bodyProvider.data()));
+                            logger.debug("Setting raw: {}", serverDirection);
+                            params.put(keyPrefix + "_raw", responseData);
                         }
-                    }
-                    catch (BodyDecodeException exc)
-                    {
-                        return exc;
-                    }
-                }
-                return null;
-            });
+                        return processBody(params, logConfig, keyPrefix, responseData, serverDirection).orElse(null);
+                    })).orElse(CompletableFuture.completedFuture(null));
         }
-        final CompletableFuture<BodyDecodeException> result = new CompletableFuture<>();
-        result.complete(null);
-        return result;
+        return CompletableFuture.completedFuture(null);
+    }
+
+    private static Optional<BodyDecodeException> processBody(final Map<String, Object> params, final LogOptions logConfig, final String keyPrefix, final byte[] responseData, final ServerDirection serverDirection)
+    {
+        if (logConfig.body() != null)
+        {
+            final BodyProvider bodyProvider;
+            try
+            {
+                bodyProvider = HttpBodyUtil.extractBody(new ByteArrayInputStream(responseData), serverDirection);
+            }
+            catch (BodyDecodeException e)
+            {
+                return Optional.of(e);
+            }
+            params.put(keyPrefix + "_body_size", bodyProvider.bodyLength());
+            if (logConfig.body() == STORE)
+            {
+                params.put(keyPrefix + "_body", IoUtil.readAllBytes(bodyProvider.data()));
+            }
+        }
+        return Optional.empty();
     }
 
     @Override
@@ -120,7 +126,7 @@ public class ClickHouseLogger implements HttpLogger
         ).thenApply(res ->
         {
             final List<BodyDecodeException> processingResult = res.stream().filter(Objects::nonNull).toList();
-            logger.debug("Inserting data into ClickHouse for request {}", dataProvider.getRequestId());
+            logger.debug("Inserting data into ClickHouse for request {}: {}", dataProvider.getRequestId(), params);
             final Stopwatch stopwatch = Stopwatch.createStarted();
 
             tpl.update("""

@@ -6,6 +6,8 @@ import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousFileChannel;
 import java.nio.channels.CompletionHandler;
 import java.nio.file.Path;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 import org.slf4j.Logger;
@@ -22,12 +24,21 @@ public class RawProvider
     private final AsynchronousFileChannel fileChannel;
     private final long size;
 
+    public RawProvider(String requestId, ServerDirection serverDirection, Path file, long size)
+    {
+        this.requestId = requestId;
+        this.serverDirection = serverDirection;
+        this.file = file;
+        this.size = size;
+        this.fileChannel = null;
+    }
+
     public RawProvider(String requestId, ServerDirection serverDirection, Path file, AsynchronousFileChannel fileChannel)
     {
         this.requestId = requestId;
         this.serverDirection = serverDirection;
         this.file = file;
-        this.fileChannel = fileChannel;
+        this.fileChannel = Objects.requireNonNull(fileChannel);
         try
         {
             this.size = fileChannel.size();
@@ -43,8 +54,13 @@ public class RawProvider
         return size;
     }
 
-    public CompletableFuture<ByteBuffer> getBuffer()
+    public Optional<CompletableFuture<ByteBuffer>> getBuffer()
     {
+        if (fileChannel == null)
+        {
+            return Optional.empty();
+        }
+
         final CompletableFuture<ByteBuffer> completableFuture = new CompletableFuture<>();
         long fileSize;
         try
@@ -54,7 +70,7 @@ public class RawProvider
         catch (IOException e)
         {
             completableFuture.completeExceptionally(e);
-            return completableFuture;
+            return Optional.of(completableFuture);
         }
 
         final ByteBuffer buffer = ByteBuffer.allocate(Math.toIntExact(fileSize));
@@ -73,6 +89,6 @@ public class RawProvider
             }
         });
         logger.debug("Using data from buffer file {} of size {} for {} {}", file, size, serverDirection, requestId);
-        return completableFuture;
+        return Optional.of(completableFuture);
     }
 }
