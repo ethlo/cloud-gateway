@@ -55,7 +55,7 @@ public class HandleDifferentResponseTypesTest
                     .getResponseBody();
 
             assertThat(body).isEqualTo("Mozilla Developer Network");
-            Thread.sleep(1000);
+            Thread.sleep(100);
         }
     }
 
@@ -81,7 +81,7 @@ public class HandleDifferentResponseTypesTest
                     .getResponseBody();
 
             assertThat(body).isEqualTo("Mozilla Developer Network");
-            Thread.sleep(1000);
+            Thread.sleep(100);
         }
     }
 }

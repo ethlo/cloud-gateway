@@ -5,8 +5,9 @@ import static com.ethlo.http.netty.ContextUtil.getRequestId;
 import static com.ethlo.http.netty.ServerDirection.REQUEST;
 import static com.ethlo.http.netty.ServerDirection.RESPONSE;
 
+import java.util.concurrent.CompletableFuture;
+
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.handler.logging.ByteBufFormat;
@@ -56,31 +57,31 @@ public class HttpRequestResponseLogger extends LoggingHandler
         return getLoggingConfig(ctx).map(predicateConfig ->
         {
             final String requestId = getRequestId(ctx).orElseThrow();
-
-            final int bytesAvailable = msg.readableBytes();
             final boolean isRequestAndShouldStore = predicateConfig.request().mustBuffer() && serverDirection == REQUEST;
             final boolean isResponseAndShouldStore = predicateConfig.response().mustBuffer() && serverDirection == RESPONSE;
+            final int bytesAvailable = msg.readableBytes();
             if (isRequestAndShouldStore || isResponseAndShouldStore)
             {
+                // We need to buffer the contents
                 if (bytesAvailable > 0)
                 {
-                    dataBufferRepository.write(serverDirection, requestId, msg.nioBuffer()).thenApply(writtenBytes ->
-                    {
-                        logger.debug("Wrote {} bytes for {} for request {}", writtenBytes, serverDirection.name(), requestId);
-                        return null;
-                    }).join();
+                    final CompletableFuture<Integer> writer = dataBufferRepository.write(serverDirection, requestId, msg.nioBuffer())
+                            .thenApply(writtenBytes ->
+                            {
+                                logger.debug("Wrote {} bytes for {} for request {}", writtenBytes, serverDirection.name(), requestId);
+                                return writtenBytes;
+                            });
+
+                    // Wait for write
+                    writer.join();
                 }
             }
             else
             {
+                // Log only size
                 dataBufferRepository.appendSizeAvailable(serverDirection, requestId, bytesAvailable);
             }
             return requestId;
         }).orElse(null);
-    }
-
-    private byte[] getBytes(ByteBuf buf)
-    {
-        return ByteBufUtil.getBytes(buf, buf.readerIndex(), buf.readableBytes(), false);
     }
 }

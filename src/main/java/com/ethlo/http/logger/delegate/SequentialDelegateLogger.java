@@ -12,6 +12,8 @@ import org.springframework.stereotype.Component;
 import com.ethlo.http.logger.HttpLogger;
 import com.ethlo.http.model.AccessLogResult;
 import com.ethlo.http.model.WebExchangeDataProvider;
+import com.ethlo.http.netty.PredicateConfig;
+import com.ethlo.http.util.AsyncUtil;
 
 /**
  * This logger will log to the delegate loggers in order.
@@ -39,18 +41,15 @@ public class SequentialDelegateLogger
         }
     }
 
-    private static <T> CompletableFuture<List<T>> join(List<CompletableFuture<T>> executionPromises)
-    {
-        final CompletableFuture<Void> joinedPromise = CompletableFuture.allOf(executionPromises.toArray(CompletableFuture[]::new));
-        return joinedPromise.thenApply(it -> executionPromises.stream().map(CompletableFuture::join).toList());
-    }
-
     public CompletableFuture<AccessLogResult> accessLog(final WebExchangeDataProvider dataProvider)
     {
-        return join(httpLoggers.stream().map(httpLogger -> httpLogger.accessLog(dataProvider)).toList())
+        final PredicateConfig predicateConfig = dataProvider.getPredicateConfig().orElseThrow();
+        return AsyncUtil.join(httpLoggers.stream()
+                        .map(httpLogger -> httpLogger.accessLog(dataProvider))
+                        .toList())
                 .thenApply(list ->
                 {
-                    AccessLogResult result = AccessLogResult.ok(dataProvider.getPredicateConfig().orElseThrow());
+                    AccessLogResult result = AccessLogResult.ok(predicateConfig);
                     for (AccessLogResult l : list)
                     {
                         result = result.combine(l);
