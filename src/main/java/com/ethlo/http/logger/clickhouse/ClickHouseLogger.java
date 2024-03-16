@@ -117,7 +117,7 @@ public class ClickHouseLogger implements HttpLogger
                         processContent(predicateConfig.request(), dataProvider.getRawRequest().orElse(null), ServerDirection.REQUEST, params),
                         processContent(predicateConfig.request(), dataProvider.getRawResponse().orElse(null), ServerDirection.RESPONSE, params)
                 )
-        ).thenApplyAsync(res ->
+        ).thenApply(res ->
         {
             final List<BodyDecodeException> processingResult = res.stream().filter(Objects::nonNull).toList();
             logger.debug("Inserting data into ClickHouse for request {}", dataProvider.getRequestId());
