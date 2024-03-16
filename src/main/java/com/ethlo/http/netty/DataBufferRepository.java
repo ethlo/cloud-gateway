@@ -62,9 +62,9 @@ public class DataBufferRepository
                 {
                     logger.debug("Deleting buffer file {} with size of {} bytes", file, Files.size(file));
                 }
-                catch (IOException ignored)
+                catch (IOException exc)
                 {
-                    logger.debug("Ignored: File size calculation failed");
+                    logger.trace("Ignored: File size calculation failed", exc);
                 }
             }
 
@@ -140,32 +140,38 @@ public class DataBufferRepository
     public void close(final String requestId)
     {
         final Path requestFile = getFilename(basePath, REQUEST, requestId);
-        Optional.ofNullable(pool.get(requestFile)).ifPresent(holder ->
-        {
-            if (holder.fileChannel.isOpen())
-            {
-                logger.debug("Closing request file {} used by request {}", requestFile, requestId);
-                CloseUtil.closeQuietly(holder.fileChannel);
-            }
-        });
+        getFileChannel(requestFile)
+                .ifPresent(fc ->
+                {
+                    if (fc.isOpen())
+                    {
+                        logger.debug("Closing request file {} used by request {}", requestFile, requestId);
+                        CloseUtil.closeQuietly(fc);
+                    }
+                });
 
         final Path responseFile = getFilename(basePath, RESPONSE, requestId);
-        Optional.ofNullable(pool.get(responseFile)).ifPresent(holder ->
+        getFileChannel(responseFile).ifPresent(fc ->
         {
-            if (holder.fileChannel.isOpen())
+            if (fc.isOpen())
             {
                 logger.debug("Closing response file {} used by request {}", responseFile, requestId);
-                CloseUtil.closeQuietly(holder.fileChannel);
+                CloseUtil.closeQuietly(fc);
             }
         });
     }
 
+    private Optional<AsynchronousFileChannel> getFileChannel(Path file)
+    {
+        return Optional.ofNullable(pool.get(file))
+                .filter(bufferHolder -> bufferHolder.fileChannel != null)
+                .map(bufferHolder -> bufferHolder.fileChannel);
+    }
+
     public Optional<RawProvider> get(final ServerDirection serverDirection, final String requestId)
     {
-        final Path key = getFilename(basePath, serverDirection, requestId);
-        return Optional.ofNullable(pool.get(key))
-                .filter(holder -> holder.fileChannel != null)
-                .map(holder -> new RawProvider(requestId, serverDirection, key, holder.fileChannel));
+        final Path file = getFilename(basePath, serverDirection, requestId);
+        return getFileChannel(file).map(fc -> new RawProvider(requestId, serverDirection, file, fc));
     }
 
     public void appendSizeAvailable(final ServerDirection serverDirection, final String requestId, final int byteCount)

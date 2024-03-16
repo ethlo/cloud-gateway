@@ -67,13 +67,13 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
         return chain.filter(exchange)
                 .doFinally(signalType ->
                         ioScheduler.schedule(() ->
-                                saveDataAndCleanupIfApplicable(exchange, predicateConfig, requestId, started)));
+                                saveDataAndCleanupIfApplicable(exchange, predicateConfig, requestId, started).join()));
     }
 
-    private void saveDataAndCleanupIfApplicable(ServerWebExchange exchange, PredicateConfig predicateConfig, String requestId, long started)
+    private CompletableFuture<AccessLogResult> saveDataAndCleanupIfApplicable(ServerWebExchange exchange, PredicateConfig predicateConfig, String requestId, long started)
     {
         final CompletableFuture<AccessLogResult> result = saveDataUsingProviders(exchange, requestId, predicateConfig, Duration.ofNanos(System.nanoTime() - started));
-        result.whenComplete((logResult, exc) ->
+        return result.whenComplete((logResult, exc) ->
         {
             dataBufferRepository.close(requestId);
             if (logResult.isOk())
