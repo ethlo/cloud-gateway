@@ -46,7 +46,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,metrics,clickhouse,env,logio
+        include: health,status
   endpoint:
     env:
       show-values: when_authorized
