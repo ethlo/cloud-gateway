@@ -15,7 +15,7 @@ http-logging:
       realm-claim-name: iss
       realm-expression: ([^/]+)/?$
     basic:
-      enabled: false
+      enabled: true
       realm-header-name: x-realm
   capture:
     enabled: true
@@ -46,7 +46,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,status
+        include: health,metrics,status
   endpoint:
     env:
       show-values: when_authorized

@@ -19,117 +19,189 @@
 <body>
 <main class="container">
     <h1>Cloud Gateway - Status</h1>
-    <h3>Log provider I/O processing</h3>
-    <section id="processing">
-        <div class="overflow-auto">
-            <table class="striped">
-                <thead>
-                <tr>
-                    <th scope="col">Property</th>
-                    <th scope="col" class="right">Value</th>
-                </tr>
-                </thead>
-                <tbody>
-                {% for e in logio %}
-                <tr>
-                    <th scope="row" class=left-col">{{e.key}}</th>
-                    <td class="right">{{e.value}}</td>
-                </tr>
-                {% endfor %}
-            </table>
-        </div>
-    </section>
-    <h3>ClickHouse</h3>
-    <h4>Storage metrics</h4>
-    <section id="clickhouse">
-        <div class="overflow-auto">
-            <table class="striped">
-                <thead>
-                <tr>
-                    <th scope="col">Property</th>
-                    <th scope="col" class="right">Value</th>
-                </tr>
-                </thead>
-                <tbody>
-                {% for e in clickhouse %}
-                <tr>
-                    <th scope="row" class=left-col">{{e.key}}</th>
-                    <td class="right">{{e.value}}</td>
-                </tr>
-                {% endfor %}
-            </table>
-        </div>
-    </section>
-    <h4>Inserts last {{clickhouse_minute_interval_count}} minutes</h4>
-    <section id="clickhouse-queries">
-        <div class="overflow-auto">
-            <table class="striped">
-                <thead>
-                <tr>
-                    <th scope="col">Time</th>
-                    <th scope="col" class="right">Inserts</th>
-                    <th scope="col" class="right">Average insert time</th>
-                </tr>
-                </thead>
-                <tbody>
-                {% for e in clickhouse_minute_queries %}
-                <tr>
-                    <td class=left-col">{{e.event_time}}</td>
-                    <td class="right">{{e.count}}</td>
-                    <td class="right">{{e.avg_insert_duration}} ms</td>
-                </tr>
-                {% endfor %}
-            </table>
-        </div>
-    </section>
 
-    <h4>Inserts last {{clickhouse_hour_interval_count}} hours</h4>
-    <section id="clickhouse-queries-hour">
-        <div class="overflow-auto">
-            <table class="striped">
-                <thead>
-                <tr>
-                    <th scope="col">Time</th>
-                    <th scope="col" class="right">Inserts</th>
-                    <th scope="col" class="right">Average insert time</th>
-                </tr>
-                </thead>
-                <tbody>
-                {% for e in clickhouse_hour_queries %}
-                <tr>
-                    <td class=left-col">{{e.event_time}}</td>
-                    <td class="right">{{e.count}}</td>
-                    <td class="right">{{e.avg_insert_duration}} ms</td>
-                </tr>
-                {% endfor %}
-            </table>
-        </div>
-    </section>
+    {% if capture_config.enabled %}
+    <details open>
+        <summary role="button">Log provider I/O processing</summary>
+        <section id="processing">
+            <div class="overflow-auto">
+                <table class="striped">
+                    <thead>
+                    <tr>
+                        <th scope="col">Property</th>
+                        <th scope="col" class="right">Value</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for e in logio %}
+                    <tr>
+                        <th scope="row" class=left-col">{{e.key}}</th>
+                        <td class="right">{{e.value}}</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+        </section>
+    </details>
 
-    <h4>Inserts last {{clickhouse_day_interval_count}} days</h4>
-    <section id="clickhouse-queries-days">
-        <div class="overflow-auto">
-            <table class="striped">
-                <thead>
-                <tr>
-                    <th scope="col">Time</th>
-                    <th scope="col" class="right">Inserts</th>
-                    <th scope="col" class="right">Average insert time</th>
-                </tr>
-                </thead>
-                <tbody>
-                {% for e in clickhouse_day_queries %}
-                <tr>
-                    <td class=left-col">{{e.event_time}}</td>
-                    <td class="right">{{e.count}}</td>
-                    <td class="right">{{e.avg_insert_duration}} ms</td>
-                </tr>
-                {% endfor %}
-            </table>
-        </div>
-    </section>
+    <details open>
+        <summary role="button">ClickHouse storage metrics</summary>
+        <section id="clickhouse">
+            <div class="overflow-auto">
+                <table class="striped">
+                    <thead>
+                    <tr>
+                        <th scope="col">Property</th>
+                        <th scope="col" class="right">Value</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for e in clickhouse %}
+                    <tr>
+                        <th scope="row" class=left-col">{{e.key}}</th>
+                        <td class="right">{{e.value}}</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+        </section>
+    </details>
 
+    <details open>
+        <summary role="button">Inserts last {{clickhouse_minute_interval_count}} minutes</summary>
+        <section id="clickhouse-queries">
+            <div class="overflow-auto">
+                <table class="striped">
+                    <thead>
+                    <tr>
+                        <th scope="col">Time</th>
+                        <th scope="col" class="right">Inserts</th>
+                        <th scope="col" class="right">Average insert time</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for e in clickhouse_minute_queries %}
+                    <tr>
+                        <td class=left-col">{{e.event_time}}</td>
+                        <td class="right">{{e.count}}</td>
+                        <td class="right">{{e.avg_insert_duration}} sec</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+        </section>
+    </details>
 
+    <details open>
+        <summary role="button">Inserts last {{clickhouse_hour_interval_count}} hours</summary>
+        <section id="clickhouse-queries-hour">
+            <div class="overflow-auto">
+                <table class="striped">
+                    <thead>
+                    <tr>
+                        <th scope="col">Time</th>
+                        <th scope="col" class="right">Inserts</th>
+                        <th scope="col" class="right">Average insert time</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for e in clickhouse_hour_queries %}
+                    <tr>
+                        <td class=left-col">{{e.event_time}}</td>
+                        <td class="right">{{e.count}}</td>
+                        <td class="right">{{e.avg_insert_duration}} sec</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+        </section>
+    </details>
+
+    <details open>
+        <summary role="button">Inserts last {{clickhouse_day_interval_count}} days</summary>
+        <section id="clickhouse-queries-days">
+            <div class="overflow-auto">
+                <table class="striped">
+                    <thead>
+                    <tr>
+                        <th scope="col">Time</th>
+                        <th scope="col" class="right">Inserts</th>
+                        <th scope="col" class="right">Average insert time</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for e in clickhouse_day_queries %}
+                    <tr>
+                        <td class=left-col">{{e.event_time}}</td>
+                        <td class="right">{{e.count}}</td>
+                        <td class="right">{{e.avg_insert_duration}} sec</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+        </section>
+    </details>
+    {% endif %}
+
+    <details open>
+        <summary role="button">Capture configuration</summary>
+        <section id="capture-config">
+            <div class="overflow-auto">
+                <table class="striped">
+                    <thead>
+                    <tr>
+                        <th scope="col">Property</th>
+                        <th scope="col" class="right">Value</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr>
+                        <th scope="row" class=left-col">Enabled</th>
+                        <td class="right">{{capture_config.enabled}}</td>
+                    </tr>
+                    <tr>
+                        <th scope="row" class=left-col">Log directory</th>
+                        <td class="right">{{capture_config.logDirectory}}</td>
+                    </tr>
+                </table>
+            </div>
+        </section>
+    </details>
+
+    <details open>
+        <summary role="button">Memory</summary>
+        <section>
+
+            <div>
+                Used: {{memory_summary.used | sizeformat}}
+                Committed: {{memory_summary.committed | sizeformat}}
+                Max: {{memory_summary.max | sizeformat}}
+            </div>
+        </section>
+        <section>
+            <div class="overflow-auto">
+                <table class="striped">
+                    <thead>
+                    <tr>
+                        <th scope="col">Property</th>
+                        <th scope="col" class="right">Used</th>
+                        <th scope="col" class="right">Committed</th>
+                        <th scope="col" class="right">Max</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for e in memory %}
+                    <tr>
+                        <th scope="row" class=left-col">{{e.key}}</th>
+                        <td class="right">{{e.value.used | sizeformat}}</td>
+                        <td class="right">{{e.value.committed | sizeformat}}</td>
+                        <td class="right">{{e.value.max | sizeformat}}</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+        </section>
+    </details>
 </main>
 </body>
 </html>

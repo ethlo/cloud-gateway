@@ -3,9 +3,14 @@ package com.ethlo.http;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
+
+import com.ethlo.http.util.IoUtil;
+import io.pebbletemplates.pebble.template.EvaluationContext;
+import io.pebbletemplates.pebble.template.PebbleTemplate;
 
 import org.springframework.core.io.ClassPathResource;
 
@@ -23,6 +28,28 @@ public class PebbleRenderer
     public PebbleRenderer(boolean strict)
     {
         final Map<String, Filter> filters = new TreeMap<>();
+        filters.put("sizeformat", new Filter()
+        {
+            @Override
+            public Object apply(final Object input, final Map<String, Object> args, final PebbleTemplate self, final EvaluationContext context, final int lineNumber) throws PebbleException
+            {
+                if (input == null)
+                {
+                    return null;
+                }
+                else if (input instanceof Number)
+                {
+                    return IoUtil.formatSize(((Number) input).longValue());
+                }
+                return input;
+            }
+
+            @Override
+            public List<String> getArgumentNames()
+            {
+                return null;
+            }
+        });
 
         engine = new PebbleEngine.Builder()
                 .strictVariables(strict)

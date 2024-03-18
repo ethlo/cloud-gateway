@@ -5,11 +5,13 @@ import java.util.Map;
 
 import org.springframework.boot.actuate.endpoint.annotation.Endpoint;
 import org.springframework.boot.actuate.endpoint.annotation.ReadOperation;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Component;
 
 import com.ethlo.http.util.ObservableScheduler;
 
 @Component
+@ConditionalOnBean(ObservableScheduler.class)
 @Endpoint(id = "logio")
 public class IOStatusEndpoint
 {

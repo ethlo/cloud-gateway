@@ -38,8 +38,7 @@ public class ClickHouseStatsEndpoint
     {
         final String sql = """
                 select
-                       sum(bytes)                       as size,
-                       sum(rows)                        as rows_count,
+                       sum(rows)                        as row_count,
                        max(modification_time)           as latest_modification_timestamp,
                        sum(data_compressed_bytes)       as data_compressed_size,
                        sum(data_uncompressed_bytes)     as data_uncompressed_size,
