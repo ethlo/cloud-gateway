@@ -4,6 +4,7 @@ import static org.springframework.web.reactive.function.server.RequestPredicates
 import static org.springframework.web.reactive.function.server.RouterFunctions.nest;
 import static org.springframework.web.reactive.function.server.RouterFunctions.route;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
@@ -47,7 +48,7 @@ import reactor.core.scheduler.Schedulers;
 public class CaptureCfg
 {
     @Bean
-    public DataBufferRepository pooledFileDataBufferRepository(CaptureConfiguration captureConfiguration)
+    public DataBufferRepository pooledFileDataBufferRepository(CaptureConfiguration captureConfiguration) throws IOException
     {
         return new DataBufferRepository(captureConfiguration);
     }

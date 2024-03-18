@@ -27,7 +27,7 @@ public class IOStatusEndpoint
         result.put("queue_length", observableScheduler.getQueueSize());
         result.put("queue_capacity", observableScheduler.getQueueCapacity());
         result.put("queue_waits", observableScheduler.getQueueInsertDelayCount());
-        result.put("queue_wait_time", observableScheduler.getQueueInsertDelayElapsed());
+        result.put("queue_wait_duration", observableScheduler.getQueueInsertDelayElapsed().toMillis());
         return result;
     }
 }

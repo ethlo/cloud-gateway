@@ -32,9 +32,9 @@ public class DataBufferRepository
     private final Path basePath;
     private final ConcurrentMap<Path, BufferHolder> pool;
 
-    public DataBufferRepository(CaptureConfiguration captureConfiguration)
+    public DataBufferRepository(CaptureConfiguration captureConfiguration) throws IOException
     {
-        this.basePath = captureConfiguration.getLogDirectory();
+        this.basePath = Files.createDirectories(captureConfiguration.getLogDirectory());
         this.pool = new ConcurrentHashMap<>();
     }
 
