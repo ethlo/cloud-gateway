@@ -175,7 +175,7 @@
             <div>
                 Used: {{memory_summary.used | sizeformat}}
                 Committed: {{memory_summary.committed | sizeformat}}
-                Max: {{memory_summary.max | sizeformat}}
+                <progress value="{{memory_summary.used}}" max="{{memory_summary.committed}}" />
             </div>
         </section>
         <section>

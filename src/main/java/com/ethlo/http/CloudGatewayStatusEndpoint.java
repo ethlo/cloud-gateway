@@ -6,6 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -112,10 +113,13 @@ public class CloudGatewayStatusEndpoint
                 .stream()
                 .filter(m -> key.equals(m.getId().getName()))
                 .toList();
-        return byKey
+        return new TreeMap<>(byKey
                 .stream()
                 .collect(Collectors.toMap(m ->
-                        m.getId().getTags().stream().map(t -> t.getKey() + ":" + t.getValue()).collect(Collectors.joining(":")), m -> m.measure().iterator().next().getValue()));
+                        m.getId().getTags().stream()
+                                .map(t -> t.getKey() + ":" + t.getValue())
+                                .collect(Collectors.joining(", ")), m -> m.measure()
+                        .iterator().next().getValue())));
     }
 
     private Map<String, Object> preProcess(Map<String, Object> map)
