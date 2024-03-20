@@ -7,10 +7,6 @@
     <link rel="stylesheet" href="status/css">
     <title>Cloud Gateway status</title>
     <style>
-        .left-col {
-            width: 300px;
-        }
-
         .right {
             text-align: right;
         }
@@ -21,126 +17,20 @@
     <h1>Cloud Gateway - Status</h1>
 
     {% if capture_config.enabled %}
-    <details open>
-        <summary role="button">Log provider I/O processing</summary>
-        <section id="processing">
-            <div class="overflow-auto">
-                <table class="striped">
-                    <thead>
-                    <tr>
-                        <th scope="col">Property</th>
-                        <th scope="col" class="right">Value</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {% for e in logio %}
-                    <tr>
-                        <th scope="row" class=left-col">{{e.key}}</th>
-                        <td class="right">{{e.value}}</td>
-                    </tr>
-                    {% endfor %}
-                </table>
-            </div>
-        </section>
-    </details>
 
-    <details open>
-        <summary role="button">ClickHouse storage metrics</summary>
-        <section id="clickhouse">
-            <div class="overflow-auto">
-                <table class="striped">
-                    <thead>
-                    <tr>
-                        <th scope="col">Property</th>
-                        <th scope="col" class="right">Value</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {% for e in clickhouse %}
-                    <tr>
-                        <th scope="row" class=left-col">{{e.key}}</th>
-                        <td class="right">{{e.value}}</td>
-                    </tr>
-                    {% endfor %}
-                </table>
-            </div>
-        </section>
-    </details>
+    {% include '_generic_map.tpl.html' with {'map': logio , 'title': 'Log provider I/O processing'} %}
 
-    <details open>
-        <summary role="button">Inserts last {{clickhouse_minute_interval_count}} minutes</summary>
-        <section id="clickhouse-queries">
-            <div class="overflow-auto">
-                <table class="striped">
-                    <thead>
-                    <tr>
-                        <th scope="col">Time</th>
-                        <th scope="col" class="right">Inserts</th>
-                        <th scope="col" class="right">Average insert time</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {% for e in clickhouse_minute_queries %}
-                    <tr>
-                        <td class=left-col">{{e.event_time}}</td>
-                        <td class="right">{{e.count}}</td>
-                        <td class="right">{{e.avg_insert_duration}} sec</td>
-                    </tr>
-                    {% endfor %}
-                </table>
-            </div>
-        </section>
-    </details>
+    {% include '_generic_map.tpl.html' with {'map': clickhouse , 'title': 'ClickHouse storage metrics'} %}
 
-    <details open>
-        <summary role="button">Inserts last {{clickhouse_hour_interval_count}} hours</summary>
-        <section id="clickhouse-queries-hour">
-            <div class="overflow-auto">
-                <table class="striped">
-                    <thead>
-                    <tr>
-                        <th scope="col">Time</th>
-                        <th scope="col" class="right">Inserts</th>
-                        <th scope="col" class="right">Average insert time</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {% for e in clickhouse_hour_queries %}
-                    <tr>
-                        <td class=left-col">{{e.event_time}}</td>
-                        <td class="right">{{e.count}}</td>
-                        <td class="right">{{e.avg_insert_duration}} sec</td>
-                    </tr>
-                    {% endfor %}
-                </table>
-            </div>
-        </section>
-    </details>
+    {% include "_queryload.tpl.html" with {'clickhouse_queries': clickhouse_minute_queries, 'interval_count':
+    clickhouse_minute_interval_count, 'interval_unit': 'minutes'} %}
 
-    <details open>
-        <summary role="button">Inserts last {{clickhouse_day_interval_count}} days</summary>
-        <section id="clickhouse-queries-days">
-            <div class="overflow-auto">
-                <table class="striped">
-                    <thead>
-                    <tr>
-                        <th scope="col">Time</th>
-                        <th scope="col" class="right">Inserts</th>
-                        <th scope="col" class="right">Average insert time</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {% for e in clickhouse_day_queries %}
-                    <tr>
-                        <td class=left-col">{{e.event_time}}</td>
-                        <td class="right">{{e.count}}</td>
-                        <td class="right">{{e.avg_insert_duration}} sec</td>
-                    </tr>
-                    {% endfor %}
-                </table>
-            </div>
-        </section>
-    </details>
+    {% include "_queryload.tpl.html" with {'clickhouse_queries': clickhouse_hour_queries, 'interval_count':
+    clickhouse_hour_interval_count, 'interval_unit': 'hours'} %}
+
+    {% include "_queryload.tpl.html" with {'clickhouse_queries': clickhouse_day_queries, 'interval_count':
+    clickhouse_day_interval_count, 'interval_unit': 'days'} %}
+
     {% endif %}
 
     <details open>
@@ -175,7 +65,7 @@
             <div>
                 Used: {{memory_summary.used | sizeformat}}
                 Committed: {{memory_summary.committed | sizeformat}}
-                <progress value="{{memory_summary.used}}" max="{{memory_summary.committed}}" />
+                <progress value="{{memory_summary.used}}" max="{{memory_summary.committed}}"/>
             </div>
         </section>
         <section>

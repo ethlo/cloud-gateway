@@ -6,6 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
@@ -82,7 +83,7 @@ public class CloudGatewayStatusEndpoint
             model.put("logio", preProcess(ioStatusEndpoint.getLogio()));
         }
 
-        return pebbleRenderer.renderFromTemplate(model, "info.tpl.html", Locale.ENGLISH, false);
+        return pebbleRenderer.renderFromTemplate(model, "info.tpl.html", Locale.ENGLISH);
     }
 
     private Map<String, Memory> overlay(Map<String, Double> usedMemory, Map<String, Double> committedMemory, Map<String, Double> totalMemory)
@@ -129,16 +130,15 @@ public class CloudGatewayStatusEndpoint
         {
             if (k.endsWith("size"))
             {
-                result.put(k, IoUtil.formatSize(Long.parseLong(v.toString())));
+                result.put(k, Optional.ofNullable(v).map(value -> IoUtil.formatSize(Long.parseLong(value.toString()))).orElse(null));
             }
             else if (k.endsWith("count"))
             {
-                result.put(k, String.format("%,d\n", Long.parseLong(v.toString())));
+                result.put(k, Optional.ofNullable(v).map(value -> String.format("%,d\n", Long.parseLong(value.toString()))).orElse(null));
             }
             else if (k.endsWith("duration"))
             {
-                final double s = Double.parseDouble(v.toString()) / 1000;
-                result.put(k, String.format("%,.3f", s));
+                result.put(k, Optional.ofNullable(v).map(value -> String.format("%,.3f", Double.parseDouble(value.toString()) / 1000)).orElse(null));
             }
             else
             {

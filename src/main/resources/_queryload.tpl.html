@@ -1,0 +1,28 @@
+<details open>
+    <summary role="button">Inserts last {{interval_count}} {{interval_unit}}</summary>
+    <section>
+        <div class="overflow-auto">
+            <table class="striped">
+                <thead>
+                <tr>
+                    <th scope="col">Time</th>
+                    <th scope="col">% of max in period</th>
+                    <th scope="col">Count</th>
+                    <th scope="col" class="right">Average time</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for e in clickhouse_queries %}
+                <tr>
+                    <td class=left-col">{{e.event_time}}</td>
+                    <td class="right" style="width:60%;">
+                        <progress value="{{e.count_percentage}}" max="100"></progress>
+                    </td>
+                    <td>{{e.count}}</td>
+                    <td class="right">{{e.avg_insert_duration}} sec</td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+    </section>
+</details>

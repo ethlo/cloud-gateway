@@ -6,6 +6,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.clickhouse.data.value.UnsignedLong;
+
 import org.springframework.boot.actuate.endpoint.web.annotation.ControllerEndpoint;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -73,6 +75,13 @@ public class ClickHouseStatsEndpoint
                 GROUP BY event_time
                 ORDER BY event_time DESC WITH FILL FROM toStartOfInterval(now(), INTERVAL :interval SECOND) to (toStartOfInterval(now(), INTERVAL :interval SECOND) - toIntervalSecond(:interval * :intervalCount)) STEP toIntervalSecond(-:interval),
                 count""";
-        return tpl.queryForList(sql, Map.of("interval", interval.toSeconds(), "intervalCount", intervalCount));
+        final List<Map<String, Object>> result = tpl.queryForList(sql, Map.of("interval", interval.toSeconds(), "intervalCount", intervalCount));
+        final long max = result.stream().mapToLong(m -> ((UnsignedLong) m.getOrDefault("count", UnsignedLong.valueOf(0))).longValue()).max().orElse(1);
+        result.forEach(map ->
+        {
+            final double percentage = (((UnsignedLong) map.getOrDefault("count", UnsignedLong.valueOf(0))).longValue() / (double) max) * 100;
+            map.put("count_percentage", percentage);
+        });
+        return result;
     }
 }
