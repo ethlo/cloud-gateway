@@ -14,12 +14,12 @@ services:
   cloud-gateway:
     hostname: cloud-gateway
     container_name: cloud-gateway
-    image: ethlocom/cloud-gateway:${project.version}
+    image: ethlocom/cloud-gateway:1.2.2
     restart: on-failure:5
     environment:
       - 'JAVA_OPTS="-XX:MaxDirectMemorySize=200M"'
       - 'SPRING_CONFIG_LOCATION=/config/application.yaml'
-      - "HTTPLOGGING_PROVIDERS_CLICKHOUSE_URL=jdbc:ch://clickhouse-cloud-gateway/default?async_insert=1,wait_for_async_insert=0"
+      - "HTTPLOGGING_PROVIDERS_CLICKHOUSE_URL=jdbc:clickhouse://clickhouse-cloud-gateway?database=default&async_insert=1&wait_for_async_insert=1"
     volumes:
       - ./config:/config
       - ./static:/static
