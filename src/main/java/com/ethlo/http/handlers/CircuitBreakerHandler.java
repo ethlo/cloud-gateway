@@ -85,8 +85,8 @@ public class CircuitBreakerHandler implements HandlerFunction<ServerResponse>
         final HttpMethod method = request.getMethod();
 
         final ByteBuffer fakeRequestLine = ByteBuffer.wrap((method.name() + " / HTTP/1.1\r\n").getBytes(StandardCharsets.UTF_8));
-        dataBufferRepository.write(ServerDirection.REQUEST, requestId, fakeRequestLine);
-        dataBufferRepository.write(ServerDirection.REQUEST, requestId, extractHeaders(request));
+        dataBufferRepository.write(ServerDirection.REQUEST, requestId, fakeRequestLine).join();
+        dataBufferRepository.write(ServerDirection.REQUEST, requestId, extractHeaders(request)).join();
 
         return serverRequest.exchange().getRequest().getBody()
                 .publishOn(Schedulers.boundedElastic())
