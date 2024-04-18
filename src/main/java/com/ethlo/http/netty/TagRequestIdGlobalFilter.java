@@ -73,8 +73,13 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
         return chain.filter(exchange)
                 .doOnError(exc -> exchange.getAttributes().put(TagRequestIdGlobalFilter.EXCEPTION_ATTRIBUTE_NAME, exc))
                 .doFinally(signalType ->
-                        ioScheduler.schedule(() ->
-                                saveDataAndCleanupIfApplicable(exchange, predicateConfig, requestId, started, exchange.getAttribute(TagRequestIdGlobalFilter.EXCEPTION_ATTRIBUTE_NAME)).join()));
+                {
+                    final Throwable exception = Optional.ofNullable((Throwable) exchange.getAttribute(TagRequestIdGlobalFilter.EXCEPTION_ATTRIBUTE_NAME))
+                            .or(() -> Optional.ofNullable(exchange.getAttribute(ServerWebExchangeUtils.CIRCUITBREAKER_EXECUTION_EXCEPTION_ATTR)))
+                            .orElse(null);
+
+                    ioScheduler.schedule(() -> saveDataAndCleanupIfApplicable(exchange, predicateConfig, requestId, started, exception).join());
+                });
     }
 
     private CompletableFuture<AccessLogResult> saveDataAndCleanupIfApplicable(ServerWebExchange exchange, PredicateConfig predicateConfig, String requestId, long started, final Throwable exc)

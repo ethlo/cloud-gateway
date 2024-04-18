@@ -63,10 +63,23 @@ public class CircuitBreakerHandler implements HandlerFunction<ServerResponse>
         final Optional<PredicateConfig> config = ContextUtil.getLoggingConfig(serverRequest);
         logger.debug("Reading logging config: {}", config.orElse(null));
         return config
-                .filter(predicateConfig -> predicateConfig.request().mustBuffer())
-                .map(p -> saveIncomingRequest(serverRequest))
-                .orElse(ServerResponse.status(504)
-                        .build());
+                .map(p ->
+                {
+                    if (p.request().mustBuffer())
+                    {
+                        return saveIncomingRequest(serverRequest)
+                                .then(buildResponse(exc.orElse(null)));
+                    }
+                    return buildResponse(exc.orElse(null));
+                })
+                .orElse(buildResponse(exc.orElse(null)));
+    }
+
+    private Mono<ServerResponse> buildResponse(final Exception e)
+    {
+        return ServerResponse
+                .status(504)
+                .build();
     }
 
     private Mono<ServerResponse> saveIncomingRequest(ServerRequest serverRequest)
