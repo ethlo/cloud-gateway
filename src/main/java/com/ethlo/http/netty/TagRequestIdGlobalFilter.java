@@ -15,6 +15,7 @@ import org.springframework.cloud.gateway.route.Route;
 import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
 import org.springframework.core.Ordered;
 import org.springframework.data.util.Pair;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
@@ -52,6 +53,7 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
         this.ioScheduler = ioScheduler;
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public @Nonnull Mono<Void> filter(@Nonnull ServerWebExchange exchange, GatewayFilterChain chain)
     {
@@ -93,15 +95,12 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
         });
     }
 
-    private CompletableFuture<AccessLogResult> saveDataUsingProviders(ServerWebExchange exchange, String requestId, final PredicateConfig predicateConfig, final Duration duration, final Throwable exc)
+    private CompletableFuture<AccessLogResult> saveDataUsingProviders(ServerWebExchange exchange, String requestId, final PredicateConfig predicateConfig, final Duration duration, final Throwable exception)
     {
         final ServerHttpRequest req = exchange.getRequest();
         final ServerHttpResponse res = exchange.getResponse();
         final Route route = exchange.getAttribute(ServerWebExchangeUtils.GATEWAY_ROUTE_ATTR);
-
-        final HttpStatusCode httpStatusCode = Optional.ofNullable(exc).filter(e -> ResponseStatusException.class.isAssignableFrom(e.getClass()))
-                .map(ResponseStatusException.class::cast)
-                .map(ErrorResponseException::getStatusCode).orElse(exchange.getResponse().getStatusCode());
+        final HttpStatusCode httpStatusCode = determineStatusCode(exception, exchange.getResponse().getStatusCode());
 
         logger.debug("Completed request {} in {}: {}", requestId, duration, predicateConfig);
 
@@ -111,6 +110,7 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
                 .method(req.getMethod())
                 .path(req.getPath())
                 .uri(req.getURI())
+                .exception(exception)
                 .statusCode(httpStatusCode)
                 .requestHeaders(req.getHeaders())
                 .responseHeaders(res.getHeaders())
@@ -124,9 +124,22 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
         return httpLogger.accessLog(processed);
     }
 
+    private HttpStatusCode determineStatusCode(final Throwable exc, final HttpStatusCode responseStatusCode)
+    {
+        if (exc != null)
+        {
+            return Optional.of(exc)
+                    .filter(e -> ResponseStatusException.class.isAssignableFrom(e.getClass()))
+                    .map(ResponseStatusException.class::cast)
+                    .map(ErrorResponseException::getStatusCode)
+                    .orElse(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+        return responseStatusCode;
+    }
+
     @Override
     public int getOrder()
     {
-        return Integer.MIN_VALUE;
+        return Ordered.HIGHEST_PRECEDENCE;
     }
 }

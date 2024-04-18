@@ -37,6 +37,7 @@ public class WebExchangeDataProvider
     private Duration duration;
     private InetSocketAddress remoteAddress;
     private RealmUser user;
+    private Throwable exception;
 
     public WebExchangeDataProvider(DataBufferRepository dataBufferRepository, final PredicateConfig predicateConfig)
     {
@@ -215,5 +216,16 @@ public class WebExchangeDataProvider
     public Optional<PredicateConfig> getPredicateConfig()
     {
         return Optional.ofNullable(predicateConfig);
+    }
+
+    public WebExchangeDataProvider exception(Throwable exc)
+    {
+        this.exception = exc;
+        return this;
+    }
+
+    public Throwable getException()
+    {
+        return exception;
     }
 }
