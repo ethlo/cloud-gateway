@@ -1,6 +1,5 @@
 package com.ethlo.http.logger.clickhouse;
 
-import static com.ethlo.http.match.LogOptions.ContentProcessing.SIZE;
 import static com.ethlo.http.match.LogOptions.ContentProcessing.STORE;
 
 import java.io.ByteArrayInputStream;
@@ -106,6 +105,14 @@ public class ClickHouseLogger implements HttpLogger
         dataProvider.getRequestHeaders().remove(HttpHeaders.USER_AGENT);
         dataProvider.getRequestHeaders().remove(HttpHeaders.CONTENT_TYPE);
 
+        params.put("exception_type", null);
+        params.put("exception_message", null);
+        dataProvider.getException().ifPresent(exc ->
+        {
+            params.put("exception_type", exc.getClass().getName());
+            params.put("exception_message", exc.getMessage());
+        });
+
         params.put("request_raw", null);
         params.put("request_body", null);
         params.put("request_body_size", null);
@@ -136,14 +143,14 @@ public class ClickHouseLogger implements HttpLogger
                               response_time, request_body_size, response_body_size, request_total_size,
                               response_total_size, status, is_error, user_claim, realm_claim, host,
                               request_content_type, response_content_type, user_agent,
-                              request_headers, response_headers, request_body, response_body, request_raw, response_raw)
+                              request_headers, response_headers, request_body, response_body, request_raw, response_raw, exception_type, exception_message)
                             VALUES(
                               :timestamp, :route_id, :route_uri, :gateway_request_id, :method, :path,
                               :duration, :request_body_size, :response_body_size,
                               :request_total_size, :response_total_size, :status, :is_error, :user_claim, :realm_claim,
                               :host, :request_content_type, :response_content_type, :user_agent,
                               :request_headers, :response_headers,
-                              :request_body, :response_body, :request_raw, :response_raw)""",
+                              :request_body, :response_body, :request_raw, :response_raw, :exception_type, :exception_message)""",
                     params
             );
             logger.debug("Finished inserting data into ClickHouse for request {} in {}", dataProvider.getRequestId(), stopwatch.elapsed());

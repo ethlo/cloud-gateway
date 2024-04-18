@@ -3,6 +3,7 @@ package com.ethlo.http.netty;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 import org.reactivestreams.Publisher;
@@ -14,8 +15,12 @@ import org.springframework.cloud.gateway.route.Route;
 import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
 import org.springframework.core.Ordered;
 import org.springframework.data.util.Pair;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
+import org.springframework.web.ErrorResponseException;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.server.ServerWebExchange;
 
 import com.ethlo.http.logger.delegate.SequentialDelegateLogger;
@@ -29,8 +34,8 @@ import reactor.core.scheduler.Scheduler;
 
 public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
 {
-    public static final String LOG_CAPTURE_CONFIG_ATTRIBUTE_NAME = "log_capture_config";
-
+    public static final String LOG_CAPTURE_CONFIG_ATTRIBUTE_NAME = TagRequestIdGlobalFilter.class.getName() + ".captureConfig";
+    private static final String EXCEPTION_ATTRIBUTE_NAME = TagRequestIdGlobalFilter.class.getName() + ".exception";
     private static final Logger logger = LoggerFactory.getLogger(TagRequestIdGlobalFilter.class);
 
     private final SequentialDelegateLogger httpLogger;
@@ -48,6 +53,7 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
         this.ioScheduler = ioScheduler;
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public @Nonnull Mono<Void> filter(@Nonnull ServerWebExchange exchange, GatewayFilterChain chain)
     {
@@ -65,22 +71,39 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
         logger.debug("Tagging request {}: {}", requestId, predicateConfig);
         exchange.getAttributes().put(TagRequestIdGlobalFilter.LOG_CAPTURE_CONFIG_ATTRIBUTE_NAME, predicateConfig);
         return chain.filter(exchange)
+                .doOnError(exc -> exchange.getAttributes().put(TagRequestIdGlobalFilter.EXCEPTION_ATTRIBUTE_NAME, exc))
                 .doFinally(signalType ->
-                        ioScheduler.schedule(() ->
-                                saveDataAndCleanupIfApplicable(exchange, predicateConfig, requestId, started).join()));
+                {
+                    final Throwable exception = Optional.ofNullable((Throwable) exchange.getAttribute(TagRequestIdGlobalFilter.EXCEPTION_ATTRIBUTE_NAME))
+                            .or(() -> Optional.ofNullable(exchange.getAttribute(ServerWebExchangeUtils.CIRCUITBREAKER_EXECUTION_EXCEPTION_ATTR)))
+                            .orElse(null);
+
+                    ioScheduler.schedule(() -> saveDataAndCleanupIfApplicable(exchange, predicateConfig, requestId, started, exception).join());
+                });
     }
 
-    private CompletableFuture<AccessLogResult> saveDataAndCleanupIfApplicable(ServerWebExchange exchange, PredicateConfig predicateConfig, String requestId, long started)
+    private CompletableFuture<AccessLogResult> saveDataAndCleanupIfApplicable(ServerWebExchange exchange, PredicateConfig predicateConfig, String requestId, long started, final Throwable exc)
     {
-        final CompletableFuture<AccessLogResult> result = saveDataUsingProviders(exchange, requestId, predicateConfig, Duration.ofNanos(System.nanoTime() - started));
-        return result.whenComplete((logResult, exc) ->
+        final CompletableFuture<AccessLogResult> result = saveDataUsingProviders(exchange, requestId, predicateConfig, Duration.ofNanos(System.nanoTime() - started), exc);
+        return result.whenComplete((logResult, loggerException) ->
         {
             dataBufferRepository.close(requestId);
-            if (logResult.isOk())
+
+            boolean cleaned = false;
+            if (loggerException != null)
             {
-                dataBufferRepository.cleanup(requestId);
+                logger.error("There was an error logging: {}", loggerException.getMessage(), loggerException);
             }
             else
+            {
+                if (logResult.isOk())
+                {
+                    dataBufferRepository.cleanup(requestId);
+                    cleaned = true;
+                }
+            }
+
+            if (!cleaned)
             {
                 final Pair<String, String> filenames = dataBufferRepository.getBufferFileNames(requestId);
                 logger.warn("There were problems storing data for request {}. The buffer files are left behind: {} {}. Details: {}", requestId, filenames.getFirst(), filenames.getSecond(), logResult.getProcessingErrors());
@@ -88,11 +111,12 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
         });
     }
 
-    private CompletableFuture<AccessLogResult> saveDataUsingProviders(ServerWebExchange exchange, String requestId, final PredicateConfig predicateConfig, final Duration duration)
+    private CompletableFuture<AccessLogResult> saveDataUsingProviders(ServerWebExchange exchange, String requestId, final PredicateConfig predicateConfig, final Duration duration, final Throwable exception)
     {
         final ServerHttpRequest req = exchange.getRequest();
         final ServerHttpResponse res = exchange.getResponse();
         final Route route = exchange.getAttribute(ServerWebExchangeUtils.GATEWAY_ROUTE_ATTR);
+        final HttpStatusCode httpStatusCode = determineStatusCode(exception, exchange.getResponse().getStatusCode());
 
         logger.debug("Completed request {} in {}: {}", requestId, duration, predicateConfig);
 
@@ -102,7 +126,8 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
                 .method(req.getMethod())
                 .path(req.getPath())
                 .uri(req.getURI())
-                .statusCode(res.getStatusCode())
+                .exception(exception)
+                .statusCode(httpStatusCode)
                 .requestHeaders(req.getHeaders())
                 .responseHeaders(res.getHeaders())
                 .timestamp(OffsetDateTime.now())
@@ -115,9 +140,22 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
         return httpLogger.accessLog(processed);
     }
 
+    private HttpStatusCode determineStatusCode(final Throwable exc, final HttpStatusCode responseStatusCode)
+    {
+        if (exc != null)
+        {
+            return Optional.of(exc)
+                    .filter(e -> ResponseStatusException.class.isAssignableFrom(e.getClass()))
+                    .map(ResponseStatusException.class::cast)
+                    .map(ErrorResponseException::getStatusCode)
+                    .orElse(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+        return responseStatusCode;
+    }
+
     @Override
     public int getOrder()
     {
-        return Integer.MIN_VALUE;
+        return Ordered.HIGHEST_PRECEDENCE;
     }
 }

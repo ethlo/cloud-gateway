@@ -62,11 +62,20 @@ public class CircuitBreakerHandler implements HandlerFunction<ServerResponse>
 
         final Optional<PredicateConfig> config = ContextUtil.getLoggingConfig(serverRequest);
         logger.debug("Reading logging config: {}", config.orElse(null));
+
+        final Mono<ServerResponse> response = ServerResponse.status(504).build();
+
         return config
-                .filter(predicateConfig -> predicateConfig.request().mustBuffer())
-                .map(p -> saveIncomingRequest(serverRequest))
-                .orElse(ServerResponse.status(504)
-                        .build());
+                .map(p ->
+                {
+                    if (p.request().mustBuffer())
+                    {
+                        return saveIncomingRequest(serverRequest)
+                                .then(response);
+                    }
+                    return response;
+                })
+                .orElse(response);
     }
 
     private Mono<ServerResponse> saveIncomingRequest(ServerRequest serverRequest)
@@ -76,8 +85,8 @@ public class CircuitBreakerHandler implements HandlerFunction<ServerResponse>
         final HttpMethod method = request.getMethod();
 
         final ByteBuffer fakeRequestLine = ByteBuffer.wrap((method.name() + " / HTTP/1.1\r\n").getBytes(StandardCharsets.UTF_8));
-        dataBufferRepository.write(ServerDirection.REQUEST, requestId, fakeRequestLine);
-        dataBufferRepository.write(ServerDirection.REQUEST, requestId, extractHeaders(request));
+        dataBufferRepository.write(ServerDirection.REQUEST, requestId, fakeRequestLine).join();
+        dataBufferRepository.write(ServerDirection.REQUEST, requestId, extractHeaders(request)).join();
 
         return serverRequest.exchange().getRequest().getBody()
                 .publishOn(Schedulers.boundedElastic())
@@ -87,7 +96,7 @@ public class CircuitBreakerHandler implements HandlerFunction<ServerResponse>
 
     private Mono<Long> saveDataChunk(String requestId, DataBuffer dataBuffer)
     {
-        try (final DataBuffer.ByteBufferIterator iter = dataBuffer.readableByteBuffers();)
+        try (final DataBuffer.ByteBufferIterator iter = dataBuffer.readableByteBuffers())
         {
             long written = 0;
             while (iter.hasNext())
