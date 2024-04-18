@@ -88,11 +88,22 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
         return result.whenComplete((logResult, loggerException) ->
         {
             dataBufferRepository.close(requestId);
-            if (logResult.isOk())
+
+            boolean cleaned = false;
+            if (loggerException != null)
             {
-                dataBufferRepository.cleanup(requestId);
+                logger.error("There was an error logging: {}", loggerException.getMessage(), loggerException);
             }
             else
+            {
+                if (logResult.isOk())
+                {
+                    dataBufferRepository.cleanup(requestId);
+                    cleaned = true;
+                }
+            }
+
+            if (!cleaned)
             {
                 final Pair<String, String> filenames = dataBufferRepository.getBufferFileNames(requestId);
                 logger.warn("There were problems storing data for request {}. The buffer files are left behind: {} {}. Details: {}", requestId, filenames.getFirst(), filenames.getSecond(), logResult.getProcessingErrors());

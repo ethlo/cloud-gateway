@@ -62,24 +62,20 @@ public class CircuitBreakerHandler implements HandlerFunction<ServerResponse>
 
         final Optional<PredicateConfig> config = ContextUtil.getLoggingConfig(serverRequest);
         logger.debug("Reading logging config: {}", config.orElse(null));
+
+        final Mono<ServerResponse> response = ServerResponse.status(504).build();
+
         return config
                 .map(p ->
                 {
                     if (p.request().mustBuffer())
                     {
                         return saveIncomingRequest(serverRequest)
-                                .then(buildResponse(exc.orElse(null)));
+                                .then(response);
                     }
-                    return buildResponse(exc.orElse(null));
+                    return response;
                 })
-                .orElse(buildResponse(exc.orElse(null)));
-    }
-
-    private Mono<ServerResponse> buildResponse(final Exception e)
-    {
-        return ServerResponse
-                .status(504)
-                .build();
+                .orElse(response);
     }
 
     private Mono<ServerResponse> saveIncomingRequest(ServerRequest serverRequest)
@@ -100,7 +96,7 @@ public class CircuitBreakerHandler implements HandlerFunction<ServerResponse>
 
     private Mono<Long> saveDataChunk(String requestId, DataBuffer dataBuffer)
     {
-        try (final DataBuffer.ByteBufferIterator iter = dataBuffer.readableByteBuffers();)
+        try (final DataBuffer.ByteBufferIterator iter = dataBuffer.readableByteBuffers())
         {
             long written = 0;
             while (iter.hasNext())

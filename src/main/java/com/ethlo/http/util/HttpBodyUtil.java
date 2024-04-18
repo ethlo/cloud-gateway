@@ -13,6 +13,8 @@ import com.ethlo.http.netty.ServerDirection;
 import rawhttp.core.HttpMessage;
 import rawhttp.core.RawHttp;
 import rawhttp.core.RawHttpOptions;
+import rawhttp.core.errors.InvalidHttpRequest;
+import rawhttp.core.errors.InvalidHttpResponse;
 
 public class HttpBodyUtil
 {
@@ -28,6 +30,10 @@ public class HttpBodyUtil
         catch (IOException exc)
         {
             throw new UncheckedIOException(exc);
+        }
+        catch (InvalidHttpRequest | InvalidHttpResponse exc)
+        {
+            throw new BodyDecodeException(exc.getMessage(), new IOException(exc));
         }
 
         if (message.getBody().isPresent())
