@@ -105,6 +105,8 @@ public class ClickHouseLogger implements HttpLogger
         dataProvider.getRequestHeaders().remove(HttpHeaders.USER_AGENT);
         dataProvider.getRequestHeaders().remove(HttpHeaders.CONTENT_TYPE);
 
+        params.put("exception_type", null);
+        params.put("exception_message", null);
         dataProvider.getException().ifPresent(exc ->
         {
             params.put("exception_type", exc.getClass().getName());
