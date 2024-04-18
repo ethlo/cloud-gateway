@@ -224,8 +224,8 @@ public class WebExchangeDataProvider
         return this;
     }
 
-    public Throwable getException()
+    public Optional<Throwable> getException()
     {
-        return exception;
+        return Optional.ofNullable(exception);
     }
 }
