@@ -11,6 +11,8 @@ import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
 import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
@@ -31,6 +33,8 @@ import jakarta.validation.constraints.NotNull;
 @Component
 public class TemplateRedirectGatewayFilterFactory extends AbstractGatewayFilterFactory<TemplateRedirectGatewayFilterFactory.Config>
 {
+    private static final Logger logger = LoggerFactory.getLogger(TemplateRedirectGatewayFilterFactory.class);
+
     public TemplateRedirectGatewayFilterFactory()
     {
         super(Config.class);
@@ -46,6 +50,7 @@ public class TemplateRedirectGatewayFilterFactory extends AbstractGatewayFilterF
                 final Optional<URI> match = determineRequestUri(exchange, config);
                 if (match.isPresent())
                 {
+                    logger.debug("Matched '{}' redirecting with {} to '{}'", config.source.pattern(), config.status, match.get());
                     exchange.getResponse().setStatusCode(config.status);
                     exchange.getResponse().getHeaders().add(HttpHeaders.LOCATION, match.get().toString());
                     ServerWebExchangeUtils.setAlreadyRouted(exchange);
