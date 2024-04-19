@@ -66,4 +66,9 @@ public class PebbleRenderer
         engine.getTemplate(template).evaluate(sw, data, locale);
         return sw.toString();
     }
+
+    public PebbleTemplate compile(String templateContent)
+    {
+        return engine.getLiteralTemplate(templateContent);
+    }
 }
