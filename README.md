@@ -29,7 +29,7 @@ the dashboard by picking the dashboard named `HTTP traffic` from the left-hand m
 
 ## Logging
 
-One of the strong points of this project is the logging and ability to viev and analyze traffic. Below is a quick guide
+One of the strong points of this project is the logging and ability to view and analyze traffic. Below is a quick guide
 to configuring logging.
 
 ### Logging providers
@@ -50,8 +50,6 @@ http-logging:
 
 NOTE: The file log appender can be configured with the logger name `access_log`.
 
-## Special features
-
 ### Logging of request body when upstream server is down
 
 Normally the request is not (fully) consumed by the load balancer/reverse-proxy/gateway, thus the request contents are
@@ -63,7 +61,7 @@ spring:
     gateway:
       routes:
         - id: my-upstream-is-down
-          uri: ${rewrite.backend.uri:http://my-service1}
+          uri: http://my-service1
           predicates:
             - Path=/my-service
           filters:
@@ -74,6 +72,26 @@ spring:
 ```
 
 ## Custom filters
+
+
+### RedirectTemplate
+It supports regexp named parameters, otherwise you can also use numeric variables like `{{1}}` and `{{2}}`. You also have access to query paramters via `query`
+
+Example shorthand:
+```yaml
+  filters:
+    - TemplateRedirect=/foo/(?<var1>.*)/21/(?<var2>.*),https://example.com/{{var2}}?={{var1}},302
+```
+
+Example full:
+```yaml
+  filters:
+    - name: TemplateRedirect
+      source: /foo/(?<var1>.*)/21/(?<var2>.*)
+      target: https://example.com/{{var2}}?={{var1}}
+      status: 301 # default is 302
+```
+
 
 ### InjectBasicAuth
 Allows the injection of basic auth credentials before forwarding the request upstream
@@ -86,31 +104,39 @@ filters:
     password: ${SECRET_PASSWORD}
 ```
 
+## Custom predicates
+
 ### NotPath
-The opposite of `Path`
+Negated version of [Path](https://cloud.spring.io/spring-cloud-gateway/multi/multi_gateway-request-predicates-factories.html#_path_route_predicate_factory).
+
+```yaml
+- NotPath=/secret
+```
+
+### NotMethod
+Negated version of [Method](https://cloud.spring.io/spring-cloud-gateway/multi/multi_gateway-request-predicates-factories.html#_method_route_predicate_factory).
+```yaml
+- NotMethod=GET
+```
 
 ### NotHost
-The opposite of `Host`
+Negated version of [Host](https://cloud.spring.io/spring-cloud-gateway/multi/multi_gateway-request-predicates-factories.html#_host_route_predicate_factory).
+
+```yaml
+- NotHost=sub.example.com
+```
 
 ### NotExtension
 Without any listed extension, it will skip all URLs ending with an extension.
 
-### RedirectTemplate
-It supports regexp named parameters, otherwise you can also use numeric variables like `{{1}}` and `{{2}}`. You also have access to query paramters via `query`
-
-Example shorthand:
+Example config for not logging anything with an extension (like `file.js`, `file.css`, etc.):
 ```yaml
-  filters:
-    - TemplateRedirect=/foo/(?<var1>.*)/21/(?<var2>.*),https://example.com/{{var2}}?={{var1}}
+- NotExtension=
 ```
 
-Example full:
+Example config fo skipping specific extensions. Other extensions like `file.zip` would still be let through:
 ```yaml
-  filters:
-    - name: TemplateRedirect
-      source: /foo/(?<var1>.*)/21/(?<var2>.*)
-      target: https://example.com/{{var2}}?={{var1}}
-      status: 302 # default is 302
+- NotExtension=html,css,js
 ```
 
 ## References
