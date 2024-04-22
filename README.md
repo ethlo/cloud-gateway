@@ -50,37 +50,6 @@ http-logging:
 
 NOTE: The file log appender can be configured with the logger name `access_log`.
 
-### Capture configuration
-
-The requests can be conditionally logged based on numerous properties of the request. The capturing is happening
-straight from the bytebuffers in Netty, and is attempted to be done in a manner that incurs minimum overhead.
-The `memory-buffer-size` defines how large the request or response can be before it is buffered to file.
-
-```yaml
-http-logging:
-  capture:
-    memory-buffer-size: 500KB
-    temp-directory: /tmp
-  matchers:
-    - includes:
-        - uris:
-            - path: /my-service
-          methods:
-            - GET
-            - POST
-      log-request-body: true
-      log-response-body: true
-    - includes:
-        - uris:
-            - path: /my-other-service
-      log-request-body: true
-      log-response-body: false # default is also false for request/response body logging
-```
-
-NOTE: Keep in mind that the request and response body logging may be invaluable for debugging and auditing, it also
-potentially affects the performance negatively, as this will require additional resources for both processing and
-storage.
-
 ## Special features
 
 ### Logging of request body when upstream server is down
@@ -102,6 +71,46 @@ spring:
               args:
                 name: upstream-down
                 fallbackUri: forward:/upstream-down
+```
+
+## Custom filters
+
+### InjectBasicAuth
+Allows the injection of basic auth credentials before forwarding the request upstream
+
+```yaml
+filters:
+- name: InjectBasicAuth
+  args:
+    username: ${SECRET_USERNAME}
+    password: ${SECRET_PASSWORD}
+```
+
+### NotPath
+The opposite of `Path`
+
+### NotHost
+The opposite of `Host`
+
+### NotExtension
+Without any listed extension, it will skip all URLs ending with an extension.
+
+### RedirectTemplate
+It supports regexp named parameters, otherwise you can also use numeric variables like `{{1}}` and `{{2}}`. You also have access to query paramters via `query`
+
+Example shorthand:
+```yaml
+  filters:
+    - TemplateRedirect=/foo/(?<var1>.*)/21/(?<var2>.*),https://example.com/{{var2}}?={{var1}}
+```
+
+Example full:
+```yaml
+  filters:
+    - name: TemplateRedirect
+      source: /foo/(?<var1>.*)/21/(?<var2>.*)
+      target: https://example.com/{{var2}}?={{var1}}
+      status: 302 # default is 302
 ```
 
 ## References
