@@ -74,7 +74,7 @@ spring:
 ## Custom filters
 
 
-### RedirectTemplate
+### TemplateRedirect
 It supports regexp named parameters, otherwise you can also use numeric variables like `{{1}}` and `{{2}}`. You also have access to query paramters via `query`
 
 Example shorthand:
