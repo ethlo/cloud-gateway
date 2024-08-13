@@ -74,6 +74,12 @@ spring:
 ## Running behind a reverse-proxy or WAF
 In the case of the Cloud Gateway instance being behind a load-balancer/reverse-proxy/web application firewall, we need to configure Cloud gateway to be aware of that fact. Luckily, Spring Boot configuration gives us direct access to configure this: https://docs.spring.io/spring-boot/how-to/webserver.html#howto.webserver.use-behind-a-proxy-server
 
+TLDR;
+```
+server:
+  forward-headers-strategy: NATIVE
+```
+
 ## Custom filters
 
 
