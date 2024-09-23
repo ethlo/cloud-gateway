@@ -201,7 +201,7 @@ public class ClickHouseLogger implements HttpLogger
     private Map<String, Object> flattenMap(HttpHeaders headers)
     {
         final Map<String, Object> result = new LinkedHashMap<>();
-        headers.forEach((name, list) -> result.put(name, list.size() > 1 ? list : list.get(0)));
+        headers.forEach((name, list) -> result.put(name, list.size() > 1 ? list : list.getFirst()));
         return result;
     }
 
