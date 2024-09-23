@@ -5,12 +5,12 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.2.3</version>
+        <version>3.3.4</version>
         <relativePath/>
     </parent>
     <groupId>com.ethlo.http</groupId>
     <artifactId>reverse-proxy</artifactId>
-    <version>1.4.0</version>
+    <version>1.4.1-SNAPSHOT</version>
     <name>reverse-proxy</name>
     <description>Spring Cloud Gateway powered reverse proxy</description>
     <properties>
@@ -28,7 +28,7 @@
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-circuitbreaker-reactor-resilience4j</artifactId>
-            <version>3.1.0</version>
+            <version>3.1.1</version>
         </dependency>
         <dependency>
             <groupId>io.pebbletemplates</groupId>
@@ -96,18 +96,14 @@
             <artifactId>logback-classic</artifactId>
         </dependency>
         <dependency>
-            <groupId>ch.qos.logback</groupId>
-            <artifactId>logback-access</artifactId>
-        </dependency>
-        <dependency>
             <groupId>net.logstash.logback</groupId>
             <artifactId>logstash-logback-encoder</artifactId>
-            <version>7.3</version>
+            <version>7.4</version>
         </dependency>
         <dependency>
             <groupId>com.ethlo.time</groupId>
             <artifactId>itu</artifactId>
-            <version>1.10.1</version>
+            <version>1.10.2</version>
         </dependency>
         <dependency>
             <groupId>com.auth0</groupId>
