@@ -28,18 +28,13 @@ http-logging:
       request:
         raw: STORE
         body: STORE
-        headers:
-          exclude:
-          - Content-Type
-          - Authorization
-
       response:
         body: STORE
         raw: STORE
 logging:
   level:
-    com.ethlo.http: DEBUG
-    org.springframework.cloud.gateway: DEBUG
+    com.ethlo.http: INFO
+    org.springframework.cloud.gateway: INFO
     com.ethlo.qjc: INFO
 management:
   endpoints:
@@ -63,19 +58,45 @@ spring:
             enabled: true
         enabled: true
       routes:
-        - id: holzweiler-1
-          uri: http://foo,http://bar
+        - id: dynamic-hosts
+          uri: http://default
           predicates:
-            - Path=/01/**
+            - Path=/hosts/**
           filters:
-            - TemplateRedirect=/01/(?<gtin>.*)/21/(?<serial>.*),https://qr.holzweiler.no/?uid={{serial}}
-        - id: holzweiler-2
-          uri: http://baz
+            - PathHost=1
+        - id: http-bin-delay
+          uri: https://httpbin.org/delay
           predicates:
-            - Query=serial
-            - Path=/
+            - Path=/delay/**
+        - id: http-bin-get
+          uri: https://httpbin.org/get
+          predicates:
+            - Path=/get
           filters:
-            - TemplateRedirect=/,/?uid={{query.serial[0]}}
+            - name: InjectBasicAuth
+              args:
+                username: foo
+                password: bar
+            - SetRequestHeader=x-realm,baz
+        - id: http-bin-anything
+          uri: https://httpbin.org/anything
+          predicates:
+            - Path=/anything
+          filters:
+            - name: RequestRateLimiter
+              args:
+                local-rate-limiter:
+                  replenish-rate: 2
+                  refresh-period: 10
+        - id: http-upstream-missing
+          uri: http://192.0.0.255
+          predicates:
+            - Path=/504
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: upstream-down
+                fallbackUri: 'forward:/upstream-down'
   web:
     resources:
       static-locations:
