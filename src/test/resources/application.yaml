@@ -22,9 +22,15 @@ http-logging:
       predicates:
         - Path=/**
       request:
+        headers:
+          includes:
+            - Content-Type
         body: STORE
         raw: STORE
       response:
+        headers:
+          includes:
+            - foo
         body: STORE
         raw: STORE
 logging:

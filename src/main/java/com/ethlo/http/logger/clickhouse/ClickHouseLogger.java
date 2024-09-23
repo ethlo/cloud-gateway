@@ -1,6 +1,8 @@
 package com.ethlo.http.logger.clickhouse;
 
 import static com.ethlo.http.match.LogOptions.ContentProcessing.STORE;
+import static com.ethlo.http.netty.ServerDirection.REQUEST;
+import static com.ethlo.http.netty.ServerDirection.RESPONSE;
 
 import java.io.ByteArrayInputStream;
 import java.util.LinkedHashMap;
@@ -99,11 +101,21 @@ public class ClickHouseLogger implements HttpLogger
         dataProvider.requestHeaders(HttpHeaders.writableHttpHeaders(dataProvider.getRequestHeaders()));
         dataProvider.responseHeaders(HttpHeaders.writableHttpHeaders(dataProvider.getResponseHeaders()));
 
-        // Remove headers already captured in dedicated columns
-        dataProvider.getRequestHeaders().remove(HttpHeaders.HOST);
-        dataProvider.getRequestHeaders().remove(HttpHeaders.AUTHORIZATION);
-        dataProvider.getRequestHeaders().remove(HttpHeaders.USER_AGENT);
-        dataProvider.getRequestHeaders().remove(HttpHeaders.CONTENT_TYPE);
+        // Remove headers already captured in dedicated columns or otherwise processed
+        final HttpHeaders requestHeaders = dataProvider.getRequestHeaders();
+        removeHeader(REQUEST, requestHeaders, HttpHeaders.HOST);
+        removeHeader(REQUEST, requestHeaders, HttpHeaders.AUTHORIZATION);
+        removeHeader(REQUEST, requestHeaders, HttpHeaders.USER_AGENT);
+        removeHeader(REQUEST, requestHeaders, HttpHeaders.CONTENT_TYPE);
+
+        // Remove headers that are not requested for logging
+        for (final String headerName : requestHeaders.keySet())
+        {
+            if (!predicateConfig.request().headers().test(headerName))
+            {
+                removeHeader(REQUEST, requestHeaders, headerName);
+            }
+        }
 
         params.put("exception_type", null);
         params.put("exception_message", null);
@@ -123,12 +135,23 @@ public class ClickHouseLogger implements HttpLogger
         params.put("response_body_size", null);
         params.put("response_total_size", null);
 
-        params.put("request_headers", flattenMap(dataProvider.getRequestHeaders()));
-        params.put("response_headers", flattenMap(dataProvider.getResponseHeaders()));
+        final HttpHeaders responseHeaders = dataProvider.getResponseHeaders();
+
+        // Remove headers that are not requested for logging
+        for (final String headerName : responseHeaders.keySet())
+        {
+            if (!predicateConfig.response().headers().test(headerName))
+            {
+                removeHeader(RESPONSE, responseHeaders, headerName);
+            }
+        }
+
+        params.put("request_headers", flattenMap(requestHeaders));
+        params.put("response_headers", flattenMap(responseHeaders));
 
         return AsyncUtil.join(List.of(
-                        processContent(predicateConfig.request(), dataProvider.getRawRequest().orElse(null), ServerDirection.REQUEST, params),
-                        processContent(predicateConfig.request(), dataProvider.getRawResponse().orElse(null), ServerDirection.RESPONSE, params)
+                        processContent(predicateConfig.request(), dataProvider.getRawRequest().orElse(null), REQUEST, params),
+                        processContent(predicateConfig.request(), dataProvider.getRawResponse().orElse(null), RESPONSE, params)
                 )
         ).thenApply(res ->
         {
@@ -136,9 +159,8 @@ public class ClickHouseLogger implements HttpLogger
             logger.debug("Inserting data into ClickHouse for request {}: {}", dataProvider.getRequestId(), params);
             final Stopwatch stopwatch = Stopwatch.createStarted();
 
-            tpl.update("""
-                                                
-                                INSERT INTO log (
+            tpl.update("""                    
+                            INSERT INTO log (
                               timestamp, route_id, route_uri, gateway_request_id, method, path,
                               response_time, request_body_size, response_body_size, request_total_size,
                               response_total_size, status, is_error, user_claim, realm_claim, host,
@@ -164,6 +186,16 @@ public class ClickHouseLogger implements HttpLogger
                 return AccessLogResult.error(predicateConfig, processingResult);
             }
         });
+    }
+
+    private void removeHeader(final ServerDirection direction, HttpHeaders headers, String headerName)
+    {
+        if(logger.isDebugEnabled())
+        {
+            logger.debug("Removing {} header {}", direction.name().toLowerCase(), headerName);
+        }
+
+        headers.remove(headerName);
     }
 
     private Map<String, Object> flattenMap(HttpHeaders headers)
