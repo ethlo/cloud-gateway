@@ -1,40 +1,58 @@
 package com.ethlo.http.match;
 
-import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.Predicate;
 
-public record HeaderPredicate(List<String> includes, List<String> excludes) implements Predicate<String>
+public record HeaderPredicate(Set<String> includes, Set<String> excludes) implements Predicate<String>
 {
-    public static final HeaderPredicate ALL = new HeaderPredicate(List.of(), List.of());
+    public static final HeaderPredicate ALL = new HeaderPredicate(Set.of(), Set.of());
+
+    public HeaderPredicate(Set<String> includes, Set<String> excludes)
+    {
+        this.includes = Optional.ofNullable(includes).orElse(Set.of());
+        this.excludes = Optional.ofNullable(excludes).orElse(Set.of());
+
+        for (String s : this.includes)
+        {
+            if (this.excludes.contains(s))
+            {
+                throw new IllegalArgumentException("Item '" + s + "' is in both includes and excludes set");
+            }
+        }
+    }
 
     @Override
     public boolean test(final String s)
     {
-        boolean match = includes == null || includes().isEmpty();
-        if (includes != null)
+        boolean match = includes().isEmpty();
+        for (String include : includes)
         {
-            for (String include : includes)
+            if (include.equalsIgnoreCase(s))
             {
-                if (include.equalsIgnoreCase(s))
-                {
-                    match = true;
-                    break;
-                }
+                match = true;
+                break;
             }
         }
 
-        if (excludes != null)
+        for (String exclude : excludes)
         {
-            for (String exclude : excludes)
+            if (exclude.equalsIgnoreCase(s))
             {
-                if (exclude.equalsIgnoreCase(s))
-                {
-                    match = false;
-                    break;
-                }
+                match = false;
+                break;
             }
         }
 
         return match;
     }
+
+    @Override
+    public String toString()
+    {
+        return "HeaderPredicate[" +
+                "includes=" + includes + ", " +
+                "excludes=" + excludes + ']';
+    }
+
 }
