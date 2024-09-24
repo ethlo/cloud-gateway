@@ -54,7 +54,8 @@ The properties `body` and `raw` refers to the HTTP body and the full, raw HTTP r
 * `SIZE` - Log the size.
 * `STORE` - Log the full data.
 
-[!WARNING] If storing the `raw` data, no sanitization is performed, and the data may contain sensitive information like access keys, usernames, passwords, etc.
+> [!WARNING] 
+> If storing the `raw` data, no sanitization is performed, and the data may contain sensitive information like access keys, usernames, passwords, etc.
 
 ### Logging providers
 
