@@ -32,10 +32,35 @@ the dashboard by picking the dashboard named `HTTP traffic` from the left-hand m
 One of the strong points of this project is the logging and ability to view and analyze traffic. Below is a quick guide
 to configuring logging.
 
+```yaml
+http-logging:
+  matchers:
+    - id: API writes
+      predicates:
+        - Path=/**
+        - NotMethod=GET
+      request:
+        headers:
+          excludes:
+            - X-My-App-Key
+            - Session
+        body: STORE
+        raw: SIZE
+```
+
+The `headers` section support both `includes` and `excludes`.
+The properties `body` and `raw` refers to the HTTP body and the full, raw HTTP request (both headers and body). The allowed values are:
+* `NONE` - No logging (default).
+* `SIZE` - Log the size.
+* `STORE` - Log the full data.
+
+IMPORTANT: If storing the `raw` data, no sanitization is performed, and the data may contain sensitive information like access keys, usernames, passwords, etc.
+
 ### Logging providers
 
-* File - log to file via template-pattern for ease of setup.
-* ClickHouse - Log to a clickhouse table for powerful and easy analysis.
+#### File
+
+Log to file via template-pattern for ease of setup.
 
 ```yaml
 http-logging:
@@ -43,16 +68,24 @@ http-logging:
     file:
       enabled: true
       pattern: '{{gateway_request_id}} {{method}} {{path}} {{request_headers["Content-Length"][0]}} {{status}}'
+```
+
+
+NOTE: The file log appender can be configured with the logger name `access_log`.
+#### ClickHouse
+Log to a clickhouse table for powerful and easy analysis.
+
+```yaml
+http-logging:
+  provider:
     clickhouse:
       enabled: true
       url: jdbc:ch://localhost:18123?database=default&async_insert=1,wait_for_async_insert=0
 ```
 
-NOTE: The file log appender can be configured with the logger name `access_log`.
-
 ### Logging of request body when upstream server is down
 
-Normally the request is not (fully) consumed by the load balancer/reverse-proxy/gateway, thus the request contents are
+Normally the request is not (fully) consumed by the load balancer/reverse-proxy/gateway if there is nothing upstream to read the request, thus the request contents are
 lost. The request can still be captured by configuring a fallback for the route, as described below:
 
 ```yaml
