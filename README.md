@@ -9,8 +9,8 @@ A Docker-packaged reverse proxy built on top of Spring Cloud Gateway with full r
 In the `docker` folder there is a `docker-compose.yaml` example that brings up Grafana on port `3000`, and the gateway
 on port `6464`.
 
-NOTE: For more information on how to configure, se the sections below. The main config file is
-in `config/application.yaml`
+> [!NOTE] 
+> For more information on how to configure, se the sections below. The main config file is in `config/application.yaml`
 
 Starting the services:
 
@@ -48,8 +48,21 @@ http-logging:
         raw: SIZE
 ```
 
-The `headers` section support both `includes` and `excludes`.
-The properties `body` and `raw` refers to the HTTP body and the full, raw HTTP request (both headers and body). The allowed values are:
+### Headers
+
+The `headers` section support lists of both `includes` and `excludes`. By default, all headers are included except for `Authorization`.
+
+### Body
+`body` refers to the decoded HTTP body.
+
+* `NONE` - No logging (default).
+* `SIZE` - Log the size.
+* `STORE` - Log the full data.
+
+
+### Raw
+`raw` refers to the full, raw HTTP request (both headers and body). The body is not decoded.
+
 * `NONE` - No logging (default).
 * `SIZE` - Log the size.
 * `STORE` - Log the full data.
@@ -72,7 +85,14 @@ http-logging:
 ```
 
 
-[!NOTE]: The file log appender can be configured with the logger name `access_log`.
+The file log appender can be configured with the logger name `access_log`. I.e. in the `application.yaml`:
+```yaml
+logging:
+  level:
+    access-log: INFO
+```
+For more information and options, please see https://docs.spring.io/spring-boot/how-to/logging.html#howto.logging.logback
+
 #### ClickHouse
 Log to a clickhouse table for powerful and easy analysis.
 
