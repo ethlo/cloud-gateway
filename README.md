@@ -1,38 +1,66 @@
 # Cloud Gateway
 
-A Docker-packaged reverse proxy built on top of Spring Cloud Gateway with full request/response (including body) logging.
+Cloud Gateway is a Docker-packaged reverse proxy built on Spring Cloud Gateway, offering full request/response logging, including body content. It integrates with Grafana for traffic monitoring.
 
-## Trying it out
+## Features
+
+*   Reverse proxy built on Spring Cloud Gateway.
+*   Full HTTP request/response logging, including headers and body.
+*   Dockerized deployment with Grafana for real-time monitoring.
 
 <img src="doc/basic_dashboard.png" alt= "Simple overview dashboard">
 
-In the `docker` folder there is a `docker-compose.yaml` example that brings up Grafana on port `3000`, and the gateway
-on port `6464`.
+## Getting Started
 
-> [!NOTE] 
-> For more information on how to configure, se the sections below. The main config file is in `config/application.yaml`
+### Prerequisites
 
-Starting the services:
+*   [Docker](https://www.docker.com/) installed.
+*   `docker-compose` file provided in the `/docker` folder.
 
-```shell
-docker-compose up -d
+### Installation
+
+1.  **Clone the repository**:
+
+    ```
+    git clone https://github.com/ethlo/cloud-gateway.git
+    cd cloud-gateway/docker
+    ```
+
+2.  **Start the services**:
+
+    ```
+    docker-compose up -d
+    ```
+
+3.  **Generate traffic**:
+
+    ```
+    curl -uuser:pass http://localhost:6464/get
+    ```
+
+4.  **View results in Grafana**:
+
+    Access Grafana at [http://localhost:3000](http://localhost:3000).
+
+    *   **Username**: `admin`
+    *   **Password**: `grafana`
+
+    Select the dashboard named `HTTP traffic` from the left-hand menu to view traffic data.
+
+
+## Configuration
+
+### Main Configuration
+
+The main configuration file is located in `config/application.yaml`.
+
+### Logging Configuration
+
+Cloud Gateway supports powerful and flexible logging configurations. Below is a sample configuration:
+
+#### Basic Example:
+
 ```
-
-Generate some traffic:
-
-```shell
-curl -uuser:pass http://localhost:6464/get
-```
-
-View the results in Grafana by going to http://localhost:3000/. The default username/password is `admin`/`grafana`. Show
-the dashboard by picking the dashboard named `HTTP traffic` from the left-hand menu.
-
-## Logging
-
-One of the strong points of this project is the logging and ability to view and analyze traffic. Below is a quick guide
-to configuring logging.
-
-```yaml
 http-logging:
   matchers:
     - id: API writes
@@ -48,35 +76,34 @@ http-logging:
         raw: SIZE
 ```
 
-### Headers
+#### Header Logging Options
 
-The `headers` section support lists of both `includes` and `excludes`. By default, all headers are included except for `Authorization`.
+*   Configure lists of headers using `includes` and `excludes`.
+*   By default, all headers are included except for `Authorization`.
 
-### Body
-`body` refers to the decoded HTTP body.
+#### Body Logging Options
 
-* `NONE` - No logging (default).
-* `SIZE` - Log the size.
-* `STORE` - Log the full data.
+*   `NONE`: No logging (default).
+*   `SIZE`: Logs the body size.
+*   `STORE`: Logs the full body content.
 
+#### Raw Data Logging Options
 
-### Raw
-`raw` refers to the full, raw HTTP request (both headers and body). The body is not decoded.
+*   `NONE`: No logging (default).
+*   `SIZE`: Logs the request size.
+*   `STORE`: Logs the full raw request, including headers and body.
 
-* `NONE` - No logging (default).
-* `SIZE` - Log the size.
-* `STORE` - Log the full data.
+**Warning**: Storing raw data may include sensitive information such as usernames, passwords, and API keys.
 
-> [!WARNING] 
-> If storing the `raw` data, no sanitization is performed, and the data may contain sensitive information like access keys, usernames, passwords, etc.
+For more details on logging in Spring Boot, see the [official Spring documentation](https://docs.spring.io/spring-boot/how-to/logging.html#howto.logging.logback).
 
-### Logging providers
+### Logging Providers
 
-#### File
+#### File-Based Logging
 
-Log to file via template-pattern for ease of setup.
+Log requests to a file using a customizable template pattern:
 
-```yaml
+```
 http-logging:
   provider:
     file:
@@ -84,19 +111,11 @@ http-logging:
       pattern: '{{gateway_request_id}} {{method}} {{path}} {{request_headers["Content-Length"][0]}} {{status}}'
 ```
 
+#### ClickHouse Logging
 
-The file log appender can be configured with the logger name `access_log`. I.e. in the `application.yaml`:
-```yaml
-logging:
-  level:
-    access-log: INFO
+Log data to a ClickHouse table for detailed analysis:
+
 ```
-For more information and options, please see https://docs.spring.io/spring-boot/how-to/logging.html#howto.logging.logback
-
-#### ClickHouse
-Log to a clickhouse table for powerful and easy analysis.
-
-```yaml
 http-logging:
   provider:
     clickhouse:
@@ -104,12 +123,11 @@ http-logging:
       url: jdbc:ch://localhost:18123?database=default&async_insert=1,wait_for_async_insert=0
 ```
 
-### Logging of request body when upstream server is down
+### Handling Unprocessed Requests
 
-Normally the request is not (fully) consumed by the load balancer/reverse-proxy/gateway if there is nothing upstream to read the request, thus the request contents are
-lost. The request can still be captured by configuring a fallback for the route, as described below:
+If the upstream server is down, the request contents may be lost. You can still capture the request by configuring a fallback:
 
-```yaml
+```
 spring:
   cloud:
     gateway:
@@ -125,14 +143,16 @@ spring:
                 fallbackUri: forward:/upstream-down
 ```
 
-## Running behind a reverse-proxy or WAF
-In the case of the Cloud Gateway instance being behind a load-balancer/reverse-proxy/web application firewall, we need to configure Cloud gateway to be aware of that fact. Luckily, Spring Boot configuration gives us direct access to configure this: https://docs.spring.io/spring-boot/how-to/webserver.html#howto.webserver.use-behind-a-proxy-server
+### Running Behind a Reverse Proxy or WAF
 
-TLDR;
+If Cloud Gateway is behind a load balancer or firewall, configure it to handle forwarded headers properly:
+
 ```
 server:
   forward-headers-strategy: NATIVE
 ```
+
+For more information, refer to the [Spring Boot documentation on using it behind a proxy server](https://docs.spring.io/spring-boot/how-to/webserver.html#howto.webserver.use-behind-a-proxy-server).
 
 ## Custom filters
 
@@ -202,14 +222,31 @@ Example config fo skipping specific extensions. Other extensions like `file.zip`
 - NotExtension=html,css,js
 ```
 
+
+## Monitoring with Grafana
+
+Grafana is set up to visualize traffic data logged by Cloud Gateway. Access Grafana at [http://localhost:3000](http://localhost:3000) and view the `HTTP traffic` dashboard to monitor real-time traffic.
+
 ## References
 
-* [Gateway](https://docs.spring.io/spring-cloud-gateway/docs/current/reference/html/)
-* [Cloud LoadBalancer](https://docs.spring.io/spring-cloud-commons/docs/current/reference/html/#spring-cloud-loadbalancer)
-* [Resilience4J](https://docs.spring.io/spring-cloud-circuitbreaker/docs/current/reference/html/#configuring-resilience4j-circuit-breakers)
-* [Spring Boot Actuator](https://docs.spring.io/spring-boot/docs/3.0.4/reference/htmlsingle/#actuator)
+For more detailed documentation, refer to:
+
+*   [Spring Cloud Gateway Reference](https://cloud.spring.io/spring-cloud-gateway/)
+*   [Spring Boot Documentation](https://docs.spring.io/spring-boot/docs/current/reference/html/)
+*   [Docker Documentation](https://docs.docker.com/)
 
 ## Guides
 
-* [Using Spring Cloud Gateway](https://github.com/spring-cloud-samples/spring-cloud-gateway-sample)
-* [Client-side load-balancing with Spring Cloud LoadBalancer](https://spring.io/guides/gs/spring-cloud-loadbalancer/)
+For practical use cases and guides on how to extend the functionalities of Cloud Gateway, you may refer to:
+
+*   [Building a microservices gateway](https://spring.io/guides/gs/gateway/)
+*   [Getting started with Spring Boot](https://spring.io/guides/gs/spring-boot/)
+*   [Monitor your services with Grafana](https://grafana.com/docs/grafana/latest/getting-started/getting-started-grafana/)
+
+## Contributing
+
+Contributions are welcome! Please submit issues or pull requests via the [GitHub repository](https://github.com/ethlo/cloud-gateway).
+
+## License
+
+This project is licensed under the Apache 2 License.
