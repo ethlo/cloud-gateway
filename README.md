@@ -54,7 +54,7 @@ The properties `body` and `raw` refers to the HTTP body and the full, raw HTTP r
 * `SIZE` - Log the size.
 * `STORE` - Log the full data.
 
-IMPORTANT: If storing the `raw` data, no sanitization is performed, and the data may contain sensitive information like access keys, usernames, passwords, etc.
+[!WARNING] If storing the `raw` data, no sanitization is performed, and the data may contain sensitive information like access keys, usernames, passwords, etc.
 
 ### Logging providers
 
@@ -71,7 +71,7 @@ http-logging:
 ```
 
 
-NOTE: The file log appender can be configured with the logger name `access_log`.
+[!NOTE]: The file log appender can be configured with the logger name `access_log`.
 #### ClickHouse
 Log to a clickhouse table for powerful and easy analysis.
 
