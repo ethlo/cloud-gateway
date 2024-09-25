@@ -45,7 +45,7 @@ public class JavaCompiledExpressionUtil
             final URL targetUrl = targetPath.toUri().toURL();
             try (final URLClassLoader classLoader = new URLClassLoader(new URL[]{targetUrl}, JavaCompiledExpressionUtil.class.getClassLoader()))
             {
-                final Compiler javaCompiler = new JavaCompiler();
+                final Compiler javaCompiler = new JavaCompiler(classLoader);
                 logger.debug("Class content: {}", classExpression);
                 Files.writeString(sourcePath.resolve(className + ".java"), classExpression);
                 javaCompiler.compile(Set.of(sourcePath), targetPath);

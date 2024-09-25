@@ -33,6 +33,12 @@ http-logging:
             - foo
         body: STORE
         raw: STORE
+  filter:
+    headers:
+      excludes:
+        - Authorization
+        - My-App-Key
+
 logging:
   level:
     com.ethlo.http: DEBUG

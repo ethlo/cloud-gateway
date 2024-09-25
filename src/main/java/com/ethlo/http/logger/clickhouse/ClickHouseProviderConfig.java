@@ -1,12 +1,7 @@
 package com.ethlo.http.logger.clickhouse;
 
-import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.cloud.context.config.annotation.RefreshScope;
-
 import com.ethlo.http.logger.BaseProviderConfig;
 
-@RefreshScope
-@ConfigurationProperties("http-logging.providers.clickhouse")
 public class ClickHouseProviderConfig extends BaseProviderConfig
 {
     private final String url;
