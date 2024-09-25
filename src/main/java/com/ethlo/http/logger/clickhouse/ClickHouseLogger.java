@@ -1,5 +1,7 @@
 package com.ethlo.http.logger.clickhouse;
 
+import static com.ethlo.http.match.HeaderProcessing.DELETE;
+import static com.ethlo.http.match.HeaderProcessing.REDACT;
 import static com.ethlo.http.match.LogOptions.ContentProcessing.STORE;
 import static com.ethlo.http.netty.ServerDirection.REQUEST;
 import static com.ethlo.http.netty.ServerDirection.RESPONSE;
@@ -19,6 +21,9 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
 import com.ethlo.http.BodyDecodeException;
 import com.ethlo.http.logger.HttpLogger;
+import com.ethlo.http.logger.LoggingFilterService;
+import com.ethlo.http.logger.RedactUtil;
+import com.ethlo.http.match.HeaderProcessing;
 import com.ethlo.http.match.LogOptions;
 import com.ethlo.http.model.AccessLogResult;
 import com.ethlo.http.model.BodyProvider;
@@ -33,10 +38,12 @@ import com.ethlo.http.util.IoUtil;
 public class ClickHouseLogger implements HttpLogger
 {
     private static final Logger logger = LoggerFactory.getLogger(ClickHouseLogger.class);
+    private final LoggingFilterService loggingFilterService;
     private final NamedParameterJdbcTemplate tpl;
 
-    public ClickHouseLogger(final NamedParameterJdbcTemplate tpl)
+    public ClickHouseLogger(final LoggingFilterService loggingFilterService, final NamedParameterJdbcTemplate tpl)
     {
+        this.loggingFilterService = loggingFilterService;
         this.tpl = tpl;
     }
 
@@ -93,7 +100,8 @@ public class ClickHouseLogger implements HttpLogger
             return null;
         }
 
-        final PredicateConfig predicateConfig = logConfigOpt.get();
+        final PredicateConfig predicateConfig = loggingFilterService.merge(logConfigOpt.get());
+
 
         final Map<String, Object> params = dataProvider.asMetaMap();
 
@@ -102,18 +110,16 @@ public class ClickHouseLogger implements HttpLogger
 
         // Remove headers already captured in dedicated columns or otherwise processed
         final HttpHeaders requestHeaders = dataProvider.getRequestHeaders();
-        removeHeader(REQUEST, requestHeaders, HttpHeaders.HOST);
-        removeHeader(REQUEST, requestHeaders, HttpHeaders.AUTHORIZATION);
-        removeHeader(REQUEST, requestHeaders, HttpHeaders.USER_AGENT);
-        removeHeader(REQUEST, requestHeaders, HttpHeaders.CONTENT_TYPE);
+        processHeader(DELETE, REQUEST, requestHeaders, HttpHeaders.HOST);
+        processHeader(DELETE, REQUEST, requestHeaders, HttpHeaders.AUTHORIZATION);
+        processHeader(DELETE, REQUEST, requestHeaders, HttpHeaders.USER_AGENT);
+        processHeader(DELETE, REQUEST, requestHeaders, HttpHeaders.CONTENT_TYPE);
 
         // Remove headers that are not requested for logging
         for (final String headerName : requestHeaders.keySet())
         {
-            if (!predicateConfig.request().headers().test(headerName))
-            {
-                removeHeader(REQUEST, requestHeaders, headerName);
-            }
+            final HeaderProcessing processing = predicateConfig.request().headers().apply(headerName);
+            processHeader(processing, REQUEST, requestHeaders, headerName);
         }
 
         params.put("exception_type", null);
@@ -139,10 +145,8 @@ public class ClickHouseLogger implements HttpLogger
         // Remove headers that are not requested for logging
         for (final String headerName : responseHeaders.keySet())
         {
-            if (!predicateConfig.response().headers().test(headerName))
-            {
-                removeHeader(RESPONSE, responseHeaders, headerName);
-            }
+            final HeaderProcessing processing = predicateConfig.response().headers().apply(headerName);
+            processHeader(processing, RESPONSE, responseHeaders, headerName);
         }
 
         params.put("request_headers", flattenMap(requestHeaders));
@@ -185,14 +189,24 @@ public class ClickHouseLogger implements HttpLogger
         });
     }
 
-    private void removeHeader(final ServerDirection direction, HttpHeaders headers, String headerName)
+    private void processHeader(final HeaderProcessing headerProcessing, final ServerDirection direction, HttpHeaders headers, String headerName)
     {
         if (logger.isDebugEnabled())
         {
-            logger.debug("Removing {} header {}", direction.name().toLowerCase(), headerName);
+            logger.debug("Processing {} header {} with instruction {}", direction.name().toLowerCase(), headerName, headerProcessing);
         }
 
-        headers.remove(headerName);
+        if (headerProcessing == DELETE)
+        {
+            headers.remove(headerName);
+        }
+        else if (headerProcessing == REDACT)
+        {
+            final List<String> values = headers.get(headerName);
+            final List<String> redacted = RedactUtil.redactAll(values);
+            headers.remove(headerName);
+            headers.addAll(headerName, redacted);
+        }
     }
 
     private Map<String, Object> flattenMap(HttpHeaders headers)

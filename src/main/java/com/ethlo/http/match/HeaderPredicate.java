@@ -1,50 +1,80 @@
 package com.ethlo.http.match;
 
+import static com.ethlo.http.match.HeaderProcessing.DELETE;
+import static com.ethlo.http.match.HeaderProcessing.NONE;
+import static com.ethlo.http.match.HeaderProcessing.REDACT;
+
+import java.util.AbstractMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Predicate;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
-public record HeaderPredicate(Set<String> includes, Set<String> excludes) implements Predicate<String>
+public class HeaderPredicate implements Function<String, HeaderProcessing>
 {
     public static final HeaderPredicate ALL = new HeaderPredicate(Set.of(), Set.of());
 
+    private final Map<String, HeaderProcessing> includes;
+    private final Map<String, HeaderProcessing> excludes;
+
     public HeaderPredicate(Set<String> includes, Set<String> excludes)
     {
-        this.includes = Optional.ofNullable(includes).orElse(Set.of());
-        this.excludes = Optional.ofNullable(excludes).orElse(Set.of());
+        this.includes = Optional.ofNullable(includes).orElse(Set.of()).stream()
+                .collect(Collectors.toMap(e -> parseProcessing(e, NONE).getKey(), e -> parseProcessing(e, NONE).getValue()));
+        this.excludes = Optional.ofNullable(excludes).orElse(Set.of()).stream()
+                .collect(Collectors.toMap(e -> parseProcessing(e, DELETE).getKey(), e -> parseProcessing(e, DELETE).getValue()));
 
-        for (String s : this.includes)
+        if (!this.includes.isEmpty() && !this.excludes.isEmpty())
         {
-            if (this.excludes.contains(s))
-            {
-                throw new IllegalArgumentException("Item '" + s + "' is in both includes and excludes set");
-            }
+            throw new IllegalArgumentException("Cannot have both includes and excludes");
         }
     }
 
     @Override
-    public boolean test(final String s)
+    public HeaderProcessing apply(final String s)
     {
-        boolean match = includes().isEmpty();
-        for (String include : includes)
+        for (Map.Entry<String, HeaderProcessing> include : includes.entrySet())
         {
-            if (include.equalsIgnoreCase(s))
+            if (include.getKey().equalsIgnoreCase(s))
             {
-                match = true;
-                break;
+                return include.getValue();
+            }
+        }
+        if (!includes.isEmpty())
+        {
+            return DELETE;
+        }
+
+        for (Map.Entry<String, HeaderProcessing> exclude : excludes.entrySet())
+        {
+            if (exclude.getKey().equalsIgnoreCase(s))
+            {
+                return exclude.getValue();
             }
         }
 
-        for (String exclude : excludes)
-        {
-            if (exclude.equalsIgnoreCase(s))
-            {
-                match = false;
-                break;
-            }
-        }
+        return NONE;
+    }
 
-        return match;
+    private Map.Entry<String, HeaderProcessing> parseProcessing(String line, HeaderProcessing defaultProcessing)
+    {
+        final String[] parts = line.splitWithDelimiters(",", 2);
+        if (parts.length == 3)
+        {
+            final String headerName = parts[0];
+            final String s = parts[2].toLowerCase();
+            final HeaderProcessing headerProcessing = switch (s)
+            {
+                case "r" -> REDACT;
+                case "d" -> DELETE;
+                default ->
+                        throw new IllegalArgumentException("Unknown processing instruction: " + s + " Expected one of 'd' for delete or 'r' for redact.");
+            };
+            return new AbstractMap.SimpleEntry<>(headerName, headerProcessing);
+        }
+        return new AbstractMap.SimpleEntry<>(line, defaultProcessing);
     }
 
     @Override
@@ -55,4 +85,13 @@ public record HeaderPredicate(Set<String> includes, Set<String> excludes) implem
                 "excludes=" + excludes + ']';
     }
 
+    public List<String> getIncludes()
+    {
+        return includes.entrySet().stream().map(e -> e.getValue().getId().isEmpty() ? e.getKey() : e.getKey() + "," + e.getValue().getId()).toList();
+    }
+
+    public List<String> getExcludes()
+    {
+        return includes.entrySet().stream().map(e -> e.getValue().getId().isEmpty() ? e.getKey() : e.getKey() + "," + e.getValue().getId()).toList();
+    }
 }

@@ -3,11 +3,11 @@ package com.ethlo.http.logger.clickhouse;
 import java.sql.SQLException;
 import java.util.Map;
 import java.util.Properties;
+import java.util.function.BiFunction;
 
 import javax.sql.DataSource;
 
 import org.flywaydb.core.Flyway;
-import org.springframework.context.support.GenericApplicationContext;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 import com.clickhouse.jdbc.internal.ClickHouseJdbcUrlParser;
 import com.ethlo.http.logger.HttpLogger;
 import com.ethlo.http.logger.HttpLoggerFactory;
+import com.ethlo.http.logger.LoggingFilterService;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
@@ -28,16 +29,17 @@ public class ClickhouseHttpLoggerFactory implements HttpLoggerFactory
     }
 
     @Override
-    public HttpLogger getInstance(GenericApplicationContext applicationContext, final Map<String, Object> configuration)
+    public HttpLogger getInstance(final LoggingFilterService loggingFilterService, final Map<String, Object> configuration, BiFunction<String, Object, Object> beanRegistration)
     {
         final ClickHouseProviderConfig clickHouseProviderConfig = load(configuration, ClickHouseProviderConfig.class);
 
         // Register additional beans
         flyway(clickHouseProviderConfig);
         final NamedParameterJdbcTemplate tpl = namedParameterJdbcTemplate(clickHouseProviderConfig);
-        applicationContext.getBeanFactory().initializeBean(clickHouseStatsEndpoint(tpl), "clickHouseStatsEndpoint");
 
-        return new ClickHouseLogger(tpl);
+        beanRegistration.apply("clickHouseStatsEndpoint", clickHouseStatsEndpoint(tpl));
+
+        return new ClickHouseLogger(loggingFilterService, tpl);
     }
 
     private NamedParameterJdbcTemplate namedParameterJdbcTemplate(ClickHouseProviderConfig clickHouseProviderConfig)

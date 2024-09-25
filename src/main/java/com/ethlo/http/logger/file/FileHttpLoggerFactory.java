@@ -1,12 +1,13 @@
 package com.ethlo.http.logger.file;
 
 import java.util.Map;
+import java.util.function.BiFunction;
 
-import org.springframework.context.support.GenericApplicationContext;
 import org.springframework.stereotype.Component;
 
 import com.ethlo.http.logger.HttpLogger;
 import com.ethlo.http.logger.HttpLoggerFactory;
+import com.ethlo.http.logger.LoggingFilterService;
 
 @Component
 public class FileHttpLoggerFactory implements HttpLoggerFactory
@@ -18,7 +19,7 @@ public class FileHttpLoggerFactory implements HttpLoggerFactory
     }
 
     @Override
-    public HttpLogger getInstance(GenericApplicationContext applicationContext, final Map<String, Object> configuration)
+    public HttpLogger getInstance(final LoggingFilterService loggingFilterService, final Map<String, Object> configuration, BiFunction<String, Object, Object> beanRegistration)
     {
         final FileProviderConfig fileProviderConfig = load(configuration, FileProviderConfig.class);
         return new FileLogger(new PebbleAccessLogTemplateRenderer(fileProviderConfig.getPattern(), false));

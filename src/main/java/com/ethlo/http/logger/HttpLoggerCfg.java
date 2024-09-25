@@ -13,14 +13,20 @@ import com.ethlo.http.logger.delegate.SequentialDelegateLogger;
 public class HttpLoggerCfg
 {
     @Bean
-    SequentialDelegateLogger sequentialDelegateLogger(GenericApplicationContext applicationContext, final HttpLoggingConfiguration httpLoggingConfiguration, List<HttpLoggerFactory> factories)
+    LoggingFilterService loggingFilterService(final HttpLoggingConfiguration httpLoggingConfiguration)
+    {
+        return new LoggingFilterService(httpLoggingConfiguration);
+    }
+
+    @Bean
+    SequentialDelegateLogger sequentialDelegateLogger(final LoggingFilterService loggingFilterService, final GenericApplicationContext applicationContext, final HttpLoggingConfiguration httpLoggingConfiguration, List<HttpLoggerFactory> factories)
     {
         final List<HttpLogger> loggers = httpLoggingConfiguration.getProviders().entrySet().stream().map(entry ->
         {
             final String name = entry.getKey();
             return factories.stream().filter(f -> f.getName().equalsIgnoreCase(name)).findFirst()
                     .orElseThrow(() -> new IllegalArgumentException("No factory for logging provider '" + name + "'"))
-                    .getInstance(applicationContext, entry.getValue());
+                    .getInstance(loggingFilterService, entry.getValue(), (beanName, instance) -> applicationContext.getBeanFactory().initializeBean(instance, beanName));
         }).toList();
         return new SequentialDelegateLogger(loggers);
     }

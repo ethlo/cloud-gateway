@@ -1,17 +1,17 @@
 package com.ethlo.http.logger;
 
 import java.util.Map;
+import java.util.function.BiFunction;
 
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.boot.context.properties.source.ConfigurationPropertySource;
 import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
-import org.springframework.context.support.GenericApplicationContext;
 
 public interface HttpLoggerFactory
 {
     String getName();
 
-    HttpLogger getInstance(GenericApplicationContext applicationContext, Map<String, Object> configuration);
+    HttpLogger getInstance(final LoggingFilterService loggingFilterService, Map<String, Object> configuration, BiFunction<String, Object, Object> beanRegistration);
 
     default <T> T load(Map<String, Object> configuration, Class<T> configType)
     {

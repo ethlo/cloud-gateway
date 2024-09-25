@@ -36,8 +36,8 @@ http-logging:
   filter:
     headers:
       excludes:
-        - Authorization
-        - My-App-Key
+        - Authorization,r
+        - My-App-Key,d
 
 logging:
   level:

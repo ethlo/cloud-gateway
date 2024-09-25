@@ -33,6 +33,7 @@ import org.springframework.web.reactive.function.server.ServerResponse;
 import com.ethlo.http.configuration.HttpLoggingConfiguration;
 import com.ethlo.http.handlers.CircuitBreakerHandler;
 import com.ethlo.http.logger.CaptureConfiguration;
+import com.ethlo.http.logger.LoggingFilterService;
 import com.ethlo.http.logger.delegate.SequentialDelegateLogger;
 import com.ethlo.http.netty.DataBufferRepository;
 import com.ethlo.http.netty.PredicateConfig;
@@ -68,6 +69,7 @@ public class CaptureCfg
     @Bean
     @RefreshScope
     public TagRequestIdGlobalFilter tagRequestIdGlobalFilter(final SequentialDelegateLogger httpLogger,
+                                                             final LoggingFilterService loggingFilterService,
                                                              final DataBufferRepository dataBufferRepository,
                                                              final LogPreProcessor logPreProcessor,
                                                              final RoutePredicateLocator routePredicateLocator,
@@ -78,7 +80,7 @@ public class CaptureCfg
                 .stream()
                 .map(c -> new PredicateConfig(c.id(), routePredicateLocator.getPredicates(c.predicates()), c.request(), c.response()))
                 .toList();
-        return new TagRequestIdGlobalFilter(httpLoggingConfiguration, httpLogger, dataBufferRepository, logPreProcessor, predicateConfigs, ioScheduler);
+        return new TagRequestIdGlobalFilter(loggingFilterService, httpLogger, dataBufferRepository, logPreProcessor, predicateConfigs, ioScheduler);
     }
 
     @Bean
