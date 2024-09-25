@@ -24,12 +24,10 @@ import org.springframework.util.Assert;
 import org.springframework.web.server.ServerWebExchange;
 
 import com.ethlo.http.PebbleRenderer;
-import com.google.common.annotations.Beta;
 import io.pebbletemplates.pebble.template.PebbleTemplate;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 
-@Beta
 @Component
 public class TemplateRedirectGatewayFilterFactory extends AbstractGatewayFilterFactory<TemplateRedirectGatewayFilterFactory.Config>
 {

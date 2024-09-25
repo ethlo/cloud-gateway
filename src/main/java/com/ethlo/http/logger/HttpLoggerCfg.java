@@ -18,7 +18,7 @@ public class HttpLoggerCfg
         final List<HttpLogger> loggers = httpLoggingConfiguration.getProviders().entrySet().stream().map(entry ->
         {
             final String name = entry.getKey();
-            return factories.stream().filter(f -> f.getName().equals(name)).findFirst()
+            return factories.stream().filter(f -> f.getName().equalsIgnoreCase(name)).findFirst()
                     .orElseThrow(() -> new IllegalArgumentException("No factory for logging provider '" + name + "'"))
                     .getInstance(applicationContext, entry.getValue());
         }).toList();

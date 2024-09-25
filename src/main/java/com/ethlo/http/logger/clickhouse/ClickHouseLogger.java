@@ -29,7 +29,6 @@ import com.ethlo.http.netty.ServerDirection;
 import com.ethlo.http.util.AsyncUtil;
 import com.ethlo.http.util.HttpBodyUtil;
 import com.ethlo.http.util.IoUtil;
-import com.google.common.base.Stopwatch;
 
 public class ClickHouseLogger implements HttpLogger
 {
@@ -157,7 +156,6 @@ public class ClickHouseLogger implements HttpLogger
         {
             final List<BodyDecodeException> processingResult = res.stream().filter(Objects::nonNull).toList();
             logger.debug("Inserting data into ClickHouse for request {}: {}", dataProvider.getRequestId(), params);
-            final Stopwatch stopwatch = Stopwatch.createStarted();
 
             tpl.update("""                    
                             INSERT INTO log (
@@ -175,7 +173,6 @@ public class ClickHouseLogger implements HttpLogger
                               :request_body, :response_body, :request_raw, :response_raw, :exception_type, :exception_message)""",
                     params
             );
-            logger.debug("Finished inserting data into ClickHouse for request {} in {}", dataProvider.getRequestId(), stopwatch.elapsed());
 
             if (processingResult.isEmpty())
             {
@@ -190,7 +187,7 @@ public class ClickHouseLogger implements HttpLogger
 
     private void removeHeader(final ServerDirection direction, HttpHeaders headers, String headerName)
     {
-        if(logger.isDebugEnabled())
+        if (logger.isDebugEnabled())
         {
             logger.debug("Removing {} header {}", direction.name().toLowerCase(), headerName);
         }
