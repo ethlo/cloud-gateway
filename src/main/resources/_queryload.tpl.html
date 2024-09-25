@@ -8,7 +8,7 @@
                     <th scope="col">Time</th>
                     <th scope="col">% of max in period</th>
                     <th scope="col">Count</th>
-                    <th scope="col" class="right">Average time</th>
+                    <th class="right" scope="col">Average time</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -16,7 +16,7 @@
                 <tr>
                     <td class=left-col">{{e.event_time}}</td>
                     <td class="right" style="width:60%;">
-                        <progress value="{{e.count_percentage}}" max="100"></progress>
+                        <progress max="100" value="{{e.count_percentage}}"></progress>
                     </td>
                     <td>{{e.count}}</td>
                     <td class="right">{{e.avg_insert_duration}} sec</td>

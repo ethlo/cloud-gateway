@@ -6,13 +6,13 @@
                 <thead>
                 <tr>
                     <th scope="col">Property</th>
-                    <th scope="col" class="right">Value</th>
+                    <th class="right" scope="col">Value</th>
                 </tr>
                 </thead>
                 <tbody>
                 {% for e in map %}
                 <tr>
-                    <th scope="row" class=left-col">{{e.key}}</th>
+                    <th class=left-col" scope="row">{{e.key}}</th>
                     <td class="right">{{e.value}}</td>
                 </tr>
                 {% endfor %}

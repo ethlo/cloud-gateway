@@ -8,13 +8,13 @@ import java.util.Map;
 
 import org.springframework.boot.actuate.endpoint.annotation.Endpoint;
 import org.springframework.boot.actuate.endpoint.annotation.ReadOperation;
-import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
-import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import com.clickhouse.data.value.UnsignedLong;
 
+@Component
 @Endpoint(id = "clickhouse")
 public class ClickHouseStatsEndpoint
 {

@@ -1,6 +1,7 @@
 package com.ethlo.http.logger;
 
-import jakarta.validation.constraints.NotNull;
+import java.nio.file.Path;
+import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -8,8 +9,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.validation.annotation.Validated;
 
-import java.nio.file.Path;
-import java.util.Optional;
+import jakarta.validation.constraints.NotNull;
 
 @Validated
 @RefreshScope

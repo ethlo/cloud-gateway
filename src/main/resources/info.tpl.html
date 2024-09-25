@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="color-scheme" content="light dark"/>
-    <link rel="stylesheet" href="status/css">
+    <meta content="width=device-width, initial-scale=1" name="viewport">
+    <meta content="light dark" name="color-scheme"/>
+    <link href="status/css" rel="stylesheet">
     <title>Cloud Gateway status</title>
     <style>
         .right {
@@ -41,16 +41,16 @@
                     <thead>
                     <tr>
                         <th scope="col">Property</th>
-                        <th scope="col" class="right">Value</th>
+                        <th class="right" scope="col">Value</th>
                     </tr>
                     </thead>
                     <tbody>
                     <tr>
-                        <th scope="row" class=left-col">Enabled</th>
+                        <th class=left-col" scope="row">Enabled</th>
                         <td class="right">{{capture_config.enabled}}</td>
                     </tr>
                     <tr>
-                        <th scope="row" class=left-col">Log directory</th>
+                        <th class=left-col" scope="row">Log directory</th>
                         <td class="right">{{capture_config.logDirectory}}</td>
                     </tr>
                 </table>
@@ -65,7 +65,7 @@
             <div>
                 Used: {{memory_summary.used | sizeformat}}
                 Committed: {{memory_summary.committed | sizeformat}}
-                <progress value="{{memory_summary.used}}" max="{{memory_summary.committed}}"/>
+                <progress max="{{memory_summary.committed}}" value="{{memory_summary.used}}"/>
             </div>
         </section>
         <section>
@@ -74,15 +74,15 @@
                     <thead>
                     <tr>
                         <th scope="col">Property</th>
-                        <th scope="col" class="right">Used</th>
-                        <th scope="col" class="right">Committed</th>
-                        <th scope="col" class="right">Max</th>
+                        <th class="right" scope="col">Used</th>
+                        <th class="right" scope="col">Committed</th>
+                        <th class="right" scope="col">Max</th>
                     </tr>
                     </thead>
                     <tbody>
                     {% for e in memory %}
                     <tr>
-                        <th scope="row" class=left-col">{{e.key}}</th>
+                        <th class=left-col" scope="row">{{e.key}}</th>
                         <td class="right">{{e.value.used | sizeformat}}</td>
                         <td class="right">{{e.value.committed | sizeformat}}</td>
                         <td class="right">{{e.value.max | sizeformat}}</td>

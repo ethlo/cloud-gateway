@@ -111,7 +111,7 @@ public class ClickHouseLogger implements HttpLogger
         // Remove headers already captured in dedicated columns or otherwise processed
         final HttpHeaders requestHeaders = dataProvider.getRequestHeaders();
         processHeader(DELETE, REQUEST, requestHeaders, HttpHeaders.HOST);
-        processHeader(DELETE, REQUEST, requestHeaders, HttpHeaders.AUTHORIZATION);
+        processHeader(REDACT, REQUEST, requestHeaders, HttpHeaders.AUTHORIZATION);
         processHeader(DELETE, REQUEST, requestHeaders, HttpHeaders.USER_AGENT);
         processHeader(DELETE, REQUEST, requestHeaders, HttpHeaders.CONTENT_TYPE);
 

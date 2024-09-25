@@ -1,12 +1,13 @@
 # Cloud Gateway
 
-Cloud Gateway is a Docker-packaged reverse proxy built on Spring Cloud Gateway, offering full request/response logging, including body content. It integrates with Grafana for traffic monitoring.
+Cloud Gateway is a Docker-packaged reverse proxy built on Spring Cloud Gateway, offering full request/response logging,
+including body content. It integrates with Grafana for traffic monitoring.
 
 ## Features
 
-*   Reverse proxy built on Spring Cloud Gateway.
-*   Full HTTP request/response logging, including headers and body.
-*   Dockerized deployment with Grafana for real-time monitoring.
+* Reverse proxy built on Spring Cloud Gateway.
+* Full HTTP request/response logging, including headers and body.
+* Dockerized deployment with Grafana for real-time monitoring.
 
 <img src="doc/basic_dashboard.png" alt= "Simple overview dashboard">
 
@@ -14,39 +15,38 @@ Cloud Gateway is a Docker-packaged reverse proxy built on Spring Cloud Gateway, 
 
 ### Prerequisites
 
-*   [Docker](https://www.docker.com/) installed.
-*   `docker-compose` file provided in the `/docker` folder.
+* [Docker](https://www.docker.com/) installed.
+* `docker-compose` file provided in the `/docker` folder.
 
 ### Installation
 
-1.  **Clone the repository**:
+1. **Clone the repository**:
 
-    ```
-    git clone https://github.com/ethlo/cloud-gateway.git
-    cd cloud-gateway/docker
-    ```
+   ```
+   git clone https://github.com/ethlo/cloud-gateway.git
+   cd cloud-gateway/docker
+   ```
 
-2.  **Start the services**:
+2. **Start the services**:
 
-    ```
-    docker-compose up -d
-    ```
+   ```
+   docker-compose up -d
+   ```
 
-3.  **Generate traffic**:
+3. **Generate traffic**:
 
-    ```
-    curl -uuser:pass http://localhost:6464/get
-    ```
+   ```
+   curl -uuser:pass http://localhost:6464/get
+   ```
 
-4.  **View results in Grafana**:
+4. **View results in Grafana**:
 
-    Access Grafana at [http://localhost:3000](http://localhost:3000).
+   Access Grafana at [http://localhost:3000](http://localhost:3000).
 
-    *   **Username**: `admin`
-    *   **Password**: `grafana`
+    * **Username**: `admin`
+    * **Password**: `grafana`
 
-    Select the dashboard named `HTTP traffic` from the left-hand menu to view traffic data.
-
+   Select the dashboard named `HTTP traffic` from the left-hand menu to view traffic data.
 
 ## Configuration
 
@@ -78,24 +78,25 @@ http-logging:
 
 #### Header Logging Options
 
-*   Configure lists of headers using `includes` and `excludes`.
-*   By default, all headers are included except for `Authorization`.
+* Configure lists of headers using `includes` and `excludes`.
+* By default, all headers are included except for `Authorization`.
 
 #### Body Logging Options
 
-*   `NONE`: No logging (default).
-*   `SIZE`: Logs the body size.
-*   `STORE`: Logs the full body content.
+* `NONE`: No logging (default).
+* `SIZE`: Logs the body size.
+* `STORE`: Logs the full body content.
 
 #### Raw Data Logging Options
 
-*   `NONE`: No logging (default).
-*   `SIZE`: Logs the request size.
-*   `STORE`: Logs the full raw request, including headers and body.
+* `NONE`: No logging (default).
+* `SIZE`: Logs the request size.
+* `STORE`: Logs the full raw request, including headers and body.
 
 **Warning**: Storing raw data may include sensitive information such as usernames, passwords, and API keys.
 
-For more details on logging in Spring Boot, see the [official Spring documentation](https://docs.spring.io/spring-boot/how-to/logging.html#howto.logging.logback).
+For more details on logging in Spring Boot, see
+the [official Spring documentation](https://docs.spring.io/spring-boot/how-to/logging.html#howto.logging.logback).
 
 ### Logging Providers
 
@@ -131,7 +132,8 @@ http-logging:
 
 ### Handling Unprocessed Requests
 
-If the upstream server is down, the request contents may be lost. You can still capture the request by configuring a fallback:
+If the upstream server is down, the request contents may be lost. You can still capture the request by configuring a
+fallback:
 
 ```
 spring:
@@ -158,21 +160,25 @@ server:
   forward-headers-strategy: NATIVE
 ```
 
-For more information, refer to the [Spring Boot documentation on using it behind a proxy server](https://docs.spring.io/spring-boot/how-to/webserver.html#howto.webserver.use-behind-a-proxy-server).
+For more information, refer to
+the [Spring Boot documentation on using it behind a proxy server](https://docs.spring.io/spring-boot/how-to/webserver.html#howto.webserver.use-behind-a-proxy-server).
 
 ## Custom filters
 
-
 ### TemplateRedirect
-It supports regexp named parameters, otherwise you can also use numeric variables like `{{1}}` and `{{2}}`. You also have access to query paramters via `query`
+
+It supports regexp named parameters, otherwise you can also use numeric variables like `{{1}}` and `{{2}}`. You also
+have access to query paramters via `query`
 
 Example shorthand:
+
 ```yaml
   filters:
     - TemplateRedirect=/foo/(?<var1>.*)/21/(?<var2>.*),https://example.com/{{var2}}?={{var1}},302
 ```
 
 Example full:
+
 ```yaml
   filters:
     - name: TemplateRedirect
@@ -181,8 +187,8 @@ Example full:
       status: 301 # default is 302
 ```
 
-
 ### InjectBasicAuth
+
 Allows the injection of basic auth credentials before forwarding the request upstream
 
 ```yaml
@@ -196,62 +202,73 @@ filters:
 ## Custom predicates
 
 ### NotPath
-Negated version of [Path](https://cloud.spring.io/spring-cloud-gateway/multi/multi_gateway-request-predicates-factories.html#_path_route_predicate_factory).
+
+Negated version
+of [Path](https://cloud.spring.io/spring-cloud-gateway/multi/multi_gateway-request-predicates-factories.html#_path_route_predicate_factory).
 
 ```yaml
 - NotPath=/secret
 ```
 
 ### NotMethod
-Negated version of [Method](https://cloud.spring.io/spring-cloud-gateway/multi/multi_gateway-request-predicates-factories.html#_method_route_predicate_factory).
+
+Negated version
+of [Method](https://cloud.spring.io/spring-cloud-gateway/multi/multi_gateway-request-predicates-factories.html#_method_route_predicate_factory).
+
 ```yaml
 - NotMethod=GET
 ```
 
 ### NotHost
-Negated version of [Host](https://cloud.spring.io/spring-cloud-gateway/multi/multi_gateway-request-predicates-factories.html#_host_route_predicate_factory).
+
+Negated version
+of [Host](https://cloud.spring.io/spring-cloud-gateway/multi/multi_gateway-request-predicates-factories.html#_host_route_predicate_factory).
 
 ```yaml
 - NotHost=sub.example.com
 ```
 
 ### NotExtension
+
 Without any listed extension, it will skip all URLs ending with an extension.
 
 Example config for not logging anything with an extension (like `file.js`, `file.css`, etc.):
+
 ```yaml
 - NotExtension=
 ```
 
 Example config fo skipping specific extensions. Other extensions like `file.zip` would still be let through:
+
 ```yaml
 - NotExtension=html,css,js
 ```
 
-
 ## Monitoring with Grafana
 
-Grafana is set up to visualize traffic data logged by Cloud Gateway. Access Grafana at [http://localhost:3000](http://localhost:3000) and view the `HTTP traffic` dashboard to monitor real-time traffic.
+Grafana is set up to visualize traffic data logged by Cloud Gateway. Access Grafana
+at [http://localhost:3000](http://localhost:3000) and view the `HTTP traffic` dashboard to monitor real-time traffic.
 
 ## References
 
 For more detailed documentation, refer to:
 
-*   [Spring Cloud Gateway Reference](https://cloud.spring.io/spring-cloud-gateway/)
-*   [Spring Boot Documentation](https://docs.spring.io/spring-boot/docs/current/reference/html/)
-*   [Docker Documentation](https://docs.docker.com/)
+* [Spring Cloud Gateway Reference](https://cloud.spring.io/spring-cloud-gateway/)
+* [Spring Boot Documentation](https://docs.spring.io/spring-boot/docs/current/reference/html/)
+* [Docker Documentation](https://docs.docker.com/)
 
 ## Guides
 
 For practical use cases and guides on how to extend the functionalities of Cloud Gateway, you may refer to:
 
-*   [Building a microservices gateway](https://spring.io/guides/gs/gateway/)
-*   [Getting started with Spring Boot](https://spring.io/guides/gs/spring-boot/)
-*   [Monitor your services with Grafana](https://grafana.com/docs/grafana/latest/getting-started/getting-started-grafana/)
+* [Building a microservices gateway](https://spring.io/guides/gs/gateway/)
+* [Getting started with Spring Boot](https://spring.io/guides/gs/spring-boot/)
+* [Monitor your services with Grafana](https://grafana.com/docs/grafana/latest/getting-started/getting-started-grafana/)
 
 ## Contributing
 
-Contributions are welcome! Please submit issues or pull requests via the [GitHub repository](https://github.com/ethlo/cloud-gateway).
+Contributions are welcome! Please submit issues or pull requests via
+the [GitHub repository](https://github.com/ethlo/cloud-gateway).
 
 ## License
 

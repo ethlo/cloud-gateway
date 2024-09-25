@@ -64,35 +64,6 @@ public class TemplateRedirectGatewayFilterFactory extends AbstractGatewayFilterF
         return List.of("source", "target", "status");
     }
 
-    @Valid
-    public static class Config
-    {
-        private final PebbleRenderer pebbleRenderer = new PebbleRenderer(false);
-        @NotNull
-        private Pattern source;
-
-        @NotNull
-        private PebbleTemplate target;
-
-        private HttpStatusCode status = HttpStatusCode.valueOf(302);
-
-        public void setSource(final String source)
-        {
-            this.source = Pattern.compile(source);
-        }
-
-        public void setTarget(final String target)
-        {
-            this.target = pebbleRenderer.compile(target);
-        }
-
-        public void setStatus(final int status)
-        {
-            this.status = HttpStatusCode.valueOf(status);
-            Assert.isTrue(this.status.is3xxRedirection(), "Must use a redirection status code, got " + status);
-        }
-    }
-
     protected Optional<URI> determineRequestUri(final ServerWebExchange exchange, final Config config)
     {
         final ServerHttpRequest req = exchange.getRequest();
@@ -129,5 +100,34 @@ public class TemplateRedirectGatewayFilterFactory extends AbstractGatewayFilterF
             }
         }
         return Optional.empty();
+    }
+
+    @Valid
+    public static class Config
+    {
+        private final PebbleRenderer pebbleRenderer = new PebbleRenderer(false);
+        @NotNull
+        private Pattern source;
+
+        @NotNull
+        private PebbleTemplate target;
+
+        private HttpStatusCode status = HttpStatusCode.valueOf(302);
+
+        public void setSource(final String source)
+        {
+            this.source = Pattern.compile(source);
+        }
+
+        public void setTarget(final String target)
+        {
+            this.target = pebbleRenderer.compile(target);
+        }
+
+        public void setStatus(final int status)
+        {
+            this.status = HttpStatusCode.valueOf(status);
+            Assert.isTrue(this.status.is3xxRedirection(), "Must use a redirection status code, got " + status);
+        }
     }
 }
