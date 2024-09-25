@@ -8,12 +8,14 @@ import java.util.Map;
 
 import org.springframework.boot.actuate.endpoint.annotation.Endpoint;
 import org.springframework.boot.actuate.endpoint.annotation.ReadOperation;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import com.clickhouse.data.value.UnsignedLong;
 
+@ConditionalOnBean(ClickHouseLogger.class)
 @Component
 @Endpoint(id = "clickhouse")
 public class ClickHouseStatsEndpoint
