@@ -5,7 +5,6 @@ import static com.ethlo.http.match.HeaderProcessing.NONE;
 import static com.ethlo.http.match.HeaderProcessing.REDACT;
 
 import java.util.AbstractMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -25,11 +24,6 @@ public class HeaderPredicate implements Function<String, HeaderProcessing>
                 .collect(Collectors.toMap(e -> parseProcessing(e, NONE).getKey(), e -> parseProcessing(e, NONE).getValue()));
         this.excludes = Optional.ofNullable(excludes).orElse(Set.of()).stream()
                 .collect(Collectors.toMap(e -> parseProcessing(e, DELETE).getKey(), e -> parseProcessing(e, DELETE).getValue()));
-
-        if (!this.includes.isEmpty() && !this.excludes.isEmpty())
-        {
-            throw new IllegalArgumentException("Cannot have both includes and excludes");
-        }
     }
 
     @Override
@@ -85,13 +79,18 @@ public class HeaderPredicate implements Function<String, HeaderProcessing>
                 "excludes=" + excludes + ']';
     }
 
-    public List<String> getIncludes()
+    public Set<String> getIncludes()
     {
-        return includes.entrySet().stream().map(e -> e.getValue().getId().isEmpty() ? e.getKey() : e.getKey() + "," + e.getValue().getId()).toList();
+        return toString(includes);
     }
 
-    public List<String> getExcludes()
+    public Set<String> getExcludes()
     {
-        return includes.entrySet().stream().map(e -> e.getValue().getId().isEmpty() ? e.getKey() : e.getKey() + "," + e.getValue().getId()).toList();
+        return toString(excludes);
+    }
+
+    private Set<String> toString(final Map<String, HeaderProcessing> map)
+    {
+        return map.entrySet().stream().map(e -> e.getValue().getId().isEmpty() ? e.getKey() : e.getKey() + "," + e.getValue().getId()).collect(Collectors.toSet());
     }
 }

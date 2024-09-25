@@ -22,27 +22,25 @@ public class LoggingFilterService
 
     public static PredicateConfig mergeFilter(HttpLoggingConfiguration httpLoggingConfiguration, PredicateConfig predicateConfig)
     {
-        final HeaderPredicate headerGlobal = httpLoggingConfiguration.getFilter().getHeaders();
-        final HeaderPredicate headersLocal = predicateConfig.request().headers();
+        final HeaderPredicate requestMerged = mergeHeader(httpLoggingConfiguration.getFilter().getHeaders(), predicateConfig.request().headers());
+        final HeaderPredicate responseMerged = mergeHeader(httpLoggingConfiguration.getFilter().getHeaders(), predicateConfig.response().headers());
+        return new PredicateConfig(predicateConfig.id(), predicateConfig.predicate(), new LogOptions(requestMerged, predicateConfig.request().raw(), predicateConfig.request().body()), new LogOptions(responseMerged, predicateConfig.response().raw(), predicateConfig.response().body()));
+    }
 
-        final Set<String> mergedIncludes = new HashSet<>(headerGlobal.getIncludes());
-        mergedIncludes.addAll(headersLocal.getIncludes());
+    public static HeaderPredicate mergeHeader(HeaderPredicate global, HeaderPredicate local)
+    {
+        final Set<String> globalIncludes = new HashSet<>(global.getIncludes());
+        final Set<String> globalExcludes = new HashSet<>(global.getExcludes());
 
-        final Set<String> diffedExcludes = new HashSet<>(0);
+        // Local includes overwrite global excludes
+        globalExcludes.removeAll(local.getIncludes());
+        globalExcludes.addAll(local.getExcludes());
 
-        if (headersLocal.getIncludes().isEmpty())
-        {
-            diffedExcludes.addAll(headerGlobal.getExcludes());
-        }
-        else
-        {
-            // Add local excludes
-            headerGlobal.getExcludes().forEach(mergedIncludes::remove);
-            diffedExcludes.addAll(headersLocal.getExcludes());
-        }
+        // Local excludes overwrite global includes
+        globalIncludes.removeAll(local.getExcludes());
+        globalIncludes.addAll(local.getIncludes());
 
-        final HeaderPredicate merged = new HeaderPredicate(mergedIncludes, diffedExcludes);
-        return new PredicateConfig(predicateConfig.id(), predicateConfig.predicate(), new LogOptions(merged, predicateConfig.request().raw(), predicateConfig.request().body()), predicateConfig.response());
+        return new HeaderPredicate(globalIncludes, globalExcludes);
     }
 
     public PredicateConfig merge(PredicateConfig predicateConfig)

@@ -9,7 +9,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-import org.junit.Assert;
 import org.junit.jupiter.api.Test;
 
 class HeaderPredicateTest
@@ -44,7 +43,9 @@ class HeaderPredicateTest
     @Test
     void testIncludesAndExcludes()
     {
-        final IllegalArgumentException exc = Assert.assertThrows(IllegalArgumentException.class, () -> new HeaderPredicate(Set.of("a", "b", "c"), Set.of("a")));
-        assertThat(exc.getMessage()).isEqualTo("Cannot have both includes and excludes");
+        final HeaderPredicate matcher = new HeaderPredicate(Set.of("a", "b", "c"), Set.of("a"));
+        final List<String> input = new ArrayList<>(List.of("1", "e", "a", "c", "b"));
+        final List<HeaderProcessing> result = input.stream().map(matcher).toList();
+        assertThat(result).containsExactly(DELETE, DELETE, NONE, NONE, NONE);
     }
 }
