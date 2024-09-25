@@ -6,15 +6,16 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.clickhouse.data.value.UnsignedLong;
-
-import org.springframework.boot.actuate.endpoint.web.annotation.ControllerEndpoint;
+import org.springframework.boot.actuate.endpoint.annotation.Endpoint;
+import org.springframework.boot.actuate.endpoint.annotation.ReadOperation;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 
-@ControllerEndpoint(id = "clickhouse")
+import com.clickhouse.data.value.UnsignedLong;
+
+@Endpoint(id = "clickhouse")
 public class ClickHouseStatsEndpoint
 {
     private final NamedParameterJdbcTemplate tpl;
@@ -26,7 +27,7 @@ public class ClickHouseStatsEndpoint
         this.tableName = tableName;
     }
 
-    @GetMapping(value = "/", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ReadOperation()
     public @ResponseBody
     Map<String, Object> logTableStats()
     {

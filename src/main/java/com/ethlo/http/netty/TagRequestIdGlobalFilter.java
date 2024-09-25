@@ -2,8 +2,10 @@ package com.ethlo.http.netty;
 
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 import org.reactivestreams.Publisher;
@@ -23,7 +25,10 @@ import org.springframework.web.ErrorResponseException;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.server.ServerWebExchange;
 
+import com.ethlo.http.configuration.HttpLoggingConfiguration;
 import com.ethlo.http.logger.delegate.SequentialDelegateLogger;
+import com.ethlo.http.match.HeaderPredicate;
+import com.ethlo.http.match.LogOptions;
 import com.ethlo.http.model.AccessLogResult;
 import com.ethlo.http.model.WebExchangeDataProvider;
 import com.ethlo.http.processors.LogPreProcessor;
@@ -38,14 +43,16 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
     private static final String EXCEPTION_ATTRIBUTE_NAME = TagRequestIdGlobalFilter.class.getName() + ".exception";
     private static final Logger logger = LoggerFactory.getLogger(TagRequestIdGlobalFilter.class);
 
+    private final HttpLoggingConfiguration httpLoggingConfiguration;
     private final SequentialDelegateLogger httpLogger;
     private final DataBufferRepository dataBufferRepository;
     private final LogPreProcessor logPreProcessor;
     private final List<PredicateConfig> predicateConfigs;
     private final Scheduler ioScheduler;
 
-    public TagRequestIdGlobalFilter(final SequentialDelegateLogger httpLogger, final DataBufferRepository dataBufferRepository, final LogPreProcessor logPreProcessor, List<PredicateConfig> predicateConfigs, Scheduler ioScheduler)
+    public TagRequestIdGlobalFilter(final HttpLoggingConfiguration httpLoggingConfiguration, final SequentialDelegateLogger httpLogger, final DataBufferRepository dataBufferRepository, final LogPreProcessor logPreProcessor, List<PredicateConfig> predicateConfigs, Scheduler ioScheduler)
     {
+        this.httpLoggingConfiguration = httpLoggingConfiguration;
         this.httpLogger = httpLogger;
         this.dataBufferRepository = dataBufferRepository;
         this.logPreProcessor = logPreProcessor;
@@ -59,9 +66,33 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
     {
         return Flux.fromIterable(predicateConfigs)
                 .filterWhen(c -> (Publisher<Boolean>) c.predicate().apply(exchange))
-                .flatMap(c -> prepareForLoggingIfApplicable(exchange, chain, c))
+                .flatMap(c -> prepareForLoggingIfApplicable(exchange, chain, mergeFilter(httpLoggingConfiguration, c)))
                 .switchIfEmpty(chain.filter(exchange))
                 .next();
+    }
+
+    private PredicateConfig mergeFilter(HttpLoggingConfiguration httpLoggingConfiguration, PredicateConfig predicateConfig)
+    {
+        final HeaderPredicate headerGlobal = httpLoggingConfiguration.getFilter().getHeaders();
+        final HeaderPredicate headersLocal = predicateConfig.request().headers();
+
+        final Set<String> mergedIncludes = new HashSet<>(headerGlobal.includes());
+        mergedIncludes.addAll(headersLocal.includes());
+
+        final Set<String> diffedExcludes = new HashSet<>(0);
+
+        if (headersLocal.includes().isEmpty())
+        {
+            diffedExcludes.addAll(headerGlobal.excludes());
+        }
+        else
+        {
+            // Add local excludes
+            diffedExcludes.addAll(headersLocal.excludes());
+        }
+
+        final HeaderPredicate merged = new HeaderPredicate(mergedIncludes, diffedExcludes);
+        return new PredicateConfig(predicateConfig.id(), predicateConfig.predicate(), new LogOptions(merged, predicateConfig.request().raw(), predicateConfig.request().body()), predicateConfig.response());
     }
 
     private Mono<Void> prepareForLoggingIfApplicable(ServerWebExchange exchange, GatewayFilterChain chain, PredicateConfig predicateConfig)

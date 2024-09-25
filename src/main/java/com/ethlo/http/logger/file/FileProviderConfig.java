@@ -2,13 +2,8 @@ package com.ethlo.http.logger.file;
 
 import java.nio.file.Path;
 
-import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.cloud.context.config.annotation.RefreshScope;
-
 import com.ethlo.http.logger.BaseProviderConfig;
 
-@RefreshScope
-@ConfigurationProperties("http-logging.providers.file")
 public class FileProviderConfig extends BaseProviderConfig
 {
     private final String pattern;

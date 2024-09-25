@@ -78,7 +78,7 @@ public class CaptureCfg
                 .stream()
                 .map(c -> new PredicateConfig(c.id(), routePredicateLocator.getPredicates(c.predicates()), c.request(), c.response()))
                 .toList();
-        return new TagRequestIdGlobalFilter(httpLogger, dataBufferRepository, logPreProcessor, predicateConfigs, ioScheduler);
+        return new TagRequestIdGlobalFilter(httpLoggingConfiguration, httpLogger, dataBufferRepository, logPreProcessor, predicateConfigs, ioScheduler);
     }
 
     @Bean

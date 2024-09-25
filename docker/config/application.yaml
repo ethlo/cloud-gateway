@@ -35,7 +35,6 @@ logging:
   level:
     com.ethlo.http: INFO
     org.springframework.cloud.gateway: INFO
-    com.ethlo.qjc: INFO
 management:
   endpoints:
     web:

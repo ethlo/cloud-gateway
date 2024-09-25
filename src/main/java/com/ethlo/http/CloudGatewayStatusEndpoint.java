@@ -48,8 +48,8 @@ public class CloudGatewayStatusEndpoint
         this.ioStatusEndpoint = ioStatusEndpoint;
     }
 
-    @ReadOperation(produces = MediaType.TEXT_HTML_VALUE)
-    public String getInfo() throws IOException
+    @ReadOperation(produces = MediaType.APPLICATION_JSON_VALUE)
+    public Map<String, Object> getInfoJson()
     {
         final Map<String, Object> model = new LinkedHashMap<>();
 
@@ -82,7 +82,13 @@ public class CloudGatewayStatusEndpoint
         {
             model.put("logio", preProcess(ioStatusEndpoint.getLogio()));
         }
+        return model;
+    }
 
+    @ReadOperation(produces = MediaType.TEXT_HTML_VALUE)
+    public String getInfoHtml() throws IOException
+    {
+        final Map<String, Object> model = getInfoJson();
         return pebbleRenderer.renderFromTemplate(model, "info.tpl.html", Locale.ENGLISH);
     }
 
@@ -101,11 +107,6 @@ public class CloudGatewayStatusEndpoint
                 .filter(d -> d > 0)
                 .mapToDouble(Double::doubleValue)
                 .sum();
-    }
-
-    public record Memory(Double used, Double committed, Double max)
-    {
-
     }
 
     private Map<String, Double> getMetrics(@Nonnull final String key)
@@ -152,5 +153,10 @@ public class CloudGatewayStatusEndpoint
     public String getCss(@Selector final String css) throws IOException
     {
         return new String(new ClassPathResource("static/pico.min.css").getInputStream().readAllBytes());
+    }
+
+    public record Memory(Double used, Double committed, Double max)
+    {
+
     }
 }
