@@ -203,9 +203,12 @@ public class ClickHouseLogger implements HttpLogger
         else if (headerProcessing == REDACT)
         {
             final List<String> values = headers.get(headerName);
-            final List<String> redacted = RedactUtil.redactAll(values);
-            headers.remove(headerName);
-            headers.addAll(headerName, redacted);
+            if (values != null)
+            {
+                final List<String> redacted = RedactUtil.redactAll(values);
+                headers.remove(headerName);
+                headers.addAll(headerName, redacted);
+            }
         }
     }
 
@@ -219,6 +222,6 @@ public class ClickHouseLogger implements HttpLogger
     @Override
     public String toString()
     {
-        return getClass().getSimpleName();
+        return getClass().getSimpleName() + " Filter={" + loggingFilterService.getGlobalFilter() + "}";
     }
 }

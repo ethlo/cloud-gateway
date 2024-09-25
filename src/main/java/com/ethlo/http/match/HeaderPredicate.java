@@ -74,9 +74,8 @@ public class HeaderPredicate implements Function<String, HeaderProcessing>
     @Override
     public String toString()
     {
-        return "HeaderPredicate[" +
-                "includes=" + includes + ", " +
-                "excludes=" + excludes + ']';
+        return (includes.isEmpty() ? "" : "includes=" + includes) +
+                (excludes.isEmpty() ? "" : ((includes.isEmpty() ? "" : ", ") + "excludes=" + excludes));
     }
 
     public Set<String> getIncludes()

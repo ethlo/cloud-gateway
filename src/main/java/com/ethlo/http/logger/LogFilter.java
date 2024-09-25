@@ -16,4 +16,10 @@ public class LogFilter
         this.headers = headers;
         return this;
     }
+
+    @Override
+    public String toString()
+    {
+        return "headers={" + headers + "}";
+    }
 }

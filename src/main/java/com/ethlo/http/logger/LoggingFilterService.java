@@ -47,4 +47,9 @@ public class LoggingFilterService
     {
         return cache.computeIfAbsent(predicateConfig.id(), (k) -> mergeFilter(httpLoggingConfiguration, predicateConfig));
     }
+
+    public LogFilter getGlobalFilter()
+    {
+        return httpLoggingConfiguration.getFilter();
+    }
 }
