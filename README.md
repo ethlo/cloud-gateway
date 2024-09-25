@@ -118,7 +118,7 @@ Log data to a ClickHouse table for detailed analysis:
 ```
 http-logging:
   filter:
-    headers:
+    request-headers:
       exclude: 
           # r = REDACT, default is DELETE
         - Authorization,r 

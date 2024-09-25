@@ -1,6 +1,7 @@
 package com.ethlo.http.logger;
 
 import java.util.HashSet;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -22,8 +23,8 @@ public class LoggingFilterService
 
     public static PredicateConfig mergeFilter(HttpLoggingConfiguration httpLoggingConfiguration, PredicateConfig predicateConfig)
     {
-        final HeaderPredicate requestMerged = mergeHeader(httpLoggingConfiguration.getFilter().getHeaders(), predicateConfig.request().headers());
-        final HeaderPredicate responseMerged = mergeHeader(httpLoggingConfiguration.getFilter().getHeaders(), predicateConfig.response().headers());
+        final HeaderPredicate requestMerged = mergeHeader(Optional.ofNullable(httpLoggingConfiguration.getFilter()).map(LogFilter::getRequestHeaders).orElse(new HeaderPredicate(null, null)), predicateConfig.request().headers());
+        final HeaderPredicate responseMerged = mergeHeader(Optional.ofNullable(httpLoggingConfiguration.getFilter()).map(LogFilter::getResponseHeaders).orElse(new HeaderPredicate(null, null)), predicateConfig.response().headers());
         return new PredicateConfig(predicateConfig.id(), predicateConfig.predicate(), new LogOptions(requestMerged, predicateConfig.request().raw(), predicateConfig.request().body()), new LogOptions(responseMerged, predicateConfig.response().raw(), predicateConfig.response().body()));
     }
 

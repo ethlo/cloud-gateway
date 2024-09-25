@@ -34,7 +34,7 @@ http-logging:
         body: STORE
         raw: STORE
   filter:
-    headers:
+    request-headers:
       excludes:
         - Authorization,r
         - My-App-Key,d

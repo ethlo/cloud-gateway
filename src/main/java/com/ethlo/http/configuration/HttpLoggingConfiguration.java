@@ -35,7 +35,7 @@ public class HttpLoggingConfiguration
 
     public HttpLoggingConfiguration setFilter(final LogFilter filter)
     {
-        this.filter = filter;
+        this.filter = Optional.ofNullable(filter).orElse(new LogFilter());
         return this;
     }
 
