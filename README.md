@@ -105,7 +105,7 @@ Log requests to a file using a customizable template pattern:
 
 ```
 http-logging:
-  provider:
+  providers:
     file:
       enabled: true
       pattern: '{{gateway_request_id}} {{method}} {{path}} {{request_headers["Content-Length"][0]}} {{status}}'
@@ -117,7 +117,13 @@ Log data to a ClickHouse table for detailed analysis:
 
 ```
 http-logging:
-  provider:
+  filter:
+    headers:
+      exclude: 
+          # r = REDACT, default is DELETE
+        - Authorization,r 
+        - Api-Access-Key
+  providers:
     clickhouse:
       enabled: true
       url: jdbc:ch://localhost:18123?database=default&async_insert=1,wait_for_async_insert=0
