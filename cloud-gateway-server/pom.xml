@@ -6,7 +6,7 @@
     <parent>
         <groupId>com.ethlo.http</groupId>
         <artifactId>cloud-gateway</artifactId>
-        <version>1.5.0-SNAPSHOT</version>
+        <version>1.5.0</version>
     </parent>
     <artifactId>cloud-gateway-server</artifactId>
     <packaging>jar</packaging>
@@ -18,12 +18,12 @@
         <dependency>
             <groupId>com.ethlo.http</groupId>
             <artifactId>cloud-gateway-logger-clickhouse</artifactId>
-            <version>1.5.0-SNAPSHOT</version>
+            <version>1.5.0</version>
         </dependency>
         <dependency>
             <groupId>com.ethlo.http</groupId>
             <artifactId>cloud-gateway-logger-file</artifactId>
-            <version>1.5.0-SNAPSHOT</version>
+            <version>1.5.0</version>
         </dependency>
 
         <!-- Test -->
