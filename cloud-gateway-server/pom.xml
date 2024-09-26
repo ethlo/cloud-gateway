@@ -9,6 +9,7 @@
         <version>1.5.0-SNAPSHOT</version>
     </parent>
     <artifactId>cloud-gateway-server</artifactId>
+    <packaging>jar</packaging>
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>
