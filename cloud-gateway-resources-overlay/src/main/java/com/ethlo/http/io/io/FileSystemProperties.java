@@ -1,4 +1,4 @@
-package com.ethlo.io;
+package com.ethlo.http.io.io;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;

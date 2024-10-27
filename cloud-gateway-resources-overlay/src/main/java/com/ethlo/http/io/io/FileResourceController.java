@@ -1,4 +1,4 @@
-package com.ethlo.io;
+package com.ethlo.http.io.io;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -21,7 +21,6 @@ import reactor.core.publisher.Mono;
 @RequestMapping("/files")
 public class FileResourceController
 {
-
     private final Map<String, LayeredFileSystem> layeredFileSystems;
 
     public FileResourceController(Map<String, LayeredFileSystem> layeredFileSystems)
@@ -62,7 +61,7 @@ public class FileResourceController
         {
             LayeredFileSystem fileSystem = getLayeredFileSystem(systemKey);
             sanitizePath(directory);
-            try (var paths = fileSystem.list(Path.of(directory)))
+            try (Stream<Path> paths = fileSystem.list(Path.of(directory)))
             {
                 return ResponseEntity.ok(paths.map(Path::toString));
             }
