@@ -41,7 +41,7 @@ public class LayeredFileSystem extends FileSystem
     private final Thread watcherThread;
     private volatile boolean open;
 
-    public LayeredFileSystem(final List<Path> layers, final Duration cacheTime) throws IOException
+    public LayeredFileSystem(final List<Path> layers, final Duration cacheTime)
     {
         this.layers = layers;
         this.open = true;
@@ -51,16 +51,27 @@ public class LayeredFileSystem extends FileSystem
                 .expireAfterWrite(cacheTime.getSeconds(), TimeUnit.SECONDS)
                 .build();
 
-        // Initialize the watch service for monitoring changes in file systems
-        this.watchService = FileSystems.getDefault().newWatchService();
-        for (Path layer : layers)
+        try
         {
-            layer.register(watchService, StandardWatchEventKinds.ENTRY_CREATE, StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_MODIFY);
+            this.watchService = FileSystems.getDefault().newWatchService();
+            initWatchService(layers);
+        }
+        catch (IOException e)
+        {
+            throw new UncheckedIOException(e);
         }
 
         // Watcher thread to invalidate cache entries on file changes
         this.watcherThread = new Thread(this::processWatchEvents);
         watcherThread.start();
+    }
+
+    private void initWatchService(List<Path> layers) throws IOException
+    {
+        for (Path layer : layers)
+        {
+            layer.register(watchService, StandardWatchEventKinds.ENTRY_CREATE, StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_MODIFY);
+        }
     }
 
     private void processWatchEvents()
@@ -113,7 +124,7 @@ public class LayeredFileSystem extends FileSystem
     }
 
     @Override
-    public void close() throws IOException
+    public void close()
     {
         shutdown();
     }
