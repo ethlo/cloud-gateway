@@ -175,8 +175,7 @@ public class LayeredFileSystem extends FileSystem
             path = first + getSeparator() + String.join(getSeparator(), more);
         }
         final String fullPath = path;
-        return findInLayers(Paths.get(path))
-                .orElseThrow(() -> new UncheckedIOException(new IOException("Path not found: " + fullPath)));
+        return findInLayers(Paths.get(fullPath)).orElseThrow(() -> new UncheckedIOException(new IOException("Path not found: " + fullPath)));
     }
 
     @Override
