@@ -244,6 +244,29 @@ Example config fo skipping specific extensions. Other extensions like `file.zip`
 - NotExtension=html,css,js
 ```
 
+## Serving static resources
+
+When serving static resources, one can define multiple layers, where the first layers are taking precedence over later defined layers. This allows to share common files, but override specific ones where needed. 
+
+The `application.yaml` can define multiple instances of LayeredFileSystem under the `file.systems` prefix. Each entry in file.systems.layers can have a unique key.
+
+```yaml
+static-files:
+   url-prefix: files # default
+   directories:
+      mydir1:
+         - /path/to/layer1/for/filesystem1
+         - /path/to/layer2/for/filesystem1
+      mydir2:
+         - /path/to/layer1/for/filesystem2
+         - /path/to/layer2/for/filesystem2
+         - /path/to/layer3/for/filesystem2
+```
+
+For example, the files from `mydir1` will be available under `/files/mydir1/<file>`.
+
+The prefix `files` can be adjusted with the `static-files.url-prefix` setting as show above.
+
 ## Monitoring with Grafana
 
 Grafana is set up to visualize traffic data logged by Cloud Gateway. Access Grafana
