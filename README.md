@@ -248,7 +248,7 @@ Example config fo skipping specific extensions. Other extensions like `file.zip`
 
 When serving static resources, one can define multiple layers, where the first layers are taking precedence over later defined layers. This allows to share common files, but override specific ones where needed. 
 
-The `application.yaml` can define multiple instances of LayeredFileSystem under the `file.systems` prefix. Each entry in file.systems.layers can have a unique key.
+The `application.yaml` can define multiple instances of LayeredFileSystem.
 
 ```yaml
 static-files:
