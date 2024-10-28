@@ -1,4 +1,4 @@
-package com.ethlo.http.io.io;
+package com.ethlo.http.io;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -226,14 +226,14 @@ public class LayeredFileSystem extends FileSystem
      */
     public Optional<Resource> find(Path path)
     {
-        return findInLayers(path)
-                .map(FileSystemResource::new);
+        return findInLayers(path).map(FileSystemResource::new);
     }
 
     private Optional<Path> findInLayers(Path path)
     {
-        String key = path.toString();
-        return pathCache.get(key, k -> {
+        final String key = path.toString();
+        return pathCache.get(key, k ->
+        {
             for (Path layer : layers)
             {
                 Path resolvedPath = layer.resolve(path);

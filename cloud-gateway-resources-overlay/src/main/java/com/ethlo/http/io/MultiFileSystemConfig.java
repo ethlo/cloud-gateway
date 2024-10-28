@@ -1,4 +1,4 @@
-package com.ethlo.http.io.io;
+package com.ethlo.http.io;
 
 import java.nio.file.Path;
 import java.time.Duration;

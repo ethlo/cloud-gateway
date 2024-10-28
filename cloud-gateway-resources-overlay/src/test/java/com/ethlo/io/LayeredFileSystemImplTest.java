@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-import com.ethlo.http.io.io.LayeredFileSystem;
+import com.ethlo.http.io.LayeredFileSystem;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.file.PathUtils;
