@@ -210,7 +210,11 @@ public class LayeredFileSystem extends FileSystem
             {
                 try (Stream<Path> files = Files.list(resolvedLayerPath))
                 {
-                    files.forEach(f -> uniqueFiles.add(layer.relativize(f)));
+                    files.forEach(f ->
+                    {
+                        final Path relative = layer.relativize(f);
+                        uniqueFiles.add(relative);
+                    });
                 }
             }
         }

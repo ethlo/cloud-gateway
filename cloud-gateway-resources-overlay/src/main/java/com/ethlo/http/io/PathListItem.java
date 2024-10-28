@@ -7,10 +7,9 @@ import java.nio.file.Path;
 
 public record PathListItem(PathType type, String path, long size)
 {
-    public static PathListItem of(final Path base, Path path)
+    public static PathListItem of(final Path path)
     {
-        final Path fullPath = base.resolve(path);
-        return new PathListItem(PathType.of(fullPath), path.toString(), sizeOf(fullPath));
+        return new PathListItem(PathType.of(path), path.getFileName().toString(), sizeOf(path));
     }
 
     private static long sizeOf(Path path)

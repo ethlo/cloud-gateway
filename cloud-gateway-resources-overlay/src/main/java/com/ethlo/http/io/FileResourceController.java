@@ -2,7 +2,6 @@ package com.ethlo.http.io;
 
 import static org.springframework.util.StringUtils.cleanPath;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -61,18 +60,17 @@ public class FileResourceController
             final Path path = length > 1 ? relativePath.subpath(1, length) : Path.of("");
 
             final LayeredFileSystem fileSystem = getLayeredFileSystem(systemKey);
-            final Path layeredFsPath = fileSystem.getPath(path.toString());
 
-            if (!Files.exists(layeredFsPath))
+            if (Files.isDirectory(fileSystem.getPath(path.toString())))
             {
-                throw new UncheckedIOException(new FileNotFoundException("File not found: " + layeredFsPath));
-            }
-
-            if (Files.isDirectory(layeredFsPath))
-            {
-                try (Stream<Path> paths = fileSystem.list(layeredFsPath))
+                try (Stream<Path> paths = fileSystem.list(path))
                 {
-                    final List<PathListItem> content = paths.map(p -> PathListItem.of(layeredFsPath, p.getFileName())).toList();
+                    final List<PathListItem> content = paths.map(p ->
+                    {
+                        final Path fullPath = fileSystem.getPath(path.resolve(p.getFileName()).toString());
+                        return PathListItem.of(fullPath);
+                    }).toList();
+
                     return ResponseEntity
                             .status(HttpStatus.OK)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -87,8 +85,8 @@ public class FileResourceController
             {
                 try
                 {
-                    final Resource resource = fileSystem.find(layeredFsPath).orElseThrow(() -> new IOException("File not found: " + layeredFsPath));
-                    final String extension = FilenameUtils.getExtension(layeredFsPath.getFileName().toString().toLowerCase(Locale.ENGLISH));
+                    final Resource resource = fileSystem.find(fileSystem.getPath(path.toString())).orElseThrow(() -> new IOException("File not found: " + path));
+                    final String extension = FilenameUtils.getExtension(path.getFileName().toString().toLowerCase(Locale.ENGLISH));
                     final MediaType mediaType = mediaTypeFileExtensionResolver.getMediaTypes().getOrDefault(extension, MediaType.parseMediaType("application/octet-stream"));
                     return ResponseEntity
                             .status(HttpStatus.OK)
