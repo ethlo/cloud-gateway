@@ -2,18 +2,24 @@ package com.ethlo.http.io.io;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Stream;
 
+import org.apache.commons.io.FilenameUtils;
 import org.springframework.core.io.Resource;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.accept.MappingMediaTypeFileExtensionResolver;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ServerWebExchange;
 
 import reactor.core.publisher.Mono;
 
@@ -23,54 +29,57 @@ public class FileResourceController
 {
     private final Map<String, LayeredFileSystem> layeredFileSystems;
 
-    public FileResourceController(Map<String, LayeredFileSystem> layeredFileSystems)
+    private final MappingMediaTypeFileExtensionResolver mediaTypeFileExtensionResolver;
+
+    public FileResourceController(Map<String, LayeredFileSystem> layeredFileSystems, MappingMediaTypeFileExtensionResolver mediaTypeFileExtensionResolver)
     {
         this.layeredFileSystems = layeredFileSystems;
+        this.mediaTypeFileExtensionResolver = mediaTypeFileExtensionResolver;
     }
 
-    @GetMapping(value = "/{systemKey}/{filename}", produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
-    public Mono<ResponseEntity<Resource>> getFile(
-            @PathVariable String systemKey,
-            @PathVariable String filename)
+    @GetMapping("/{systemKey}/**")
+    public Mono<ResponseEntity<?>> getFile(@PathVariable String systemKey, ServerWebExchange exchange)
     {
         return Mono.fromCallable(() ->
         {
-            LayeredFileSystem fileSystem = getLayeredFileSystem(systemKey);
-            sanitizePath(filename);
-            try
+            final String filePath = exchange.getRequest().getURI().getPath().split("/files/" + systemKey + "/")[1];
+            final LayeredFileSystem fileSystem = getLayeredFileSystem(systemKey);
+            sanitizePath(filePath);
+
+            final Path path = fileSystem.getPath(filePath);
+            if (Files.isDirectory(path))
             {
-                Resource resource = fileSystem.find(Path.of(filename))
-                        .orElseThrow(() -> new IOException("File not found: " + filename));
-                return ResponseEntity.ok(resource);
+                try (Stream<Path> paths = fileSystem.list(Path.of(filePath)))
+                {
+                    return ResponseEntity
+                            .status(HttpStatus.OK)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .body(paths.map(Path::toString).toList());
+                }
+                catch (IOException e)
+                {
+                    throw new UncheckedIOException(e);
+                }
             }
-            catch (IOException e)
+            else
             {
-                throw new UncheckedIOException(e);
+                try
+                {
+                    final Resource resource = fileSystem.find(path).orElseThrow(() -> new IOException("File not found: " + filePath));
+                    final String extension = FilenameUtils.getExtension(path.getFileName().toString().toLowerCase(Locale.ENGLISH));
+                    final MediaType mediaType = mediaTypeFileExtensionResolver.getMediaTypes().getOrDefault(extension, MediaType.parseMediaType("application/octet-stream"));
+                    return ResponseEntity
+                            .status(HttpStatus.OK)
+                            .contentType(mediaType)
+                            .body(resource);
+                }
+                catch (IOException e)
+                {
+                    throw new UncheckedIOException(e);
+                }
             }
         }).onErrorResume(UncheckedIOException.class, e ->
                 Mono.just(ResponseEntity.notFound().build())
-        );
-    }
-
-    @GetMapping(value = "/{systemKey}/list/{directory:.+}", produces = MediaType.APPLICATION_JSON_VALUE)
-    public Mono<ResponseEntity<Stream<String>>> listFiles(
-            @PathVariable String systemKey,
-            @PathVariable String directory)
-    {
-        return Mono.fromCallable(() ->
-        {
-            LayeredFileSystem fileSystem = getLayeredFileSystem(systemKey);
-            sanitizePath(directory);
-            try (Stream<Path> paths = fileSystem.list(Path.of(directory)))
-            {
-                return ResponseEntity.ok(paths.map(Path::toString));
-            }
-            catch (IOException e)
-            {
-                throw new UncheckedIOException(e);
-            }
-        }).onErrorResume(UncheckedIOException.class, e ->
-                Mono.just(ResponseEntity.badRequest().body(Stream.of("Error listing files: " + e.getMessage())))
         );
     }
 
@@ -86,14 +95,11 @@ public class FileResourceController
 
     private void sanitizePath(String path)
     {
-        if (path.contains("..") || path.contains("//") || path.contains("\\") || path.contains(":"))
+        if (path.contains("..") || path.contains("//") || path.contains("\\"))
         {
             throw new IllegalArgumentException("Invalid path: " + path);
         }
-        if (path.length() > 255)
-        {
-            throw new IllegalArgumentException("Path too long: " + path);
-        }
+
         try
         {
             Paths.get(path);
