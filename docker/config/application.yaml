@@ -108,6 +108,10 @@ spring:
     problemdetails:
       enabled: true
 
+#lamebda:
+#  enabled: true
+#  root-directory: ~/dev/lamebda
+
 # Link to other services' own routes configuration
 #upstream:
 #  interval: PT10S
