@@ -35,11 +35,6 @@
             <artifactId>lamebda-spring-webflux-starter</artifactId>
             <version>3.0.0</version>
         </dependency>
-        <dependency>
-            <groupId>com.ethlo.lamebda</groupId>
-            <artifactId>lamebda-spring-webflux-starter</artifactId>
-            <version>3.0.0</version>
-        </dependency>
 
         <!-- Test -->
         <dependency>
