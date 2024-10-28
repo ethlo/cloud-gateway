@@ -251,17 +251,21 @@ When serving static resources, one can define multiple layers, where the first l
 The `application.yaml` can define multiple instances of LayeredFileSystem under the `file.systems` prefix. Each entry in file.systems.layers can have a unique key.
 
 ```yaml
-file:
-  systems:
-    layers:
-      filesystem1:
-      - /path/to/layer1/for/filesystem1
-      - /path/to/layer2/for/filesystem1
-      filesystem2:
-      - /path/to/layer1/for/filesystem2
-      - /path/to/layer2/for/filesystem2
-      - /path/to/layer3/for/filesystem2
+static-files:
+   url-prefix: files # default
+   directories:
+      mydir1:
+         - /path/to/layer1/for/filesystem1
+         - /path/to/layer2/for/filesystem1
+      mydir2:
+         - /path/to/layer1/for/filesystem2
+         - /path/to/layer2/for/filesystem2
+         - /path/to/layer3/for/filesystem2
 ```
+
+For example, the files from `mydir1` will be available under `/files/mydir1/<file>`.
+
+The prefix `files` can be adjusted with the `static-files.url-prefix` setting as show above.
 
 ## Monitoring with Grafana
 

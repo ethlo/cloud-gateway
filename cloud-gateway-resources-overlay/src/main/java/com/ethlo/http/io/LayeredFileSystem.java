@@ -17,7 +17,6 @@ import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 import java.nio.file.attribute.UserPrincipalLookupService;
 import java.nio.file.spi.FileSystemProvider;
-import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -41,14 +40,15 @@ public class LayeredFileSystem extends FileSystem
     private final Thread watcherThread;
     private volatile boolean open;
 
-    public LayeredFileSystem(final List<Path> layers, final Duration cacheTime)
+    public LayeredFileSystem(final List<Path> layers, final FileSystemProperties.CacheConfig cacheConfig)
     {
         this.layers = layers;
         this.open = true;
 
         // Create a cache to store file paths based on requests
         this.pathCache = Caffeine.newBuilder()
-                .expireAfterWrite(cacheTime.getSeconds(), TimeUnit.SECONDS)
+                .maximumSize(cacheConfig.maxSize())
+                .expireAfterWrite(cacheConfig.duration().getSeconds(), TimeUnit.SECONDS)
                 .build();
 
         try

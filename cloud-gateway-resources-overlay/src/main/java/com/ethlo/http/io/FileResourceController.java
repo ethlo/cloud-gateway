@@ -37,13 +37,13 @@ public class FileResourceController
     private final Map<String, LayeredFileSystem> layeredFileSystems;
 
     private final MappingMediaTypeFileExtensionResolver mediaTypeFileExtensionResolver;
-    private final String urlPrefix;
+    private final Path prefixPath;
 
-    public FileResourceController(Map<String, LayeredFileSystem> layeredFileSystems, MappingMediaTypeFileExtensionResolver mediaTypeFileExtensionResolver, @Value("${file.static-url-prefix}") final String urlPrefix)
+    public FileResourceController(Map<String, LayeredFileSystem> layeredFileSystems, MappingMediaTypeFileExtensionResolver mediaTypeFileExtensionResolver, @Value("${static-files.url-prefix}") final String urlPrefix)
     {
         this.layeredFileSystems = layeredFileSystems;
         this.mediaTypeFileExtensionResolver = mediaTypeFileExtensionResolver;
-        this.urlPrefix = urlPrefix;
+        this.prefixPath = Path.of(cleanPath("/" + urlPrefix));
     }
 
     @GetMapping("/{systemKey}/**")
@@ -51,7 +51,6 @@ public class FileResourceController
     {
         return Mono.fromCallable(() ->
         {
-            final Path prefixPath = Path.of(cleanPath("/" + urlPrefix));
             final String requestPath = exchange.getRequest().getURI().getPath();
             sanitizePath(requestPath);
             final Path fullRequestPath = Path.of(cleanPath(requestPath));
