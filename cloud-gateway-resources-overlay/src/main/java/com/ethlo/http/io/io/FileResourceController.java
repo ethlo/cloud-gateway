@@ -5,12 +5,15 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Stream;
 
 import org.apache.commons.io.FilenameUtils;
 import org.springframework.core.io.Resource;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -21,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ServerWebExchange;
 
+import com.ethlo.http.io.PathListItem;
 import reactor.core.publisher.Mono;
 
 @RestController
@@ -49,12 +53,13 @@ public class FileResourceController
             final Path path = fileSystem.getPath(filePath);
             if (Files.isDirectory(path))
             {
-                try (Stream<Path> paths = fileSystem.list(Path.of(filePath)))
+                try (Stream<Path> paths = fileSystem.list(path))
                 {
+                    final List<PathListItem> content = paths.map(p -> PathListItem.of(path, p.getFileName())).toList();
                     return ResponseEntity
                             .status(HttpStatus.OK)
                             .contentType(MediaType.APPLICATION_JSON)
-                            .body(paths.map(Path::toString).toList());
+                            .body(new PageImpl<>(content, PageRequest.of(0, content.size()), content.size()));
                 }
                 catch (IOException e)
                 {
