@@ -39,7 +39,7 @@ public class FileResourceController
     private final MappingMediaTypeFileExtensionResolver mediaTypeFileExtensionResolver;
     private final Path prefixPath;
 
-    public FileResourceController(Map<String, LayeredFileSystem> layeredFileSystems, MappingMediaTypeFileExtensionResolver mediaTypeFileExtensionResolver, @Value("${static-files.url-prefix}") final String urlPrefix)
+    public FileResourceController(Map<String, LayeredFileSystem> layeredFileSystems, MappingMediaTypeFileExtensionResolver mediaTypeFileExtensionResolver, @Value("${static-files.url-prefix:files}") final String urlPrefix)
     {
         this.layeredFileSystems = layeredFileSystems;
         this.mediaTypeFileExtensionResolver = mediaTypeFileExtensionResolver;
