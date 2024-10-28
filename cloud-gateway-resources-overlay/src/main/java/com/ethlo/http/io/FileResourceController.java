@@ -57,7 +57,8 @@ public class FileResourceController
             sanitizePath(requestPath);
             final Path fullRequestPath = Path.of(cleanPath(requestPath));
             final Path relativePath = Path.of(fullRequestPath.toString().substring(prefixPath.toString().length()));
-            final Path path = relativePath.getNameCount() > 1 ? relativePath.subpath(1, relativePath.getNameCount()) : relativePath;
+            final int length = relativePath.getNameCount();
+            final Path path = length > 1 ? relativePath.subpath(1, length) : Path.of("");
 
             final LayeredFileSystem fileSystem = getLayeredFileSystem(systemKey);
             final Path layeredFsPath = fileSystem.getPath(path.toString());
