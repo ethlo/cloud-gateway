@@ -263,7 +263,7 @@ static-files:
          - /path/to/layer3/for/mydir2
 ```
 
-For example, the files from `mydir1` will be available under `/files/mydir1/<file>`.
+For example, the files from `mydir1` will be available under `/myfiles/mydir1/<file>`.
 
 The prefix can be adjusted with the `static-files.url-prefix` setting as shown above.
 
