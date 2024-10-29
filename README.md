@@ -252,20 +252,41 @@ The `application.yaml` can define multiple instances of LayeredFileSystem.
 
 ```yaml
 static-files:
-   url-prefix: files # default
+   url-prefix: myfiles # default prefix is `files`
    directories:
       mydir1:
-         - /path/to/layer1/for/filesystem1
-         - /path/to/layer2/for/filesystem1
+         - /path/to/layer1/for/mydir1
+         - /path/to/layer2/for/mydir1
       mydir2:
-         - /path/to/layer1/for/filesystem2
-         - /path/to/layer2/for/filesystem2
-         - /path/to/layer3/for/filesystem2
+         - /path/to/layer1/for/mydir2
+         - /path/to/layer2/for/mydir2
+         - /path/to/layer3/for/mydir2
 ```
 
 For example, the files from `mydir1` will be available under `/files/mydir1/<file>`.
 
-The prefix `files` can be adjusted with the `static-files.url-prefix` setting as show above.
+The prefix can be adjusted with the `static-files.url-prefix` setting as shown above.
+
+#### An example with 3 layers:
+```
+            ▼
+┌──────────────────────────┐
+│        [Layer 1]         │ ▶ Not found, continue
+└──────────────────────────┘
+            ▼         
+┌──────────────────────────┐
+│        [Layer 2]         │ ▶ Not found, continue
+└──────────────────────────┘
+            ▼
+┌──────────────────────────┐
+│        [Layer 3]         │ ▶ Found, return contents
+└──────────────────────────┘
+```
+
+* Layer 1: The request checks Layer 1 first. Since the file is not present, the system moves to the next layer.
+* Layer 2: The system checks Layer 2, where the file is also not found.
+* Layer 3: The file is finally located in Layer 3, so the system retrieves it from this layer.
+This approach maintains a fallback order, with each layer serving as a backup if the file is not available in the layers above it.
 
 ## Monitoring with Grafana
 
