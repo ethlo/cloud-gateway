@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
@@ -144,6 +145,7 @@ public class InjectAccessTokenAuthGatewayFilterFactory extends AbstractGatewayFi
 
     public static class Config
     {
+        private static final Duration DEFAULT_MINIMUM_TTL = Duration.ofMinutes(1);
         @NotEmpty
         private String tokenUrl;
 
@@ -181,7 +183,7 @@ public class InjectAccessTokenAuthGatewayFilterFactory extends AbstractGatewayFi
 
         public Config setMinimumTTL(final Duration minimumTTL)
         {
-            this.minimumTTL = minimumTTL;
+            this.minimumTTL = Optional.ofNullable(minimumTTL).orElse(DEFAULT_MINIMUM_TTL);
             return this;
         }
 
