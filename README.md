@@ -180,11 +180,22 @@ Example shorthand:
 Example full:
 
 ```yaml
-  filters:
-    - name: TemplateRedirect
-      source: /foo/(?<var1>.*)/21/(?<var2>.*)
-      target: https://example.com/{{var2}}?={{var1}}
-      status: 301 # default is 302
+filters:
+  - name: TemplateRedirect
+    source: /foo/(?<var1>.*)/21/(?<var2>.*)
+    target: https://example.com/{{var2}}?={{var1}}
+    status: 301 # default is 302
+```
+
+### InjectAccessTokenAuth
+```yaml
+filters:
+  - name: InjectAccessTokenAuth
+    args:
+      client-id: my-client
+      token-url: https://sso.example.com/token
+      refresh-token: ey...
+      minimum-ttl: PT30S # Default is 1 minute
 ```
 
 ### InjectBasicAuth
@@ -193,10 +204,10 @@ Allows the injection of basic auth credentials before forwarding the request ups
 
 ```yaml
 filters:
-- name: InjectBasicAuth
-  args:
-    username: ${SECRET_USERNAME}
-    password: ${SECRET_PASSWORD}
+  - name: InjectBasicAuth
+    args:
+      username: ${SECRET_USERNAME}
+      password: ${SECRET_PASSWORD}
 ```
 
 ## Custom predicates
