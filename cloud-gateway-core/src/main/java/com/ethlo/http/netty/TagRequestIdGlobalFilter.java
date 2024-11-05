@@ -109,7 +109,7 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
             if (!cleaned)
             {
                 final Pair<String, String> filenames = dataBufferRepository.getBufferFileNames(requestId);
-                logger.warn("There were problems storing data for request {}. The buffer files are left behind: {} {}. Details: {}", requestId, filenames.getFirst(), filenames.getSecond(), logResult.getProcessingErrors());
+                logger.warn("There were problems storing data for request {}. The buffer files are left behind: {} {}. Details: {}", requestId, filenames.getFirst(), filenames.getSecond(), Optional.ofNullable(logResult).map(AccessLogResult::getProcessingErrors).orElse(List.of()));
             }
         });
     }
