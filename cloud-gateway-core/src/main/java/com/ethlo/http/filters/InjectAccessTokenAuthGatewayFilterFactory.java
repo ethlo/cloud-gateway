@@ -2,10 +2,13 @@ package com.ethlo.http.filters;
 
 import static java.net.URLEncoder.encode;
 
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -17,12 +20,17 @@ import org.slf4j.LoggerFactory;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
+import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.interfaces.DecodedJWT;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import jakarta.validation.constraints.NotEmpty;
@@ -35,12 +43,14 @@ public class InjectAccessTokenAuthGatewayFilterFactory extends AbstractGatewayFi
 {
     private static final Logger logger = LoggerFactory.getLogger(InjectAccessTokenAuthGatewayFilterFactory.class);
     private final HttpClient httpClient;
+    private final ObjectMapper objectMapper;
     protected DecodedJWT jwt;
 
-    public InjectAccessTokenAuthGatewayFilterFactory(final HttpClient httpClient)
+    public InjectAccessTokenAuthGatewayFilterFactory(final HttpClient httpClient, final ObjectMapper objectMapper)
     {
         super(Config.class);
         this.httpClient = httpClient;
+        this.objectMapper = objectMapper;
     }
 
     private static String encodeFormData(Map<String, String> formData)
@@ -62,11 +72,47 @@ public class InjectAccessTokenAuthGatewayFilterFactory extends AbstractGatewayFi
             public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain)
             {
                 return getAccessToken(config).flatMap(token ->
+                        {
+                            final String authValue = "Bearer " + jwt.getToken();
+                            exchange.getRequest().getHeaders().set("Authorization", authValue);
+                            return chain.filter(exchange);
+                        }).onErrorResume(error ->
+                        {
+                            logger.warn("Denying access: {}", error.getMessage());
+                            return handleError(exchange);
+                        })
+                        .onErrorComplete();
+            }
+
+            private Mono<Void> handleError(ServerWebExchange exchange)
+            {
+                // Create a JSON response body
+                final Map<String, Object> errorAttributes = new LinkedHashMap<>();
+                errorAttributes.put("timestamp", new Date());
+                errorAttributes.put("path", exchange.getRequest().getPath().value());
+                final HttpStatus errorStatus = HttpStatus.FORBIDDEN;
+                errorAttributes.put("status", errorStatus.value());
+                errorAttributes.put("error", errorStatus.getReasonPhrase());
+                errorAttributes.put("requestId", exchange.getRequest().getId());
+
+                final String errorJson;
+                try
                 {
-                    final String authValue = "Bearer " + jwt.getToken();
-                    exchange.getRequest().getHeaders().set("Authorization", authValue);
-                    return chain.filter(exchange);
-                });
+                    errorJson = objectMapper.writeValueAsString(errorAttributes);
+                }
+                catch (JsonProcessingException e)
+                {
+                    throw new UncheckedIOException(e);
+                }
+
+                // Set the response headers
+                exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
+                exchange.getResponse().getHeaders().setContentType(MediaType.APPLICATION_JSON);
+                exchange.getResponse().getHeaders().add(HttpHeaders.CONTENT_LENGTH, String.valueOf(errorJson.length()));
+
+                // Write the JSON error response to the output buffer
+                DataBuffer buffer = exchange.getResponse().bufferFactory().wrap(errorJson.getBytes());
+                return exchange.getResponse().writeWith(Mono.just(buffer));
             }
 
             @Override
@@ -137,7 +183,10 @@ public class InjectAccessTokenAuthGatewayFilterFactory extends AbstractGatewayFi
                     }
                     else
                     {
-                        return Mono.error(new RuntimeException("Failed to POST with status code " + response.status().code()));
+                        return body.map(b -> b.toString(StandardCharsets.UTF_8))
+                                .flatMap(decodedBody -> Mono.error(new RuntimeException(
+                                        "Failed to fetch access token. Upstream token endpoint status code was " + response.status().code() + ":\n" + decodedBody
+                                )));
                     }
                 })
                 .flatMap(responseBody -> Mono.just(JWT.decode(responseBody)));

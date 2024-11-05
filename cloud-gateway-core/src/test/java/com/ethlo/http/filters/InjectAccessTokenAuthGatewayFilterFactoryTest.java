@@ -28,6 +28,7 @@ import org.springframework.web.server.ServerWebExchange;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.ethlo.http.filters.InjectAccessTokenAuthGatewayFilterFactory.Config;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
 import com.github.tomakehurst.wiremock.matching.RequestPattern;
 import com.github.tomakehurst.wiremock.verification.LoggedRequest;
@@ -47,7 +48,7 @@ public class InjectAccessTokenAuthGatewayFilterFactoryTest
     @BeforeEach
     public void setup()
     {
-        filterFactory = new InjectAccessTokenAuthGatewayFilterFactory(HttpClient.create());
+        filterFactory = new InjectAccessTokenAuthGatewayFilterFactory(HttpClient.create(), new ObjectMapper());
     }
 
     @Test
