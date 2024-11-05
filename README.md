@@ -188,6 +188,8 @@ filters:
 ```
 
 ### InjectAccessTokenAuth
+
+Allows to inject a JWT bearer-token that is fetched on behalf of the configured refresh token. In case the refresh token is not valid, or there is an error fetching a bearer token, an HTTP 403 Forbidden is returned from Cloud Gateway.
 ```yaml
 filters:
   - name: InjectAccessTokenAuth
