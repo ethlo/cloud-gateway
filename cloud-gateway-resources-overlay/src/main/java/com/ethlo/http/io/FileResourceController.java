@@ -22,6 +22,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.accept.MappingMediaTypeFileExtensionResolver;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -33,14 +34,13 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 @RestController
-@RequestMapping("${file.static-url-prefix:files}")
+@RequestMapping("${static-files.url-prefix:files}")
 public class FileResourceController
 {
+    private static final Logger logger = LoggerFactory.getLogger(FileResourceController.class);
     private final Map<String, LayeredFileSystem> layeredFileSystems;
-
     private final MappingMediaTypeFileExtensionResolver mediaTypeFileExtensionResolver;
     private final Path prefixPath;
-    private static final Logger logger = LoggerFactory.getLogger(FileResourceController.class);
 
     public FileResourceController(Map<String, LayeredFileSystem> layeredFileSystems, MappingMediaTypeFileExtensionResolver mediaTypeFileExtensionResolver, @Value("${static-files.url-prefix:files}") final String urlPrefix)
     {
@@ -67,7 +67,8 @@ public class FileResourceController
 
             final LayeredFileSystem fileSystem = getLayeredFileSystem(systemKey);
 
-            if (Files.isDirectory(fileSystem.getPath(path.toString())))
+            final Path fileSystemPath = fileSystem.getPath(path.toString());
+            if (Files.isDirectory(fileSystemPath))
             {
                 try (Stream<Path> paths = fileSystem.list(path))
                 {
@@ -105,7 +106,12 @@ public class FileResourceController
                 }
             }
         }).onErrorResume(UncheckedIOException.class, e ->
-                Mono.just(ResponseEntity.notFound().build())
+                {
+                    final ProblemDetail pd = ProblemDetail.forStatus(HttpStatus.NOT_FOUND);
+                    pd.setDetail(e.getMessage());
+                    final ResponseEntity.HeadersBuilder<?> res = ResponseEntity.of(pd);
+                    return Mono.just(res.build());
+                }
         );
     }
 
