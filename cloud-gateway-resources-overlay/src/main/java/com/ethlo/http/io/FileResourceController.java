@@ -14,6 +14,8 @@ import java.util.Map;
 import java.util.stream.Stream;
 
 import org.apache.commons.io.FilenameUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.PageImpl;
@@ -38,12 +40,17 @@ public class FileResourceController
 
     private final MappingMediaTypeFileExtensionResolver mediaTypeFileExtensionResolver;
     private final Path prefixPath;
+    private static final Logger logger = LoggerFactory.getLogger(FileResourceController.class);
 
     public FileResourceController(Map<String, LayeredFileSystem> layeredFileSystems, MappingMediaTypeFileExtensionResolver mediaTypeFileExtensionResolver, @Value("${static-files.url-prefix:files}") final String urlPrefix)
     {
         this.layeredFileSystems = layeredFileSystems;
         this.mediaTypeFileExtensionResolver = mediaTypeFileExtensionResolver;
         this.prefixPath = Path.of(cleanPath("/" + urlPrefix));
+
+        logger.info("Initializing static resource controller with prefix {}", this.prefixPath);
+        logger.debug("File system layers: {}", layeredFileSystems);
+        logger.debug("Media types registered: {}", this.mediaTypeFileExtensionResolver.getMediaTypes());
     }
 
     @GetMapping("/{systemKey}/**")

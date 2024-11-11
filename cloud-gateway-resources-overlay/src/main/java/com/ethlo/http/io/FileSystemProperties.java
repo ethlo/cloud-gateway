@@ -79,6 +79,4 @@ public class FileSystemProperties
     public record CacheConfig(Duration duration, int maxSize)
     {
     }
-
-    ;
 }

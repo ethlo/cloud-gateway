@@ -25,6 +25,8 @@ import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 
@@ -34,6 +36,7 @@ import jakarta.annotation.Nonnull;
 
 public class LayeredFileSystem extends FileSystem
 {
+    private static final Logger logger = LoggerFactory.getLogger(LayeredFileSystem.class);
     private final List<Path> layers;
     private final Cache<String, Optional<Path>> pathCache;
     private final WatchService watchService;
@@ -204,6 +207,7 @@ public class LayeredFileSystem extends FileSystem
         final SortedSet<Path> uniqueFiles = new TreeSet<>();
         for (Path layer : layers)
         {
+            logger.debug("Searching layer {} for path {}", layer, path);
             Path resolvedLayerPath = layer.resolve(path);
             if (Files.exists(resolvedLayerPath) && Files.isDirectory(resolvedLayerPath))
             {
@@ -212,9 +216,14 @@ public class LayeredFileSystem extends FileSystem
                     files.forEach(f ->
                     {
                         final Path relative = layer.relativize(f);
+                        logger.debug("Adding {} to the listing", relative);
                         uniqueFiles.add(relative);
                     });
                 }
+            }
+            else
+            {
+                logger.debug("Layer {} did not have path {} as a directory", layer, path);
             }
         }
         if (uniqueFiles.isEmpty())
@@ -234,18 +243,30 @@ public class LayeredFileSystem extends FileSystem
 
     private Optional<Path> findInLayers(Path path)
     {
+        logger.debug("Attempting to fetch path {}", path);
         final String key = path.toString();
         return pathCache.get(key, k ->
         {
             for (Path layer : layers)
             {
+                logger.debug("Checking layer {}", layer);
                 Path resolvedPath = layer.resolve(path);
                 if (Files.exists(resolvedPath))
                 {
+                    logger.debug("Path {} was found in layer {}", path, layer);
                     return Optional.of(resolvedPath);
                 }
             }
+            logger.debug("Path {} not found in any layer", path);
             return Optional.empty();
         });
+    }
+
+    @Override
+    public String toString()
+    {
+        return "LayeredFileSystem{" +
+                "layers=" + layers +
+                '}';
     }
 }
