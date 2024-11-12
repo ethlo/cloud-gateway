@@ -301,6 +301,10 @@ The prefix can be adjusted with the `static-files.url-prefix` setting as shown a
 * Layer 3: The file is finally located in Layer 3, so the system retrieves it from this layer.
 This approach maintains a fallback order, with each layer serving as a backup if the file is not available in the layers above it.
 
+> [!IMPORTANT]
+> To define paths with multiple segments, you need to wrap the YAML key in quotes and brackets to avoid stripping of slashes from the key!
+> I.e. to define `/foo/bar` you need to write `"[/foo/bar]"`.
+
 ## Monitoring with Grafana
 
 Grafana is set up to visualize traffic data logged by Cloud Gateway. Access Grafana
