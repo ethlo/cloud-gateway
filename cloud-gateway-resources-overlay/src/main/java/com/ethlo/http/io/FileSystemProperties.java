@@ -43,6 +43,9 @@ public class FileSystemProperties
     );
 
     private CacheConfig cacheConfig = new CacheConfig(Duration.ofMinutes(10), 1_000);
+    private boolean allowRootListing = true;
+
+    private String urlPrefix = "files";
 
     public Map<String, List<String>> getDirectories()
     {
@@ -73,6 +76,28 @@ public class FileSystemProperties
     public FileSystemProperties setCacheConfig(final CacheConfig cacheConfig)
     {
         this.cacheConfig = cacheConfig;
+        return this;
+    }
+
+    public boolean isAllowRootListing()
+    {
+        return allowRootListing;
+    }
+
+    public FileSystemProperties setAllowRootListing(final boolean allowRootListing)
+    {
+        this.allowRootListing = allowRootListing;
+        return this;
+    }
+
+    public String getUrlPrefix()
+    {
+        return urlPrefix;
+    }
+
+    public FileSystemProperties setUrlPrefix(final String urlPrefix)
+    {
+        this.urlPrefix = urlPrefix;
         return this;
     }
 

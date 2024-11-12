@@ -26,7 +26,7 @@ public record PathListItem(PathType type, String path, long size)
 
     enum PathType
     {
-        FILE, DIRECTORY;
+        FILE, DIRECTORY, ROOT;
 
         public static PathType of(Path path)
         {
