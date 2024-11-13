@@ -15,15 +15,13 @@ public class HeaderPredicate implements Function<String, HeaderProcessing>
 {
     public static final HeaderPredicate ALL = new HeaderPredicate(Set.of(), Set.of());
 
-    private final Map<String, HeaderProcessing> includes;
-    private final Map<String, HeaderProcessing> excludes;
+    private Map<String, HeaderProcessing> includes;
+    private Map<String, HeaderProcessing> excludes;
 
     public HeaderPredicate(Set<String> includes, Set<String> excludes)
     {
-        this.includes = Optional.ofNullable(includes).orElse(Set.of()).stream()
-                .collect(Collectors.toMap(e -> parseProcessing(e, NONE).getKey(), e -> parseProcessing(e, NONE).getValue()));
-        this.excludes = Optional.ofNullable(excludes).orElse(Set.of()).stream()
-                .collect(Collectors.toMap(e -> parseProcessing(e, DELETE).getKey(), e -> parseProcessing(e, DELETE).getValue()));
+        setIncludes(includes);
+        setExcludes(excludes);
     }
 
     @Override
@@ -83,9 +81,21 @@ public class HeaderPredicate implements Function<String, HeaderProcessing>
         return toString(includes);
     }
 
+    private void setIncludes(Set<String> includes)
+    {
+        this.includes = Optional.ofNullable(includes).orElse(Set.of()).stream()
+                .collect(Collectors.toMap(e -> parseProcessing(e, NONE).getKey(), e -> parseProcessing(e, NONE).getValue()));
+    }
+
     public Set<String> getExcludes()
     {
         return toString(excludes);
+    }
+
+    public void setExcludes(final Set<String> excludes)
+    {
+        this.excludes = Optional.ofNullable(excludes).orElse(Set.of()).stream()
+                .collect(Collectors.toMap(e -> parseProcessing(e, DELETE).getKey(), e -> parseProcessing(e, DELETE).getValue()));
     }
 
     private Set<String> toString(final Map<String, HeaderProcessing> map)
