@@ -27,20 +27,20 @@ public class RequestIdHeaderGatewayFilterFactory extends AbstractGatewayFilterFa
             public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain)
             {
                 final String internalRequestId = exchange.getRequest().getId();
-                exchange.getRequest().getHeaders().set(config.getRequestHeaderName(), internalRequestId);
+                exchange.getRequest().mutate().header(config.getHeaderName(), internalRequestId);
                 return chain.filter(exchange);
             }
 
             @Override
             public String toString()
             {
-                return RequestIdHeaderGatewayFilterFactory.class + "{requestHeaderName=" + config.getRequestHeaderName() + "}";
+                return RequestIdHeaderGatewayFilterFactory.class + "{headerName=" + config.getHeaderName() + "}";
             }
 
             @Override
             public List<String> shortcutFieldOrder()
             {
-                return List.of("requestHeaderName");
+                return List.of("headerName");
             }
 
             @Override
@@ -53,16 +53,16 @@ public class RequestIdHeaderGatewayFilterFactory extends AbstractGatewayFilterFa
 
     public static class Config
     {
-        private String requestHeaderName = "X-Internal-Request-Id";
+        private String headerName = "X-Internal-Request-Id";
 
-        public String getRequestHeaderName()
+        public String getHeaderName()
         {
-            return requestHeaderName;
+            return headerName;
         }
 
-        public Config setRequestHeaderName(final String requestHeaderName)
+        public Config setHeaderName(final String requestHeaderName)
         {
-            this.requestHeaderName = requestHeaderName;
+            this.headerName = requestHeaderName;
             return this;
         }
     }
