@@ -60,10 +60,25 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
     @Override
     public @Nonnull Mono<Void> filter(@Nonnull ServerWebExchange exchange, GatewayFilterChain chain)
     {
-        return Flux.fromIterable(predicateConfigs)
-                .filterWhen(c -> (Publisher<Boolean>) c.predicate().apply(exchange))
-                .flatMap(c -> prepareForLoggingIfApplicable(exchange, chain, loggingFilterService.merge(c)))
-                .switchIfEmpty(chain.filter(exchange))
+        final Flux<PredicateConfig> filteredConfigs = Flux.fromIterable(predicateConfigs)
+                .filterWhen(c -> (Publisher<Boolean>) c.predicate().apply(exchange));
+
+        return filteredConfigs
+                .hasElements()  // Check if any predicate passed
+                .flatMapMany(hasMatches -> {
+                    if (hasMatches)
+                    {
+                        // If there's at least one match, run prepareForLoggingIfApplicable once
+                        return filteredConfigs.take(1)
+                                .flatMap(predicateConfig ->
+                                        prepareForLoggingIfApplicable(exchange, chain, loggingFilterService.merge(predicateConfig)));
+                    }
+                    else
+                    {
+                        // If no matches, run chain.filter(exchange)
+                        return chain.filter(exchange).flux();
+                    }
+                })
                 .next();
     }
 
