@@ -167,13 +167,12 @@ the [Spring Boot documentation on using it behind a proxy server](https://docs.s
 
 ### CorrelationIdHeader
           
-A filter that injects a correlation-id header in both the request and response headers. Upstream servers should use this correlation id to correlate the logs entries. 
+A filter that injects a correlation-id header in both the request and response headers. Upstream servers should use this correlation-id to correlate the log entries. 
 ```yaml
 filters:
 - CorrelationIdHeader
 ```
-The header name can be changed if necessary, by setting the `header-name` argument.
-
+The header name can be changed if necessary, by setting the `header-name` argument. The default is `X-Correlation-Id`.
 ### TemplateRedirect
 
 It supports regexp named parameters, otherwise you can also use numeric variables like `{{1}}` and `{{2}}`. You also
