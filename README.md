@@ -165,6 +165,15 @@ the [Spring Boot documentation on using it behind a proxy server](https://docs.s
 
 ## Custom filters
 
+### CorrelationIdHeader
+          
+A filter that injects a correlation-id header in both the request and response headers. Upstream servers should use this correlation id to correlate the logs entries. 
+```yaml
+filters:
+- CorrelationIdHeader
+```
+The header name can be changed if necessary, by setting the `header-name` argument.
+
 ### TemplateRedirect
 
 It supports regexp named parameters, otherwise you can also use numeric variables like `{{1}}` and `{{2}}`. You also
@@ -173,18 +182,18 @@ have access to query paramters via `query`
 Example shorthand:
 
 ```yaml
-  filters:
-    - TemplateRedirect=/foo/(?<var1>.*)/21/(?<var2>.*),https://example.com/{{var2}}?={{var1}},302
+filters:
+- TemplateRedirect=/foo/(?<var1>.*)/21/(?<var2>.*),https://example.com/{{var2}}?={{var1}},302
 ```
 
 Example full:
 
 ```yaml
 filters:
-  - name: TemplateRedirect
-    source: /foo/(?<var1>.*)/21/(?<var2>.*)
-    target: https://example.com/{{var2}}?={{var1}}
-    status: 301 # default is 302
+- name: TemplateRedirect
+  source: /foo/(?<var1>.*)/21/(?<var2>.*)
+  target: https://example.com/{{var2}}?={{var1}}
+  status: 301 # default is 302
 ```
 
 ### InjectAccessTokenAuth
