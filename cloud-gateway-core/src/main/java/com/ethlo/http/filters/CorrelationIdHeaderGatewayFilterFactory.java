@@ -11,9 +11,9 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 @Component
-public class RequestIdHeaderGatewayFilterFactory extends AbstractGatewayFilterFactory<RequestIdHeaderGatewayFilterFactory.Config>
+public class CorrelationIdHeaderGatewayFilterFactory extends AbstractGatewayFilterFactory<CorrelationIdHeaderGatewayFilterFactory.Config>
 {
-    public RequestIdHeaderGatewayFilterFactory()
+    public CorrelationIdHeaderGatewayFilterFactory()
     {
         super(Config.class);
     }
@@ -28,13 +28,14 @@ public class RequestIdHeaderGatewayFilterFactory extends AbstractGatewayFilterFa
             {
                 final String internalRequestId = exchange.getRequest().getId();
                 exchange.getRequest().mutate().header(config.getHeaderName(), internalRequestId);
+                exchange.getResponse().getHeaders().set(config.getHeaderName(), internalRequestId);
                 return chain.filter(exchange);
             }
 
             @Override
             public String toString()
             {
-                return RequestIdHeaderGatewayFilterFactory.class + "{headerName=" + config.getHeaderName() + "}";
+                return CorrelationIdHeaderGatewayFilterFactory.class + "{headerName=" + config.getHeaderName() + "}";
             }
 
             @Override
@@ -53,7 +54,7 @@ public class RequestIdHeaderGatewayFilterFactory extends AbstractGatewayFilterFa
 
     public static class Config
     {
-        private String headerName = "X-Internal-Request-Id";
+        private String headerName = "X-Correlation-Id";
 
         public String getHeaderName()
         {

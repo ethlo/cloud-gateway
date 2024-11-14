@@ -1,10 +1,14 @@
 package com.ethlo.http.netty;
 
+import java.math.BigInteger;
+import java.net.URI;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ThreadLocalRandom;
 
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
@@ -14,11 +18,17 @@ import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.cloud.gateway.route.Route;
 import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
 import org.springframework.core.Ordered;
+import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.data.util.Pair;
+import org.springframework.http.HttpCookie;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.server.RequestPath;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.ErrorResponseException;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.server.ServerWebExchange;
@@ -56,10 +66,83 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
         this.ioScheduler = ioScheduler;
     }
 
+    private static ServerWebExchange wrapWithRequestId(ServerWebExchange exchange)
+    {
+        final String requestId = generateId();
+        final ServerHttpRequest origRequest = exchange.getRequest();
+        return exchange.mutate().request(new ServerHttpRequest()
+        {
+            @Override
+            @Nonnull
+            public HttpHeaders getHeaders()
+            {
+                return origRequest.getHeaders();
+            }
+
+            @Override
+            @Nonnull
+            public Flux<DataBuffer> getBody()
+            {
+                return origRequest.getBody();
+            }
+
+            @Override
+            @Nonnull
+            public HttpMethod getMethod()
+            {
+                return origRequest.getMethod();
+            }
+
+            @Override
+            @Nonnull
+            public URI getURI()
+            {
+                return origRequest.getURI();
+            }
+
+            @Override
+            @Nonnull
+            public String getId()
+            {
+                return requestId;
+            }
+
+            @Override
+            @Nonnull
+            public RequestPath getPath()
+            {
+                return origRequest.getPath();
+            }
+
+            @Override
+            @Nonnull
+            public MultiValueMap<String, String> getQueryParams()
+            {
+                return origRequest.getQueryParams();
+            }
+
+            @Override
+            @Nonnull
+            public MultiValueMap<String, HttpCookie> getCookies()
+            {
+                return origRequest.getCookies();
+            }
+        }).build();
+    }
+
+    private static String generateId()
+    {
+        final String timestampPart = Long.toString(Instant.now().toEpochMilli(), 36);
+        final String randomPart = new BigInteger(48, ThreadLocalRandom.current()).toString(36);
+        return timestampPart + "-" + randomPart;
+    }
+
     @SuppressWarnings("unchecked")
     @Override
-    public @Nonnull Mono<Void> filter(@Nonnull ServerWebExchange exchange, GatewayFilterChain chain)
+    public @Nonnull Mono<Void> filter(@Nonnull ServerWebExchange origExchange, GatewayFilterChain chain)
     {
+        final ServerWebExchange exchange = wrapWithRequestId(origExchange);
+
         final Flux<PredicateConfig> filteredConfigs = Flux.fromIterable(predicateConfigs)
                 .filterWhen(c -> (Publisher<Boolean>) c.predicate().apply(exchange));
 
