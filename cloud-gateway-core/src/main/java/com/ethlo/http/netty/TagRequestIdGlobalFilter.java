@@ -133,7 +133,7 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
     private static String generateId()
     {
         final String timestampPart = Long.toString(Instant.now().toEpochMilli(), 36);
-        final String randomPart = new BigInteger(48, ThreadLocalRandom.current()).toString(36);
+        final String randomPart = new BigInteger(56, ThreadLocalRandom.current()).toString(36);
         return timestampPart + "-" + randomPart;
     }
 
