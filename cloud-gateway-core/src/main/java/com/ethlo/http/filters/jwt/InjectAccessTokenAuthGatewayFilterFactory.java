@@ -19,6 +19,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.json.Jackson2JsonEncoder;
+import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
@@ -83,12 +84,13 @@ public class InjectAccessTokenAuthGatewayFilterFactory extends AbstractGatewayFi
                 else
                 {
                     return Mono.just(jwt).flatMap(token ->
-                            {
-                                final String authValue = "Bearer " + jwt.getToken();
-                                logger.debug("Sending Authorization header (redacted): Bearer {}", RedactUtil.redact(jwt.getToken(), 3));
-                                exchange.getRequest().mutate().header(HttpHeaders.AUTHORIZATION, authValue);
-                                return chain.filter(exchange);
-                            });
+                    {
+                        final String authValue = "Bearer " + jwt.getToken();
+                        logger.debug("Sending Authorization header (redacted): Bearer {}", RedactUtil.redact(jwt.getToken(), 3));
+                        final ServerHttpRequest mutatedRequest = exchange.getRequest().mutate().header(HttpHeaders.AUTHORIZATION, authValue).build();
+                        final ServerWebExchange mutatedExchange = exchange.mutate().request(mutatedRequest).build();
+                        return chain.filter(mutatedExchange);
+                    });
                 }
             }
 
