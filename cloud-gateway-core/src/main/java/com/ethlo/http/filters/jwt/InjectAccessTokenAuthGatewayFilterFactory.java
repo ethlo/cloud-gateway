@@ -34,8 +34,8 @@ public class InjectAccessTokenAuthGatewayFilterFactory extends AbstractGatewayFi
 {
     private static final Logger logger = LoggerFactory.getLogger(InjectAccessTokenAuthGatewayFilterFactory.class);
     private final Jackson2JsonEncoder jacksonEncoder = new Jackson2JsonEncoder();
+    private final JwtTokenService tokenService = new JwtTokenService();
     protected DecodedJWT jwt;
-    private JwtTokenService tokenService;
     private Config config;
 
     public InjectAccessTokenAuthGatewayFilterFactory()
@@ -128,11 +128,6 @@ public class InjectAccessTokenAuthGatewayFilterFactory extends AbstractGatewayFi
         {
             logger.info("Waiting for configuration to be initialized");
             return;
-        }
-
-        if (tokenService == null)
-        {
-            this.tokenService = new JwtTokenService();
         }
 
         final long now = Instant.now().toEpochMilli();
