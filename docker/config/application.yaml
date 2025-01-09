@@ -81,6 +81,11 @@ spring:
                 username: foo
                 password: bar
             - SetRequestHeader=x-realm,baz
+            - name: InjectAccessTokenAuth
+              args:
+                client-id: my-client
+                token-url: https://login.acme.com/auth/realms/my-realm/protocol/openid-connect/token
+                refresh-token: ey...
         - id: http-bin-anything
           uri: https://httpbin.org/anything
           predicates:

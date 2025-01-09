@@ -56,7 +56,7 @@ spring:
   cloud:
     gateway:
       routes:
-        - id: http-bin-get
+        - id: for-junit-test
           uri: http://localhost:11117
           predicates:
             - Path=/get
