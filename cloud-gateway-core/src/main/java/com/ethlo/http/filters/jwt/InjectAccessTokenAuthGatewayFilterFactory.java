@@ -3,7 +3,6 @@ package com.ethlo.http.filters.jwt;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -80,7 +79,6 @@ public class InjectAccessTokenAuthGatewayFilterFactory extends AbstractGatewayFi
                 {
                     logger.warn("No auth token to inject for request to {}", exchange.getRequest().getURI());
                     return writeBodyJson(getErrorResponse(exchange), exchange);
-                    //return exchange.getResponse().setComplete();
                 }
                 else
                 {
@@ -95,7 +93,6 @@ public class InjectAccessTokenAuthGatewayFilterFactory extends AbstractGatewayFi
                             {
                                 logger.warn("Denying access: {}", error.getMessage(), error);
                                 return writeBodyJson(getErrorResponse(exchange), exchange);
-                                //return exchange.getResponse().setComplete();
                             })
                             .onErrorComplete();
                 }
@@ -104,19 +101,8 @@ public class InjectAccessTokenAuthGatewayFilterFactory extends AbstractGatewayFi
             @Override
             public String toString()
             {
-                return InjectAccessTokenAuthGatewayFilterFactory.class + "{username: " + config.getTokenUrl() + "}";
-            }
-
-            @Override
-            public List<String> shortcutFieldOrder()
-            {
-                return List.of("username", "password");
-            }
-
-            @Override
-            public ShortcutType shortcutType()
-            {
-                return ShortcutType.GATHER_LIST;
+                return InjectAccessTokenAuthGatewayFilterFactory.class + "{client-id=" + config.getClientId()
+                        + ", token-url" + config.getTokenUrl() + "}";
             }
         };
     }
@@ -134,29 +120,28 @@ public class InjectAccessTokenAuthGatewayFilterFactory extends AbstractGatewayFi
         if (jwt == null || jwt.getExpiresAtAsInstant().toEpochMilli() - now < config.getMinimumTTL().toMillis())
         {
             // We do not have an access token, or we are getting too close to expiry, refresh it
-            logger.debug("Refreshing access token for {}", config.tokenUrl);
+            logger.debug("Refreshing access token for {}", config.getTokenUrl());
 
             try
             {
-                this.jwt = tokenService.fetchAccessToken(config.tokenUrl, config.refreshToken, config.clientId, config.clientSecret).block();
-                logger.debug("Successfully fetched access token from {}", config.tokenUrl);
+                this.jwt = tokenService.fetchAccessToken(config.getTokenUrl(), config.getRefreshToken(), config.getClientId(), config.getClientSecret()).block();
+                logger.debug("Successfully fetched access token from {}", config.getTokenUrl());
             }
             catch (TokenFetchException | TokenParseException exc)
             {
-                logger.warn("Error refreshing access token from {}: {}", config.tokenUrl, exc.getMessage());
+                logger.warn("Error refreshing access token from {}: {}", config.getTokenUrl(), exc.getMessage());
             }
         }
     }
 
     public Publisher<DecodedJWT> fetchAccessToken(Config config)
     {
-        return tokenService.fetchAccessToken(config.tokenUrl, config.refreshToken, config.clientId, config.clientSecret);
+        return tokenService.fetchAccessToken(config.getTokenUrl(), config.getRefreshToken(), config.getClientId(), config.getClientSecret());
     }
 
     public static class Config
     {
         private static final Duration DEFAULT_MINIMUM_TTL = Duration.ofMinutes(1);
-        public String jwksUrl;
         @NotEmpty
         private String tokenUrl;
 
@@ -200,17 +185,6 @@ public class InjectAccessTokenAuthGatewayFilterFactory extends AbstractGatewayFi
         public Config setClientSecret(final String clientSecret)
         {
             this.clientSecret = clientSecret;
-            return this;
-        }
-
-        public String getJwksUrl()
-        {
-            return jwksUrl;
-        }
-
-        public Config setJwksUrl(final String jwksUrl)
-        {
-            this.jwksUrl = jwksUrl;
             return this;
         }
 
