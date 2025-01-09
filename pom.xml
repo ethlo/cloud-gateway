@@ -21,6 +21,7 @@
         <module>cloud-gateway-resources-overlay</module>
     </modules>
     <properties>
+        <logback.version>1.5.16</logback.version>
         <java.version>21</java.version>
         <source.encoding>utf-8</source.encoding>
     </properties>
