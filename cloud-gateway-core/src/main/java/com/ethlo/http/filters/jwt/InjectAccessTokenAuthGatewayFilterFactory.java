@@ -88,13 +88,7 @@ public class InjectAccessTokenAuthGatewayFilterFactory extends AbstractGatewayFi
                                 logger.debug("Sending Authorization header (redacted): Bearer {}", RedactUtil.redact(jwt.getToken(), 3));
                                 exchange.getRequest().mutate().header(HttpHeaders.AUTHORIZATION, authValue);
                                 return chain.filter(exchange);
-                            })
-                            .onErrorResume(error ->
-                            {
-                                logger.warn("Denying access: {}", error.getMessage(), error);
-                                return writeBodyJson(getErrorResponse(exchange), exchange);
-                            })
-                            .onErrorComplete();
+                            });
                 }
             }
 
