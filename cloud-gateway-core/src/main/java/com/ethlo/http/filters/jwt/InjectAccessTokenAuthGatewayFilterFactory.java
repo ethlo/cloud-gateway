@@ -87,7 +87,7 @@ public class InjectAccessTokenAuthGatewayFilterFactory extends AbstractGatewayFi
                     {
                         final String authValue = "Bearer " + jwt.getToken();
                         logger.debug("Sending Authorization header (redacted): Bearer {}", RedactUtil.redact(jwt.getToken(), 3));
-                        final ServerHttpRequest mutatedRequest = exchange.getRequest().mutate().header(HttpHeaders.AUTHORIZATION, authValue).build();
+                        final ServerHttpRequest mutatedRequest = exchange.getRequest().mutate().headers(httpHeaders -> httpHeaders.set(HttpHeaders.AUTHORIZATION, authValue)).build();
                         final ServerWebExchange mutatedExchange = exchange.mutate().request(mutatedRequest).build();
                         return chain.filter(mutatedExchange);
                     });
@@ -103,7 +103,7 @@ public class InjectAccessTokenAuthGatewayFilterFactory extends AbstractGatewayFi
         };
     }
 
-    @Scheduled(initialDelay = 0, fixedRate = 10_000)
+    @Scheduled(initialDelay = 1_000, fixedRate = 10_000)
     protected void scheduledRefreshAccessToken()
     {
         if (config == null)
@@ -113,19 +113,29 @@ public class InjectAccessTokenAuthGatewayFilterFactory extends AbstractGatewayFi
         }
 
         final long now = Instant.now().toEpochMilli();
-        if (jwt == null || jwt.getExpiresAtAsInstant().toEpochMilli() - now < config.getMinimumTTL().toMillis())
-        {
+        final long expiresAt = jwt == null ? 0 : jwt.getExpiresAtAsInstant().toEpochMilli();
+        if (jwt == null || expiresAt - now < config.getMinimumTTL().toMillis()) {
+
             // We do not have an access token, or we are getting too close to expiry, refresh it
-            logger.debug("Refreshing access token for {}", config.getTokenUrl());
+            logger.debug("Attempting to refresh access token from {}", config.getTokenUrl());
 
             try
             {
-                this.jwt = tokenService.fetchAccessToken(config.getTokenUrl(), config.getRefreshToken(), config.getClientId(), config.getClientSecret()).block();
-                logger.debug("Successfully fetched access token from {}", config.getTokenUrl());
+                final DecodedJWT newToken = tokenService.fetchAccessToken(config.getTokenUrl(), config.getRefreshToken(), config.getClientId(), config.getClientSecret()).block();
+                if (jwt == null)
+                {
+                    logger.info("Access token fetched from {}", config.getTokenUrl());
+                }
+                else
+                {
+                    logger.debug("Refreshed access token from {}", config.getTokenUrl());
+                }
+                this.jwt = newToken;
             }
-            catch (TokenFetchException | TokenParseException exc)
+            catch (Exception exc)
             {
                 logger.warn("Error refreshing access token from {}: {}", config.getTokenUrl(), exc.getMessage());
+                jwt = null;
             }
         }
     }
