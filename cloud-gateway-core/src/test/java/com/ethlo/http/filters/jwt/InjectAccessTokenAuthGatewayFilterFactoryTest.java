@@ -16,12 +16,16 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.scheduling.TaskScheduler;
+import org.springframework.scheduling.concurrent.DefaultManagedTaskScheduler;
 
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
-import com.ethlo.http.filters.jwt.InjectAccessTokenAuthGatewayFilterFactory.Config;
 import com.github.tomakehurst.wiremock.junit5.WireMockRuntimeInfo;
 import com.github.tomakehurst.wiremock.junit5.WireMockTest;
+
+import org.springframework.scheduling.support.NoOpTaskScheduler;
+
 import reactor.test.StepVerifier;
 
 @WireMockTest
@@ -36,12 +40,14 @@ public class InjectAccessTokenAuthGatewayFilterFactoryTest
             .withExpiresAt(Instant.now().plusSeconds(300))
             .sign(Algorithm.none()); // Replace with a valid algorithm for production
     private final String TOKEN_PATH = "/token";
+
+    private final TaskScheduler taskScheduler = new NoOpTaskScheduler();
     private InjectAccessTokenAuthGatewayFilterFactory filterFactory;
 
     @BeforeEach
     public void setup()
     {
-        filterFactory = new InjectAccessTokenAuthGatewayFilterFactory();
+        filterFactory = new InjectAccessTokenAuthGatewayFilterFactory(taskScheduler);
     }
 
     @Test
@@ -64,14 +70,14 @@ public class InjectAccessTokenAuthGatewayFilterFactoryTest
                 )
         );
 
-        final Config config = new Config()
+        final InjectAccessTokenConfig config = new InjectAccessTokenConfig()
                 .setMinimumTTL(Duration.ofSeconds(30))
                 .setClientId(clientId)
                 .setClientSecret(clientSecret)
                 .setRefreshToken(refreshToken)
                 .setTokenUrl(wmRuntimeInfo.getHttpBaseUrl() + TOKEN_PATH);
 
-        StepVerifier.create(filterFactory.fetchAccessToken(config))
+        StepVerifier.create(filterFactory.apply(config).fetchAccessToken())
                 .expectNextMatches(jwt -> jwt.getToken().equals(accessToken))
                 .verifyComplete();
     }
@@ -93,12 +99,12 @@ public class InjectAccessTokenAuthGatewayFilterFactoryTest
                 )
         );
 
-        final Config config = new Config()
+        final InjectAccessTokenConfig config = new InjectAccessTokenConfig()
                 .setClientId(clientId)
                 .setRefreshToken(refreshToken)
                 .setTokenUrl(wmRuntimeInfo.getHttpBaseUrl() + TOKEN_PATH);
 
-        StepVerifier.create(filterFactory.fetchAccessToken(config))
+        StepVerifier.create(filterFactory.apply(config).fetchAccessToken())
                 .expectNextMatches(jwt -> jwt.getToken().equals(accessToken))
                 .verifyComplete();
     }
@@ -124,12 +130,12 @@ public class InjectAccessTokenAuthGatewayFilterFactoryTest
         );
 
         // Create config for public client with invalid refresh token
-        final Config config = new Config()
+        final InjectAccessTokenConfig config = new InjectAccessTokenConfig()
                 .setClientId(clientId)
                 .setRefreshToken(refreshToken)
                 .setTokenUrl(wmRuntimeInfo.getHttpBaseUrl() + TOKEN_PATH);
 
-        StepVerifier.create(filterFactory.fetchAccessToken(config))
+        StepVerifier.create(filterFactory.apply(config).fetchAccessToken())
                 .expectErrorMatches(error -> error instanceof TokenFetchException &&
                         error.getMessage().contains("Invalid refresh token"))
                 .verify();

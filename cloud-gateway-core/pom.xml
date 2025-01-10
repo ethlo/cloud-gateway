@@ -4,7 +4,7 @@
     <parent>
         <groupId>com.ethlo.http</groupId>
         <artifactId>cloud-gateway</artifactId>
-        <version>1.6.2</version>
+        <version>1.6.3</version>
     </parent>
     <packaging>jar</packaging>
 
