@@ -5,6 +5,7 @@ import java.util.List;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
+import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 
@@ -27,9 +28,9 @@ public class CorrelationIdHeaderGatewayFilterFactory extends AbstractGatewayFilt
             public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain)
             {
                 final String internalRequestId = exchange.getRequest().getId();
-                exchange.getRequest().mutate().header(config.getHeaderName(), internalRequestId);
+                final ServerHttpRequest updatedRequest = exchange.getRequest().mutate().header(config.getHeaderName(), internalRequestId).build();
                 exchange.getResponse().getHeaders().set(config.getHeaderName(), internalRequestId);
-                return chain.filter(exchange);
+                return chain.filter(exchange.mutate().request(updatedRequest).build());
             }
 
             @Override
