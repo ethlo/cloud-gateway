@@ -27,11 +27,17 @@ public class PathHostGatewayFilterFactory extends AbstractChangeRequestUriGatewa
         final ServerHttpRequest req = exchange.getRequest();
         final String path = req.getURI().getRawPath();
         final String[] originalParts = StringUtils.tokenizeToStringArray(path, "/");
-        final String serviceName = originalParts[config.serviceIndex];
-        if (config.allowedRegexp == null || config.allowedRegexp.matcher(serviceName).matches())
+
+        final String serviceName = config.getServiceIndex() < originalParts.length ? originalParts[config.getServiceIndex()] : null;
+        if (serviceName == null)
+        {
+            return Optional.empty();
+        }
+
+        if (config.getAllowedRegexp() == null || config.allowedRegexp.matcher(serviceName).matches())
         {
             final String subPath = "/" + Arrays.stream(originalParts).skip(config.serviceIndex + 1).collect(Collectors.joining("/"));
-            final String newUri = req.getURI().getScheme() + "://" + serviceName + subPath;
+            final String newUri = config.getScheme() + "://" + serviceName + subPath;
             return Optional.of(URI.create(newUri));
         }
         return Optional.empty();
@@ -48,24 +54,39 @@ public class PathHostGatewayFilterFactory extends AbstractChangeRequestUriGatewa
         private Pattern allowedRegexp;
         private int serviceIndex = 0;
 
+        private String scheme = "http";
+
         public int getServiceIndex()
         {
             return serviceIndex;
         }
 
-        public void setServiceIndex(final int serviceIndex)
+        public Config setServiceIndex(final int serviceIndex)
         {
             this.serviceIndex = serviceIndex;
+            return this;
         }
 
         public String getAllowedRegexp()
         {
-            return allowedRegexp.pattern();
+            return allowedRegexp != null ? allowedRegexp.pattern() : null;
         }
 
-        public void setAllowedRegexp(final String allowedRegexp)
+        public Config setAllowedRegexp(final String allowedRegexp)
         {
             this.allowedRegexp = Pattern.compile(allowedRegexp);
+            return this;
+        }
+
+        public String getScheme()
+        {
+            return scheme;
+        }
+
+        public Config setScheme(final String scheme)
+        {
+            this.scheme = scheme;
+            return this;
         }
     }
 }

@@ -114,20 +114,23 @@ public class TemplateRedirectGatewayFilterFactory extends AbstractGatewayFilterF
 
         private HttpStatusCode status = HttpStatusCode.valueOf(302);
 
-        public void setSource(final String source)
+        public Config setSource(final String source)
         {
             this.source = Pattern.compile(source);
+            return this;
         }
 
-        public void setTarget(final String target)
+        public Config setTarget(final String target)
         {
             this.target = pebbleRenderer.compile(target);
+            return this;
         }
 
-        public void setStatus(final int status)
+        public Config setStatus(final int status)
         {
             this.status = HttpStatusCode.valueOf(status);
             Assert.isTrue(this.status.is3xxRedirection(), "Must use a redirection status code, got " + status);
+            return this;
         }
     }
 }

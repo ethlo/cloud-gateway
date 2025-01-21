@@ -35,7 +35,11 @@ public abstract class AbstractFilterTest<T>
 
     protected ServerWebExchange execute(T config)
     {
-        final MockServerHttpRequest mockRequest = MockServerHttpRequest.get("/test").build();
+        return execute(config, MockServerHttpRequest.get("/anything"));
+    }
+
+    protected ServerWebExchange execute(T config, MockServerHttpRequest.BaseBuilder<?> mockRequest)
+    {
         final ServerWebExchange exchange = MockServerWebExchange.from(mockRequest);
         final GatewayFilter filter = filterFactory().apply(config);
         filter.filter(exchange, filterChain).block();
