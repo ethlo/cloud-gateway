@@ -6,7 +6,7 @@
     <parent>
         <groupId>com.ethlo.http</groupId>
         <artifactId>cloud-gateway</artifactId>
-        <version>1.6.5-SNAPSHOT</version>
+        <version>1.6.5</version>
     </parent>
     <artifactId>cloud-gateway-server</artifactId>
     <packaging>jar</packaging>
@@ -18,22 +18,22 @@
         <dependency>
             <groupId>com.ethlo.http</groupId>
             <artifactId>cloud-gateway-logger-clickhouse</artifactId>
-            <version>1.6.5-SNAPSHOT</version>
+            <version>1.6.5</version>
         </dependency>
         <dependency>
             <groupId>com.ethlo.http</groupId>
             <artifactId>cloud-gateway-logger-file</artifactId>
-            <version>1.6.5-SNAPSHOT</version>
+            <version>1.6.5</version>
         </dependency>
         <dependency>
             <groupId>com.ethlo.http</groupId>
             <artifactId>cloud-gateway-resources-overlay</artifactId>
-            <version>1.6.5-SNAPSHOT</version>
+            <version>1.6.5</version>
         </dependency>
         <dependency>
             <groupId>com.ethlo.lamebda</groupId>
             <artifactId>lamebda-spring-webflux-starter</artifactId>
-            <version>3.0.0</version>
+            <version>3.3.0</version>
         </dependency>
 
         <!-- Test -->
