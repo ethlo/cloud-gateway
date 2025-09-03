@@ -1,16 +1,16 @@
 name: Create and Publish Release
 
 on:
-  workflow_dispatch: # Allows manual triggering from the Actions tab
+  workflow_dispatch:
 
   push:
     tags:
-      - 'v*.*.*' # Triggers on tags like v1.0.0 for releases
+      - 'v*.*.*'
     branches:
-      - 'main'   # Triggers on pushes to main for snapshots
+      - 'main'
 
 env:
-  # Base name for your Docker image
+  # This now only serves as a reference; the pom.xml is the source of truth for the name.
   IMAGE_NAME: ethlocom/cloud-gateway
 
 jobs:
@@ -51,7 +51,8 @@ jobs:
           fi
           
           echo "MAVEN_VERSION=${VERSION}" >> $GITHUB_ENV
-          echo "DOCKER_IMAGE_TAG=${{ env.IMAGE_NAME }}:${DOCKER_TAG}-${{ matrix.arch }}" >> $GITHUB_ENV
+          echo "DOCKER_TAG=${DOCKER_TAG}" >> $GITHUB_ENV
+          echo "DOCKER_ARCH_TAG=${DOCKER_TAG}-${{ matrix.arch }}" >> $GITHUB_ENV
 
       - name: Set Project Version
         run: mvn versions:set -DnewVersion=${{ env.MAVEN_VERSION }} -DskipTests
@@ -66,8 +67,9 @@ jobs:
         run: |
           mvn -B clean install -DskipTests
           cd cloud-gateway-server
+          # The base image name is now read from the pom.xml
           mvn spring-boot:build-image -DskipTests \
-            -Dspring-boot.build-image.imageName=${{ env.DOCKER_IMAGE_TAG }} \
+            -Dspring-boot.build-image.imageName=${{ env.IMAGE_NAME }}:${{ env.DOCKER_ARCH_TAG }} \
             -Dspring-boot.build-image.imagePlatform=${{ matrix.platform }} \
             -Dspring-boot.build-image.publish=true
 
@@ -83,7 +85,7 @@ jobs:
 
       - name: Create and Push Multi-Arch Manifest
         run: |
-          echo "Waiting for 30 seconds for images to become available in the registry..."
+          echo "Waiting for 30 seconds for images to become available..."
           sleep 30
 
           if [[ "${{ github.ref_type }}" == "tag" ]]; then
@@ -95,10 +97,6 @@ jobs:
           AMD64_TAG="${{ env.IMAGE_NAME }}:${FINAL_TAG}-amd64"
           ARM64_TAG="${{ env.IMAGE_NAME }}:${FINAL_TAG}-arm64"
           
-          echo "Creating manifest for ${{ env.IMAGE_NAME }}:${FINAL_TAG}"
-          echo "--> Using AMD64 image: ${AMD64_TAG}"
-          echo "--> Using ARM64 image: ${ARM64_TAG}"
-
           docker manifest create ${{ env.IMAGE_NAME }}:${FINAL_TAG} \
             --amend ${AMD64_TAG} \
             --amend ${ARM64_TAG}
