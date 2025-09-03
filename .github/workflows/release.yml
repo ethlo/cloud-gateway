@@ -93,9 +93,12 @@ jobs:
             FINAL_TAG="latest-SNAPSHOT"
           fi
           
-          # Reconstruct the architecture-specific tags
+          # Reconstruct the exact architecture-specific tags that were built in the previous job
           AMD64_TAG="${{ env.IMAGE_NAME }}:${FINAL_TAG}-amd64"
           ARM64_TAG="${{ env.IMAGE_NAME }}:${FINAL_TAG}-arm64"
+          
+          echo "Looking for AMD64 image: ${AMD64_TAG}"
+          echo "Looking for ARM64 image: ${ARM64_TAG}"
           
           # Create the final multi-arch image
           docker manifest create ${{ env.IMAGE_NAME }}:${FINAL_TAG} \
