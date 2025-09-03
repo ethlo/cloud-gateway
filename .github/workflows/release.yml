@@ -68,7 +68,7 @@ jobs:
           mvn -B clean install -DskipTests
           cd cloud-gateway-server
           # The base image name is now read from the pom.xml
-          mvn spring-boot:build-image -DskipTests \
+          mvn spring-boot:build-image -DskipTests -X \
             -Dspring-boot.build-image.imageName=${{ env.IMAGE_NAME }}:${{ env.DOCKER_ARCH_TAG }} \
             -Dspring-boot.build-image.imagePlatform=${{ matrix.platform }} \
             -Dspring-boot.build-image.publish=true
