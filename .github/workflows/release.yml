@@ -1,8 +1,7 @@
 name: Create and Publish Release
 
 on:
-  # This new section enables the manual trigger
-  workflow_dispatch:
+  workflow_dispatch: # Allows manual triggering from the Actions tab
 
   push:
     tags:
@@ -63,8 +62,14 @@ jobs:
 
       - name: Build and Push Docker Image
         run: |
-          # The image name/tag is passed directly from the previous step
-          mvn -B clean install spring-boot:build-image \
+          # First, build and install all modules from the project root
+          mvn -B clean install
+          
+          # Then, change into the specific module's directory
+          cd cloud-gateway-server
+          
+          # Finally, build the image from within the submodule
+          mvn spring-boot:build-image \
             -Dspring-boot.build-image.imageName=${{ steps.set_vars.outputs.image_tag }} \
             -Dspring-boot.build-image.imagePlatform=${{ matrix.platform }}
 
