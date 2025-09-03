@@ -42,13 +42,10 @@ jobs:
         id: set_vars
         run: |
           if [[ "${{ github.ref_type }}" == "tag" ]]; then
-            # For a tag like v1.2.3, strip the 'v' for the Maven version
             VERSION=${{ github.ref_name }}
             VERSION=${VERSION#v}
-            # The Docker tag keeps the 'v'
             DOCKER_TAG=${{ github.ref_name }}
           else
-            # For main branch, use latest-SNAPSHOT
             VERSION="latest-SNAPSHOT"
             DOCKER_TAG="latest-SNAPSHOT"
           fi
@@ -71,7 +68,8 @@ jobs:
           cd cloud-gateway-server
           mvn spring-boot:build-image -DskipTests \
             -Dspring-boot.build-image.imageName=${{ env.DOCKER_IMAGE_TAG }} \
-            -Dspring-boot.build-image.imagePlatform=${{ matrix.platform }}
+            -Dspring-boot.build-image.imagePlatform=${{ matrix.platform }} \
+            -Dspring-boot.build-image.publish=true
 
   merge-manifests:
     needs: [build]
@@ -85,6 +83,9 @@ jobs:
 
       - name: Create and Push Multi-Arch Manifest
         run: |
+          echo "Waiting for 30 seconds for images to become available in the registry..."
+          sleep 30
+
           if [[ "${{ github.ref_type }}" == "tag" ]]; then
             FINAL_TAG="${{ github.ref_name }}"
           else
