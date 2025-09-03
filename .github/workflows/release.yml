@@ -1,0 +1,109 @@
+name: Create and Publish Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*' # Triggers on tags like v1.0.0 for releases
+    branches:
+      - 'main'   # Triggers on pushes to main for snapshots
+
+env:
+  # Base name for your Docker image
+  IMAGE_NAME: ethlocom/cloud-gateway
+
+jobs:
+  build:
+    strategy:
+      # Build on both architectures in parallel
+      matrix:
+        include:
+          - os: ubuntu-latest
+            arch: amd64
+            platform: linux/amd64
+          - os: ubuntu-latest-arm64
+            arch: arm64
+            platform: linux/arm64
+
+    runs-on: ${{ matrix.os }}
+
+    outputs:
+      # This output will be used by the merge-manifests job
+      image_tag: ${{ steps.set_vars.outputs.image_tag }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'maven'
+
+      - name: Set dynamic image tag
+        id: set_vars
+        run: |
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            # For a git tag like v1.2.3, the tag is "v1.2.3-amd64" or "v1.2.3-arm64"
+            echo "image_tag=${{ env.IMAGE_NAME }}:${{ github.ref_name }}-${{ matrix.arch }}" >> $GITHUB_OUTPUT
+          else
+            # For a push to main, the tag is "latest-SNAPSHOT-amd64" or "latest-SNAPSHOT-arm64"
+            echo "image_tag=${{ env.IMAGE_NAME }}:latest-SNAPSHOT-${{ matrix.arch }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and Push Docker Image
+        run: |
+          # The image name/tag is passed directly from the previous step
+          mvn -B clean install spring-boot:build-image \
+            -Dspring-boot.build-image.imageName=${{ steps.set_vars.outputs.image_tag }} \
+            -Dspring-boot.build-image.imagePlatform=${{ matrix.platform }}
+
+  merge-manifests:
+    # This job runs only after both build jobs have succeeded
+    needs: [build]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set final manifest tag
+        id: set_tag
+        run: |
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            # Final tag is the git tag, e.g., v1.2.3
+            echo "final_tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          else
+            # Final tag is latest-SNAPSHOT
+            echo "final_tag=latest-SNAPSHOT" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create and Push Multi-Arch Manifest
+        run: |
+          # Create the final multi-arch image using the architecture-specific tags from the build jobs
+          docker manifest create ${{ env.IMAGE_NAME }}:${{ steps.set_tag.outputs.final_tag }} \
+            --amend ${{ needs.build.outputs.amd64.image_tag }} \
+            --amend ${{ needs.build.outputs.arm64.image_tag }}
+          
+          # Push the final manifest to the registry
+          docker manifest push ${{ env.IMAGE_NAME }}:${{ steps.set_tag.outputs.final_tag }}
+
+      - name: (Optional) Tag release as 'latest'
+        # This step runs only for official releases (git tags), not for snapshots
+        if: github.ref_type == 'tag'
+        run: |
+          # Create and push a 'latest' tag pointing to the same multi-arch images
+          docker manifest create ${{ env.IMAGE_NAME }}:latest \
+            --amend ${{ needs.build.outputs.amd64.image_tag }} \
+            --amend ${{ needs.build.outputs.arm64.image_tag }}
+          docker manifest push ${{ env.IMAGE_NAME }}:latest
