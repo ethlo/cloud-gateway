@@ -1,6 +1,9 @@
 name: Create and Publish Release
 
 on:
+  # This new section enables the manual trigger
+  workflow_dispatch:
+
   push:
     tags:
       - 'v*.*.*' # Triggers on tags like v1.0.0 for releases
