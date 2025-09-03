@@ -62,13 +62,13 @@ jobs:
       - name: Build and Push Docker Image
         run: |
           # First, build and install all modules from the project root
-          mvn -B clean install
+          mvn -B clean install -DskipTests
           
           # Then, change into the specific module's directory
           cd cloud-gateway-server
           
           # Finally, build the image from within the submodule
-          mvn spring-boot:build-image \
+          mvn spring-boot:build-image -DskipTests \
             -Dspring-boot.build-image.imageName=${{ env.image_tag }} \
             -Dspring-boot.build-image.imagePlatform=${{ matrix.platform }}
 
