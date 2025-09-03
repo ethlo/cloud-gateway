@@ -15,22 +15,17 @@ env:
 
 jobs:
   build:
+    # This job now runs on the standard x86 runner for both architectures
+    runs-on: ubuntu-latest
+
     strategy:
-      # Build on both architectures in parallel
+      # Use a matrix to build both architectures
       matrix:
         include:
-          - os: ubuntu-latest
-            arch: amd64
+          - arch: amd64
             platform: linux/amd64
-          - os: ubuntu-latest-arm64
-            arch: arm64
+          - arch: arm64
             platform: linux/arm64
-
-    runs-on: ${{ matrix.os }}
-
-    outputs:
-      # This output will be used by the merge-manifests job
-      image_tag: ${{ steps.set_vars.outputs.image_tag }}
 
     steps:
       - name: Checkout code
@@ -43,15 +38,19 @@ jobs:
           java-version: '21'
           cache: 'maven'
 
+      # This step enables ARM emulation on the x86 runner
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
       - name: Set dynamic image tag
         id: set_vars
         run: |
           if [[ "${{ github.ref_type }}" == "tag" ]]; then
             # For a git tag like v1.2.3, the tag is "v1.2.3-amd64" or "v1.2.3-arm64"
-            echo "image_tag=${{ env.IMAGE_NAME }}:${{ github.ref_name }}-${{ matrix.arch }}" >> $GITHUB_OUTPUT
+            echo "image_tag=${{ env.IMAGE_NAME }}:${{ github.ref_name }}-${{ matrix.arch }}" >> $GITHUB_ENV
           else
             # For a push to main, the tag is "latest-SNAPSHOT-amd64" or "latest-SNAPSHOT-arm64"
-            echo "image_tag=${{ env.IMAGE_NAME }}:latest-SNAPSHOT-${{ matrix.arch }}" >> $GITHUB_OUTPUT
+            echo "image_tag=${{ env.IMAGE_NAME }}:latest-SNAPSHOT-${{ matrix.arch }}" >> $GITHUB_ENV
           fi
 
       - name: Log in to Docker Hub
@@ -63,15 +62,14 @@ jobs:
       - name: Build and Push Docker Image
         run: |
           # First, build and install all modules from the project root
-          mvn -B clean install -DskipTests
+          mvn -B clean install
           
           # Then, change into the specific module's directory
           cd cloud-gateway-server
           
           # Finally, build the image from within the submodule
           mvn spring-boot:build-image \
-            -DskipTests \
-            -Dspring-boot.build-image.imageName=${{ steps.set_vars.outputs.image_tag }} \
+            -Dspring-boot.build-image.imageName=${{ env.image_tag }} \
             -Dspring-boot.build-image.imagePlatform=${{ matrix.platform }}
 
   merge-manifests:
@@ -86,33 +84,37 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Set final manifest tag
-        id: set_tag
-        run: |
-          if [[ "${{ github.ref_type }}" == "tag" ]]; then
-            # Final tag is the git tag, e.g., v1.2.3
-            echo "final_tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-          else
-            # Final tag is latest-SNAPSHOT
-            echo "final_tag=latest-SNAPSHOT" >> $GITHUB_OUTPUT
-          fi
-
       - name: Create and Push Multi-Arch Manifest
         run: |
-          # Create the final multi-arch image using the architecture-specific tags from the build jobs
-          docker manifest create ${{ env.IMAGE_NAME }}:${{ steps.set_tag.outputs.final_tag }} \
-            --amend ${{ needs.build.outputs.amd64.image_tag }} \
-            --amend ${{ needs.build.outputs.arm64.image_tag }}
+          # Determine the base tag (e.g., "v1.2.3" or "latest-SNAPSHOT")
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            FINAL_TAG="${{ github.ref_name }}"
+          else
+            FINAL_TAG="latest-SNAPSHOT"
+          fi
+          
+          # Reconstruct the architecture-specific tags
+          AMD64_TAG="${{ env.IMAGE_NAME }}:${FINAL_TAG}-amd64"
+          ARM64_TAG="${{ env.IMAGE_NAME }}:${FINAL_TAG}-arm64"
+          
+          # Create the final multi-arch image
+          docker manifest create ${{ env.IMAGE_NAME }}:${FINAL_TAG} \
+            --amend ${AMD64_TAG} \
+            --amend ${ARM64_TAG}
           
           # Push the final manifest to the registry
-          docker manifest push ${{ env.IMAGE_NAME }}:${{ steps.set_tag.outputs.final_tag }}
+          docker manifest push ${{ env.IMAGE_NAME }}:${FINAL_TAG}
 
       - name: (Optional) Tag release as 'latest'
         # This step runs only for official releases (git tags), not for snapshots
         if: github.ref_type == 'tag'
         run: |
+          FINAL_TAG="${{ github.ref_name }}"
+          AMD64_TAG="${{ env.IMAGE_NAME }}:${FINAL_TAG}-amd64"
+          ARM64_TAG="${{ env.IMAGE_NAME }}:${FINAL_TAG}-arm64"
+          
           # Create and push a 'latest' tag pointing to the same multi-arch images
           docker manifest create ${{ env.IMAGE_NAME }}:latest \
-            --amend ${{ needs.build.outputs.amd64.image_tag }} \
-            --amend ${{ needs.build.outputs.arm64.image_tag }}
+            --amend ${AMD64_TAG} \
+            --amend ${ARM64_TAG}
           docker manifest push ${{ env.IMAGE_NAME }}:latest
