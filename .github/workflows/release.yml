@@ -69,12 +69,12 @@ jobs:
           # Step 2: Change into the correct directory
           cd cloud-gateway-server
           
-          # Step 3: Build the image locally (publish=false is the default)
+          # Step 3: Build the image locally using the correct, specific tag
           mvn spring-boot:build-image -DskipTests \
-            -Dspring-boot.build-image.imageName=${{ env.DOCKER_ARCH_TAG }} \
+            -Dspring-boot.build-image.tags=${{ env.DOCKER_ARCH_TAG }} \
             -Dspring-boot.build-image.imagePlatform=${{ matrix.platform }}
           
-          # Step 4: Push the image using the standard Docker CLI
+          # Step 4: Push the exact same tag that was just built
           docker push ${{ env.DOCKER_ARCH_TAG }}
 
   merge-manifests:
