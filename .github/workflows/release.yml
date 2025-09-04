@@ -34,9 +34,6 @@ jobs:
           java-version: '21'
           cache: 'maven'
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
       - name: Set Version and Tag
         id: set_vars
         run: |
@@ -48,12 +45,25 @@ jobs:
             VERSION="latest-SNAPSHOT"
             DOCKER_TAG="latest-SNAPSHOT"
           fi
-          
           echo "MAVEN_VERSION=${VERSION}" >> $GITHUB_ENV
           echo "DOCKER_ARCH_TAG=${DOCKER_TAG}-${{ matrix.arch }}" >> $GITHUB_ENV
 
       - name: Set Project Version
         run: mvn versions:set -DnewVersion=${{ env.MAVEN_VERSION }} -DskipTests
+
+      - name: Build JAR
+        run: mvn -B clean package -DskipTests
+
+      - name: Install Pack CLI
+        uses: buildpacks/github-actions/setup-pack@v5.6.0
+
+      - name: Cache Pack Layers
+        uses: actions/cache@v4
+        with:
+          path: ~/.pack-cache-${{ matrix.arch }}
+          key: pack-cache-${{ matrix.arch }}-${{ github.ref }}
+          restore-keys: |
+            pack-cache-${{ matrix.arch }}-
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
@@ -61,18 +71,15 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build Image and Push Manually
-        env:
-          BP_PLATFORM: ${{ matrix.platform }}
+      - name: Build and Push with Pack
         run: |
-          mvn -B clean install -DskipTests
-          cd cloud-gateway-server
-          # This command correctly sets the tag property for the pom.xml
-          mvn spring-boot:build-image -DskipTests \
-            -Dimage.tag=${{ env.DOCKER_ARCH_TAG }}
-          
-          # This command pushes the image using the standard Docker client
-          docker push ${{ env.IMAGE_NAME }}:${{ env.DOCKER_ARCH_TAG }}
+          mkdir -p ~/.pack-cache-${{ matrix.arch }}
+          pack build ${{ env.IMAGE_NAME }}:${{ env.DOCKER_ARCH_TAG }} \
+            --path . \
+            --builder paketobuildpacks/builder-jammy-base \
+            --platform ${{ matrix.platform }} \
+            --volume $HOME/.pack-cache-${{ matrix.arch }}:/cache \
+            --publish
 
   merge-manifests:
     needs: [build]
