@@ -62,17 +62,16 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build Image and Push Manually
-        # This 'env' block directly sets the required buildpack platform variable
         env:
           BP_PLATFORM: ${{ matrix.platform }}
         run: |
           mvn -B clean install -DskipTests
           cd cloud-gateway-server
-          # This is the final, correct command. It uses the pom.xml for the name
-          # and this property to set the tag.
+          # This command correctly sets the tag property for the pom.xml
           mvn spring-boot:build-image -DskipTests \
-            -Dspring-boot.build-image.tags=${{ env.IMAGE_NAME }}:${{ env.DOCKER_ARCH_TAG }}
+            -Dimage.tag=${{ env.DOCKER_ARCH_TAG }}
           
+          # This command pushes the image using the standard Docker client
           docker push ${{ env.IMAGE_NAME }}:${{ env.DOCKER_ARCH_TAG }}
 
   merge-manifests:
