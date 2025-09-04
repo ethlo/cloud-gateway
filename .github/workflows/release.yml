@@ -49,11 +49,13 @@ jobs:
           echo "DOCKER_ARCH_TAG=${DOCKER_TAG}-${{ matrix.arch }}" >> $GITHUB_ENV
 
       - name: Set Project Version
-        run: mvn -f cloud-gateway-server/pom.xml versions:set -DnewVersion=${{ env.MAVEN_VERSION }} -DskipTests
+        run: mvn versions:set -DnewVersion=${{ env.MAVEN_VERSION }} -DskipTests
+
+      - name: Build Full Project
+        run: mvn -B clean install -DskipTests
 
       - name: Build Spring Boot Docker Image Locally
         run: |
-          mvn -f cloud-gateway-server/pom.xml -B clean package -DskipTests
           mvn -f cloud-gateway-server/pom.xml spring-boot:build-image \
             -DskipTests \
             -Dimage.tag=${DOCKER_ARCH_TAG}
