@@ -10,7 +10,6 @@ on:
       - 'main'
 
 env:
-  # This now only serves as a reference; the pom.xml is the source of truth for the name.
   IMAGE_NAME: ethlocom/cloud-gateway
 
 jobs:
@@ -51,8 +50,7 @@ jobs:
           fi
           
           echo "MAVEN_VERSION=${VERSION}" >> $GITHUB_ENV
-          echo "DOCKER_TAG=${DOCKER_TAG}" >> $GITHUB_ENV
-          echo "DOCKER_ARCH_TAG=${DOCKER_TAG}-${{ matrix.arch }}" >> $GITHUB_ENV
+          echo "DOCKER_ARCH_TAG=${{ env.IMAGE_NAME }}:${DOCKER_TAG}-${{ matrix.arch }}" >> $GITHUB_ENV
 
       - name: Set Project Version
         run: mvn versions:set -DnewVersion=${{ env.MAVEN_VERSION }} -DskipTests
@@ -63,15 +61,21 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and Push Docker Image
+      - name: Build Image and Push Manually
         run: |
+          # Step 1: Build all modules
           mvn -B clean install -DskipTests
+          
+          # Step 2: Change into the correct directory
           cd cloud-gateway-server
-          # The base image name is now read from the pom.xml
-          mvn spring-boot:build-image -DskipTests -X \
-            -Dspring-boot.build-image.imageName=${{ env.IMAGE_NAME }}:${{ env.DOCKER_ARCH_TAG }} \
-            -Dspring-boot.build-image.imagePlatform=${{ matrix.platform }} \
-            -Dspring-boot.build-image.publish=true
+          
+          # Step 3: Build the image locally (publish=false is the default)
+          mvn spring-boot:build-image -DskipTests \
+            -Dspring-boot.build-image.imageName=${{ env.DOCKER_ARCH_TAG }} \
+            -Dspring-boot.build-image.imagePlatform=${{ matrix.platform }}
+          
+          # Step 4: Push the image using the standard Docker CLI
+          docker push ${{ env.DOCKER_ARCH_TAG }}
 
   merge-manifests:
     needs: [build]
