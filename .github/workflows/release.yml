@@ -50,7 +50,7 @@ jobs:
           fi
           
           echo "MAVEN_VERSION=${VERSION}" >> $GITHUB_ENV
-          echo "DOCKER_ARCH_TAG=${{ env.IMAGE_NAME }}:${DOCKER_TAG}-${{ matrix.arch }}" >> $GITHUB_ENV
+          echo "DOCKER_ARCH_TAG=${DOCKER_TAG}-${{ matrix.arch }}" >> $GITHUB_ENV
 
       - name: Set Project Version
         run: mvn versions:set -DnewVersion=${{ env.MAVEN_VERSION }} -DskipTests
@@ -68,11 +68,12 @@ jobs:
         run: |
           mvn -B clean install -DskipTests
           cd cloud-gateway-server
-          # The platform is now correctly set by the environment variable
+          # This is the final, correct command. It uses the pom.xml for the name
+          # and this property to set the tag.
           mvn spring-boot:build-image -DskipTests \
-            -Dspring-boot.build-image.tags=${{ env.DOCKER_ARCH_TAG }}
+            -Dspring-boot.build-image.tags=${{ env.IMAGE_NAME }}:${{ env.DOCKER_ARCH_TAG }}
           
-          docker push ${{ env.DOCKER_ARCH_TAG }}
+          docker push ${{ env.IMAGE_NAME }}:${{ env.DOCKER_ARCH_TAG }}
 
   merge-manifests:
     needs: [build]
