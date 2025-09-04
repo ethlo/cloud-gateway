@@ -63,7 +63,8 @@
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
                     <image>
-                        <name>ethlocom/cloud-gateway</name>
+                        <name>ethlocom/cloud-gateway:${image.tag}</name>
+                        <platform>${image.platform}</platform>
                     </image>
                 </configuration>
             </plugin>

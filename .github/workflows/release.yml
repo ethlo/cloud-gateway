@@ -50,7 +50,7 @@ jobs:
           fi
           
           echo "MAVEN_VERSION=${VERSION}" >> $GITHUB_ENV
-          echo "DOCKER_ARCH_TAG=${{ env.IMAGE_NAME }}:${DOCKER_TAG}-${{ matrix.arch }}" >> $GITHUB_ENV
+          echo "DOCKER_ARCH_TAG=${DOCKER_TAG}-${{ matrix.arch }}" >> $GITHUB_ENV
 
       - name: Set Project Version
         run: mvn versions:set -DnewVersion=${{ env.MAVEN_VERSION }} -DskipTests
@@ -63,20 +63,14 @@ jobs:
 
       - name: Build Image and Push Manually
         run: |
-          # Step 1: Build all modules
           mvn -B clean install -DskipTests
-          
-          # Step 2: Change into the correct directory
           cd cloud-gateway-server
-          
-          # Step 3: Build the image locally using the correct base name AND specific tag
+          # Set the properties defined in the pom.xml
           mvn spring-boot:build-image -DskipTests \
-            -Dspring-boot.build-image.imageName=${{ env.IMAGE_NAME }} \
-            -Dspring-boot.build-image.tags=${{ env.DOCKER_ARCH_TAG }} \
-            -Dspring-boot.build-image.imagePlatform=${{ matrix.platform }}
+            -Dimage.tag=${{ env.DOCKER_ARCH_TAG }} \
+            -Dimage.platform=${{ matrix.platform }}
           
-          # Step 4: Push the exact same tag that was just built
-          docker push ${{ env.DOCKER_ARCH_TAG }}
+          docker push ${{ env.IMAGE_NAME }}:${{ env.DOCKER_ARCH_TAG }}
 
   merge-manifests:
     needs: [build]
@@ -90,7 +84,7 @@ jobs:
 
       - name: Create and Push Multi-Arch Manifest
         run: |
-          echo "Waiting for 30 seconds for images to become available..."
+          echo "Waiting 30 seconds for images to become available..."
           sleep 30
 
           if [[ "${{ github.ref_type }}" == "tag" ]]; then
