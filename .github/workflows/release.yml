@@ -88,7 +88,9 @@ jobs:
           sleep 30
 
           if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            # Strip the 'v' from the git tag to get the final Docker tag
             FINAL_TAG="${{ github.ref_name }}"
+            FINAL_TAG="${FINAL_TAG#v}"
           else
             FINAL_TAG="latest-SNAPSHOT"
           fi
@@ -105,7 +107,10 @@ jobs:
       - name: (Optional) Tag release as 'latest'
         if: github.ref_type == 'tag'
         run: |
+          # Strip the 'v' from the git tag to get the final Docker tag
           FINAL_TAG="${{ github.ref_name }}"
+          FINAL_TAG="${FINAL_TAG#v}"
+          
           AMD64_TAG="${{ env.IMAGE_NAME }}:${FINAL_TAG}-amd64"
           ARM64_TAG="${{ env.IMAGE_NAME }}:${FINAL_TAG}-arm64"
           
