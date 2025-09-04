@@ -49,15 +49,14 @@ jobs:
           echo "DOCKER_ARCH_TAG=${DOCKER_TAG}-${{ matrix.arch }}" >> $GITHUB_ENV
 
       - name: Set Project Version
-        run: mvn versions:set -DnewVersion=${{ env.MAVEN_VERSION }} -DskipTests
+        run: mvn -f cloud-gateway-server/pom.xml versions:set -DnewVersion=${{ env.MAVEN_VERSION }} -DskipTests
 
       - name: Build Spring Boot Docker Image Locally
         run: |
-          mvn -B clean package -DskipTests
-          mvn spring-boot:build-image \
+          mvn -f cloud-gateway-server/pom.xml -B clean package -DskipTests
+          mvn -f cloud-gateway-server/pom.xml spring-boot:build-image \
             -DskipTests \
-            -Dimage.tag=${DOCKER_ARCH_TAG} \
-            -Dspring-boot.build-image.builder=paketobuildpacks/builder-jammy-base
+            -Dimage.tag=${DOCKER_ARCH_TAG}
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
