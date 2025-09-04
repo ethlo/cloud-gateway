@@ -64,9 +64,6 @@
                 <configuration>
                     <image>
                         <name>ethlocom/cloud-gateway:${image.tag}</name>
-                        <env>
-                            <BP_PLATFORM>${image.platform}</BP_PLATFORM>
-                        </env>
                     </image>
                 </configuration>
             </plugin>

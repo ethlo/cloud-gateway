@@ -43,14 +43,14 @@ jobs:
           if [[ "${{ github.ref_type }}" == "tag" ]]; then
             VERSION=${{ github.ref_name }}
             VERSION=${VERSION#v}
-            DOCKER_TAG=${VERSION} # Uses the version without the 'v'
+            DOCKER_TAG=${VERSION}
           else
             VERSION="latest-SNAPSHOT"
             DOCKER_TAG="latest-SNAPSHOT"
           fi
           
           echo "MAVEN_VERSION=${VERSION}" >> $GITHUB_ENV
-          echo "DOCKER_ARCH_TAG=${DOCKER_TAG}-${{ matrix.arch }}" >> $GITHUB_ENV
+          echo "DOCKER_ARCH_TAG=${{ env.IMAGE_NAME }}:${DOCKER_TAG}-${{ matrix.arch }}" >> $GITHUB_ENV
 
       - name: Set Project Version
         run: mvn versions:set -DnewVersion=${{ env.MAVEN_VERSION }} -DskipTests
@@ -62,15 +62,17 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build Image and Push Manually
+        # This 'env' block directly sets the required buildpack platform variable
+        env:
+          BP_PLATFORM: ${{ matrix.platform }}
         run: |
           mvn -B clean install -DskipTests
           cd cloud-gateway-server
-          # Set the properties defined in the pom.xml
+          # The platform is now correctly set by the environment variable
           mvn spring-boot:build-image -DskipTests \
-            -Dimage.tag=${{ env.DOCKER_ARCH_TAG }} \
-            -Dimage.platform=${{ matrix.platform }}
+            -Dspring-boot.build-image.tags=${{ env.DOCKER_ARCH_TAG }}
           
-          docker push ${{ env.IMAGE_NAME }}:${{ env.DOCKER_ARCH_TAG }}
+          docker push ${{ env.DOCKER_ARCH_TAG }}
 
   merge-manifests:
     needs: [build]
@@ -88,7 +90,6 @@ jobs:
           sleep 30
 
           if [[ "${{ github.ref_type }}" == "tag" ]]; then
-            # Strip the 'v' from the git tag to get the final Docker tag
             FINAL_TAG="${{ github.ref_name }}"
             FINAL_TAG="${FINAL_TAG#v}"
           else
@@ -107,7 +108,6 @@ jobs:
       - name: (Optional) Tag release as 'latest'
         if: github.ref_type == 'tag'
         run: |
-          # Strip the 'v' from the git tag to get the final Docker tag
           FINAL_TAG="${{ github.ref_name }}"
           FINAL_TAG="${FINAL_TAG#v}"
           
