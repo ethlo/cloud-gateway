@@ -14,14 +14,14 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
           - arch: amd64
-            platform: linux/amd64
+            runs_on: ubuntu-latest
           - arch: arm64
-            platform: linux/arm64
+            runs_on: ubuntu-24.04-arm  # Free ARM64 runner for public repos
+    runs-on: ${{ matrix.runs_on }}
 
     steps:
       - name: Checkout code
@@ -51,19 +51,13 @@ jobs:
       - name: Set Project Version
         run: mvn versions:set -DnewVersion=${{ env.MAVEN_VERSION }} -DskipTests
 
-      - name: Build JAR
-        run: mvn -B clean package -DskipTests
-
-      - name: Install Pack CLI
-        uses: buildpacks/github-actions/setup-pack@v5.6.0
-
-      - name: Cache Pack Layers
-        uses: actions/cache@v4
-        with:
-          path: ~/.pack-cache-${{ matrix.arch }}
-          key: pack-cache-${{ matrix.arch }}-${{ github.ref }}
-          restore-keys: |
-            pack-cache-${{ matrix.arch }}-
+      - name: Build Spring Boot Docker Image Locally
+        run: |
+          mvn -B clean package -DskipTests
+          mvn spring-boot:build-image \
+            -DskipTests \
+            -Dimage.tag=${DOCKER_ARCH_TAG} \
+            -Dspring-boot.build-image.builder=paketobuildpacks/builder-jammy-base
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
@@ -71,15 +65,9 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and Push with Pack
+      - name: Push Docker Image
         run: |
-          mkdir -p ~/.pack-cache-${{ matrix.arch }}
-          pack build ${{ env.IMAGE_NAME }}:${{ env.DOCKER_ARCH_TAG }} \
-            --path . \
-            --builder paketobuildpacks/builder-jammy-base \
-            --platform ${{ matrix.platform }} \
-            --volume $HOME/.pack-cache-${{ matrix.arch }}:/cache \
-            --publish
+          docker push ${{ env.IMAGE_NAME }}:${{ env.DOCKER_ARCH_TAG }}
 
   merge-manifests:
     needs: [build]
@@ -102,14 +90,14 @@ jobs:
           else
             FINAL_TAG="latest-SNAPSHOT"
           fi
-          
+
           AMD64_TAG="${{ env.IMAGE_NAME }}:${FINAL_TAG}-amd64"
           ARM64_TAG="${{ env.IMAGE_NAME }}:${FINAL_TAG}-arm64"
-          
+
           docker manifest create ${{ env.IMAGE_NAME }}:${FINAL_TAG} \
             --amend ${AMD64_TAG} \
             --amend ${ARM64_TAG}
-          
+
           docker manifest push ${{ env.IMAGE_NAME }}:${FINAL_TAG}
 
       - name: (Optional) Tag release as 'latest'
@@ -117,10 +105,10 @@ jobs:
         run: |
           FINAL_TAG="${{ github.ref_name }}"
           FINAL_TAG="${FINAL_TAG#v}"
-          
+
           AMD64_TAG="${{ env.IMAGE_NAME }}:${FINAL_TAG}-amd64"
           ARM64_TAG="${{ env.IMAGE_NAME }}:${FINAL_TAG}-arm64"
-          
+
           docker manifest create ${{ env.IMAGE_NAME }}:latest \
             --amend ${AMD64_TAG} \
             --amend ${ARM64_TAG}

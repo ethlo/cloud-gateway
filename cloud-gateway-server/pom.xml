@@ -61,8 +61,17 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <image>
+                        <name>ethlocom/cloud-gateway:${image.tag}</name>
+                    </image>
+                </configuration>
             </plugin>
         </plugins>
     </build>
+
+    <properties>
+        <image.tag>latest-SNAPSHOT</image.tag>
+    </properties>
 
 </project>
