@@ -43,7 +43,7 @@ jobs:
           if [[ "${{ github.ref_type }}" == "tag" ]]; then
             VERSION=${{ github.ref_name }}
             VERSION=${VERSION#v}
-            DOCKER_TAG=${{ github.ref_name }}
+            DOCKER_TAG=${VERSION} # Uses the version without the 'v'
           else
             VERSION="latest-SNAPSHOT"
             DOCKER_TAG="latest-SNAPSHOT"
