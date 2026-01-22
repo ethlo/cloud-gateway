@@ -105,8 +105,8 @@ public class ClickHouseLogger implements HttpLogger
 
         final Map<String, Object> params = dataProvider.asMetaMap();
 
-        dataProvider.requestHeaders(HttpHeaders.writableHttpHeaders(dataProvider.getRequestHeaders()));
-        dataProvider.responseHeaders(HttpHeaders.writableHttpHeaders(dataProvider.getResponseHeaders()));
+        dataProvider.requestHeaders(HttpHeaders.copyOf(dataProvider.getRequestHeaders()));
+        dataProvider.responseHeaders(HttpHeaders.copyOf(dataProvider.getResponseHeaders()));
 
         // Remove headers already captured in dedicated columns or otherwise processed
         final HttpHeaders requestHeaders = dataProvider.getRequestHeaders();
@@ -116,7 +116,7 @@ public class ClickHouseLogger implements HttpLogger
         processHeader(DELETE, REQUEST, requestHeaders, HttpHeaders.CONTENT_TYPE);
 
         // Remove headers that are not requested for logging
-        for (final String headerName : requestHeaders.keySet())
+        for (final String headerName : requestHeaders.headerNames())
         {
             final HeaderProcessing processing = predicateConfig.request().headers().apply(headerName);
             processHeader(processing, REQUEST, requestHeaders, headerName);
@@ -143,7 +143,7 @@ public class ClickHouseLogger implements HttpLogger
         final HttpHeaders responseHeaders = dataProvider.getResponseHeaders();
 
         // Remove headers that are not requested for logging
-        for (final String headerName : responseHeaders.keySet())
+        for (final String headerName : responseHeaders.headerNames())
         {
             final HeaderProcessing processing = predicateConfig.response().headers().apply(headerName);
             processHeader(processing, RESPONSE, responseHeaders, headerName);

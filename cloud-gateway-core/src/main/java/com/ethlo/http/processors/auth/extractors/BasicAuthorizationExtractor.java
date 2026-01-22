@@ -13,7 +13,7 @@ import org.springframework.validation.annotation.Validated;
 import com.ethlo.http.processors.auth.RealmUser;
 import jakarta.validation.constraints.NotNull;
 
-@ConditionalOnProperty("http-logging.auth.basic")
+@ConditionalOnProperty("http-logging.auth.basic.enabled")
 @Validated
 @Component
 @RefreshScope

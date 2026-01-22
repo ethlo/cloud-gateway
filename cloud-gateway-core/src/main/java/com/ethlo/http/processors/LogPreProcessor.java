@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 import com.ethlo.http.model.WebExchangeDataProvider;
 import com.ethlo.http.processors.auth.RealmUser;
 import com.ethlo.http.processors.auth.extractors.AuthorizationExtractor;
+import com.ethlo.http.processors.auth.extractors.DelegateAuthorizationExtractor;
 
 @Component
 @RefreshScope
@@ -19,7 +20,7 @@ public class LogPreProcessor
 
     private final AuthorizationExtractor authorizationExtractor;
 
-    public LogPreProcessor(final AuthorizationExtractor authorizationExtractor)
+    public LogPreProcessor(final DelegateAuthorizationExtractor authorizationExtractor)
     {
         this.authorizationExtractor = authorizationExtractor;
     }

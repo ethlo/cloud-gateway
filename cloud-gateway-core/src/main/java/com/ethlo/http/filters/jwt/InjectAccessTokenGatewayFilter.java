@@ -6,6 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
+import org.jetbrains.annotations.NotNull;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,7 +18,7 @@ import org.springframework.core.codec.Hints;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.http.codec.json.Jackson2JsonEncoder;
+import org.springframework.http.codec.json.JacksonJsonEncoder;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.web.server.ServerWebExchange;
@@ -32,7 +33,7 @@ public class InjectAccessTokenGatewayFilter implements GatewayFilter
 {
     private static final Logger logger = LoggerFactory.getLogger(InjectAccessTokenAuthGatewayFilterFactory.class);
 
-    private final Jackson2JsonEncoder jacksonEncoder = new Jackson2JsonEncoder();
+    private final JacksonJsonEncoder jacksonEncoder = new JacksonJsonEncoder();
     private final JwtTokenService tokenService = new JwtTokenService();
     private final InjectAccessTokenConfig config;
     protected DecodedJWT jwt;
@@ -55,7 +56,7 @@ public class InjectAccessTokenGatewayFilter implements GatewayFilter
     }
 
     @Override
-    public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain)
+    public Mono<Void> filter(@NotNull ServerWebExchange exchange, @NotNull GatewayFilterChain chain)
     {
         if (jwt == null)
         {

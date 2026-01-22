@@ -6,7 +6,7 @@
     <parent>
         <groupId>com.ethlo.http</groupId>
         <artifactId>cloud-gateway</artifactId>
-        <version>1.6.6</version>
+        <version>1.7.0-SNAPSHOT</version>
     </parent>
     <dependencies>
         <dependency>
@@ -16,7 +16,7 @@
         <dependency>
             <groupId>com.ethlo.http</groupId>
             <artifactId>cloud-gateway-core</artifactId>
-            <version>1.6.6</version>
+            <version>1.7.0-SNAPSHOT</version>
         </dependency>
 
         <!-- Test -->
@@ -35,7 +35,7 @@
         <dependency>
             <groupId>org.assertj</groupId>
             <artifactId>assertj-core</artifactId>
-            <version>3.26.3</version>
+            <version>3.27.6</version>
             <scope>test</scope>
         </dependency>
 

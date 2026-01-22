@@ -8,6 +8,7 @@ import java.util.function.BiFunction;
 import javax.sql.DataSource;
 
 import org.flywaydb.core.Flyway;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -19,6 +20,7 @@ import com.ethlo.http.logger.LoggingFilterService;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
+@ConditionalOnProperty(prefix = "http-logging.providers.clickhouse", name = "enabled", havingValue = "true")
 @Component
 public class ClickhouseHttpLoggerFactory implements HttpLoggerFactory
 {
@@ -46,6 +48,8 @@ public class ClickhouseHttpLoggerFactory implements HttpLoggerFactory
     {
         final HikariConfig config = new HikariConfig();
         config.setJdbcUrl(clickHouseProviderConfig.getUrl());
+        config.setUsername(clickHouseProviderConfig.getUsername());
+        config.setPassword(clickHouseProviderConfig.getPassword());
         final DataSource dataSource = new HikariDataSource(config);
         return new NamedParameterJdbcTemplate(dataSource);
     }

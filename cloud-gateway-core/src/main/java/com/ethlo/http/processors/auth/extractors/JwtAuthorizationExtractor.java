@@ -6,6 +6,7 @@ import java.util.Optional;
 import java.util.regex.Matcher;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
@@ -17,7 +18,7 @@ import com.ethlo.http.processors.auth.RealmUser;
 
 @RefreshScope
 @Component
-@ConditionalOnBean(JwtAuthorizationExtractor.class)
+@ConditionalOnProperty("http-logging.auth.jwt.enabled")
 public class JwtAuthorizationExtractor implements AuthorizationExtractor
 {
     private final JwtAuthorizationConfig config;

@@ -169,7 +169,7 @@ public class WebExchangeDataProvider
     {
         final Map<String, Object> params = new TreeMap<>();
         params.put("route_id", route.getId());
-        params.put("route_uri", route.getUri());
+        params.put("route_uri", route.getUri().toString());
         params.put("realm_claim", getUser().map(RealmUser::realm).orElse(null));
         params.put("user_claim", getUser().map(RealmUser::username).orElse(null));
 
