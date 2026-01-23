@@ -50,6 +50,7 @@ public class ClickhouseHttpLoggerFactory implements HttpLoggerFactory
         config.setJdbcUrl(clickHouseProviderConfig.getUrl());
         config.setUsername(clickHouseProviderConfig.getUsername());
         config.setPassword(clickHouseProviderConfig.getPassword());
+        config.setConnectionInitSql(clickHouseProviderConfig.getConnectionInitSql());
         final DataSource dataSource = new HikariDataSource(config);
         return new NamedParameterJdbcTemplate(dataSource);
     }
