@@ -7,17 +7,16 @@ import static com.ethlo.http.netty.ServerDirection.REQUEST;
 import static com.ethlo.http.netty.ServerDirection.RESPONSE;
 
 import java.io.ByteArrayInputStream;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
 import com.ethlo.http.BodyDecodeException;
 import com.ethlo.http.logger.HttpLogger;
@@ -39,12 +38,12 @@ public class ClickHouseLogger implements HttpLogger
 {
     private static final Logger logger = LoggerFactory.getLogger(ClickHouseLogger.class);
     private final LoggingFilterService loggingFilterService;
-    private final NamedParameterJdbcTemplate tpl;
+    private final ClickHouseLoggerRepository clickHouseLoggerRepository;
 
-    public ClickHouseLogger(final LoggingFilterService loggingFilterService, final NamedParameterJdbcTemplate tpl)
+    public ClickHouseLogger(final LoggingFilterService loggingFilterService, ClickHouseLoggerRepository clickHouseLoggerRepository)
     {
         this.loggingFilterService = loggingFilterService;
-        this.tpl = tpl;
+        this.clickHouseLoggerRepository = clickHouseLoggerRepository;
     }
 
     private static CompletableFuture<BodyDecodeException> processContent(LogOptions logConfig, RawProvider rawProvider, final ServerDirection serverDirection, final Map<String, Object> params)
@@ -160,23 +159,7 @@ public class ClickHouseLogger implements HttpLogger
         {
             final List<BodyDecodeException> processingResult = res.stream().filter(Objects::nonNull).toList();
             logger.debug("Inserting data into ClickHouse for request {}: {}", dataProvider.getRequestId(), params);
-
-            tpl.update("""                    
-                            INSERT INTO log (
-                              timestamp, route_id, route_uri, gateway_request_id, method, path,
-                              response_time, request_body_size, response_body_size, request_total_size,
-                              response_total_size, status, is_error, user_claim, realm_claim, host,
-                              request_content_type, response_content_type, user_agent,
-                              request_headers, response_headers, request_body, response_body, request_raw, response_raw, exception_type, exception_message)
-                            VALUES(
-                              :timestamp, :route_id, :route_uri, :gateway_request_id, :method, :path,
-                              :duration, :request_body_size, :response_body_size,
-                              :request_total_size, :response_total_size, :status, :is_error, :user_claim, :realm_claim,
-                              :host, :request_content_type, :response_content_type, :user_agent,
-                              :request_headers, :response_headers,
-                              :request_body, :response_body, :request_raw, :response_raw, :exception_type, :exception_message)""",
-                    params
-            );
+            insertIntoDatabase(params);
 
             if (processingResult.isEmpty())
             {
@@ -187,6 +170,11 @@ public class ClickHouseLogger implements HttpLogger
                 return AccessLogResult.error(predicateConfig, processingResult);
             }
         });
+    }
+
+    protected void insertIntoDatabase(Map<String, Object> params)
+    {
+        clickHouseLoggerRepository.insert(params);
     }
 
     private void processHeader(final HeaderProcessing headerProcessing, final ServerDirection direction, HttpHeaders headers, String headerName)
@@ -212,11 +200,13 @@ public class ClickHouseLogger implements HttpLogger
         }
     }
 
-    private Map<String, Object> flattenMap(HttpHeaders headers)
+    private Map<String, String> flattenMap(HttpHeaders headers)
     {
-        final Map<String, Object> result = new LinkedHashMap<>();
-        headers.forEach((name, list) -> result.put(name, list.size() > 1 ? list : list.getFirst()));
-        return result;
+        return headers.headerNames().stream()
+                .collect(Collectors.toMap(
+                        key -> key,
+                        key -> String.join(", ", Objects.requireNonNull(headers.get(key)))
+                ));
     }
 
     @Override

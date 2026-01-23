@@ -6,26 +6,16 @@ import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.time.Duration;
-
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTestClient;
-import org.springframework.cloud.gateway.filter.factory.SetRequestHeaderGatewayFilterFactory;
-import org.springframework.context.annotation.Bean;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
-import com.ethlo.http.configuration.FileConfigurationChangeDetectorConfiguration;
-import com.ethlo.http.filters.InjectBasicAuthGatewayFilterFactory;
 import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -62,7 +52,8 @@ class HandleDifferentResponseTypesTest extends BaseTest
 
         // Point the gateway route to the dynamic WireMock port
         registry.add("spring.cloud.gateway.server.webflux.routes[0].uri",
-                () -> "http://localhost:" + server.getPort());
+                () -> "http://localhost:" + server.getPort()
+        );
 
         configureClickHouseProperties(registry);
     }

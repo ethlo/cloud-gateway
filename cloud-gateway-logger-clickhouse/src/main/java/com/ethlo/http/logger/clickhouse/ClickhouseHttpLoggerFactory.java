@@ -41,7 +41,7 @@ public class ClickhouseHttpLoggerFactory implements HttpLoggerFactory
 
         beanRegistration.apply("clickHouseStatsEndpoint", clickHouseStatsEndpoint(tpl));
 
-        return new ClickHouseLogger(loggingFilterService, tpl);
+        return new ClickHouseLogger(loggingFilterService, new ClickHouseLoggerRepository(tpl));
     }
 
     private NamedParameterJdbcTemplate namedParameterJdbcTemplate(ClickHouseProviderConfig clickHouseProviderConfig)
@@ -64,7 +64,7 @@ public class ClickhouseHttpLoggerFactory implements HttpLoggerFactory
     {
         final Flyway flyway = Flyway.configure()
                 .defaultSchema(extractSchema(clickHouseProviderConfig.getUrl()))
-                .locations("db/clickhouse/migration")
+                .locations("db/migration")
                 .baselineOnMigrate(true)
                 .dataSource(
                         clickHouseProviderConfig.getUrl(),
