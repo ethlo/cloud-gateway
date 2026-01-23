@@ -1,5 +1,6 @@
 package com.ethlo.http.logger.clickhouse;
 
+import java.io.ByteArrayInputStream;
 import java.util.Map;
 
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -15,6 +16,14 @@ public class ClickHouseLoggerRepository
 
     public void insert(Map<String, Object> params)
     {
+        params.entrySet().forEach(entry ->
+        {
+            if (entry.getValue() instanceof byte[] bytes)
+            {
+                entry.setValue(new ByteArrayInputStream(bytes));
+            }
+        });
+
         tpl.update("""                    
                         INSERT INTO log (
                           timestamp, route_id, route_uri, gateway_request_id, method, path,

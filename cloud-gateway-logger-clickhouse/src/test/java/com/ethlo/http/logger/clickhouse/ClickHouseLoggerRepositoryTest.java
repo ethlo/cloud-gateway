@@ -1,7 +1,11 @@
 package com.ethlo.http.logger.clickhouse;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 
@@ -102,16 +106,53 @@ class ClickHouseLoggerRepositoryTest
         );
 
         // 7. Payloads (usually String or byte[])
-        params.put("request_body", "{\"username\": \"john.doe\", \"email\": \"john@example.com\"}");
-        params.put("response_body", "{\"id\": 99, \"status\": \"created\"}");
-        params.put("request_raw", "POST /api/v1/users HTTP/1.1\r\nHost: api.example.com...");
-        params.put("response_raw", "HTTP/1.1 201 Created\r\nContent-Type: application/json...");
+        params.put("request_body", "{\"username\": \"john.doe\", \"email\": \"john@example.com\"}".getBytes(StandardCharsets.UTF_8));
+        params.put("response_body", "{\"id\": 99, \"status\": \"created\"}".getBytes(StandardCharsets.UTF_8));
+        params.put("request_raw", "POST /api/v1/users HTTP/1.1\r\nHost: api.example.com...".getBytes(StandardCharsets.UTF_8));
+        params.put("response_raw", "HTTP/1.1 201 Created\r\nContent-Type: application/json...".getBytes(StandardCharsets.UTF_8));
 
         // 8. Error Info (Null for successful requests)
         params.put("exception_type", null);
         params.put("exception_message", null);
 
         clickHouseLoggerRepository.insert(params);
+
+        // Fetch the row using the unique gateway request ID
+        final List<Map<String, Object>> results = namedParameterJdbcTemplate.getJdbcTemplate().queryForList(
+                "SELECT * FROM log WHERE gateway_request_id = ?", "req-12345-abcde");
+
+        assertThat(results).hasSize(1);
+        Map<String, Object> row = results.getFirst();
+
+        // 1. Assert Core Info
+        assertThat(row).containsEntry("method", "POST")
+                .containsEntry("path", "/api/v1/users")
+                .containsKey("timestamp");
+
+        // 2. Assert Numbers (ClickHouse Unsigned types return as generic Numbers, so we extract longValue)
+        assertThat(((Number) row.get("response_time")).longValue()).isEqualTo(145L);
+        assertThat(((Number) row.get("request_body_size")).longValue()).isEqualTo(2048L);
+        assertThat(((Number) row.get("status")).intValue()).isEqualTo(201);
+
+        // 3. Assert Booleans (ClickHouse Bool/UInt8)
+        assertThat(row).containsEntry("is_error", (short) 0);
+
+        // 4. Assert Complex Maps (ClickHouse Map(String, String) restores to java.util.Map)
+        @SuppressWarnings("unchecked")
+        Map<String, String> requestHeaders = (Map<String, String>) row.get("request_headers");
+        assertThat(requestHeaders)
+                .containsEntry("Host", "api.example.com")
+                .containsEntry("X-Forwarded-For", "192.168.1.1, 94.22.33.193")
+                .containsEntry("Authorization", "Bearer eyJhb...");
+
+        @SuppressWarnings("unchecked")
+        Map<String, String> responseHeaders = (Map<String, String>) row.get("response_headers");
+        assertThat(responseHeaders)
+                .containsEntry("X-RateLimit-Remaining", "99");
+
+        // 5. Assert Payloads (Verifying byte[] JSON didn't turn into ASCII arrays)
+        assertThat(row).containsEntry("request_body", "{\"username\": \"john.doe\", \"email\": \"john@example.com\"}")
+                .containsEntry("response_body", "{\"id\": 99, \"status\": \"created\"}");
     }
 
     @EnableAutoConfiguration(exclude = DataJdbcRepositoriesAutoConfiguration.class)
