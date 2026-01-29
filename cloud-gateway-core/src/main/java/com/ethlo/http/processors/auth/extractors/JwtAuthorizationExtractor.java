@@ -5,7 +5,6 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import java.util.Optional;
 import java.util.regex.Matcher;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.http.HttpHeaders;

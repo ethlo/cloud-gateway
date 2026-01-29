@@ -246,20 +246,21 @@ public class LayeredFileSystem extends FileSystem
         logger.debug("Attempting to fetch path {}", path);
         final String key = path.toString();
         return pathCache.get(key, k ->
-        {
-            for (Path layer : layers)
-            {
-                logger.debug("Checking layer {}", layer);
-                Path resolvedPath = layer.resolve(path);
-                if (Files.exists(resolvedPath))
                 {
-                    logger.debug("Path {} was found in layer {}", path, layer);
-                    return Optional.of(resolvedPath);
+                    for (Path layer : layers)
+                    {
+                        logger.debug("Checking layer {}", layer);
+                        Path resolvedPath = layer.resolve(path);
+                        if (Files.exists(resolvedPath))
+                        {
+                            logger.debug("Path {} was found in layer {}", path, layer);
+                            return Optional.of(resolvedPath);
+                        }
+                    }
+                    logger.debug("Path {} not found in any layer", path);
+                    return Optional.empty();
                 }
-            }
-            logger.debug("Path {} not found in any layer", path);
-            return Optional.empty();
-        });
+        );
     }
 
     @Override

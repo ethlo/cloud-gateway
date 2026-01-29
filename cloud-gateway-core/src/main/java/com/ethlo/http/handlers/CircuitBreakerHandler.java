@@ -1,10 +1,5 @@
 package com.ethlo.http.handlers;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
 import org.slf4j.Logger;
@@ -12,8 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.server.reactive.ServerHttpRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.reactive.function.server.HandlerFunction;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
@@ -23,91 +17,71 @@ import com.ethlo.http.netty.DataBufferRepository;
 import com.ethlo.http.netty.PredicateConfig;
 import com.ethlo.http.netty.ServerDirection;
 import jakarta.annotation.Nonnull;
-import rawhttp.core.RawHttpHeaders;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
+import reactor.core.scheduler.Scheduler;
 
 public class CircuitBreakerHandler implements HandlerFunction<ServerResponse>
 {
     private static final Logger logger = LoggerFactory.getLogger(CircuitBreakerHandler.class);
     private final DataBufferRepository dataBufferRepository;
+    private final Scheduler ioScheduler;
 
-    public CircuitBreakerHandler(final DataBufferRepository dataBufferRepository)
+    public CircuitBreakerHandler(final DataBufferRepository dataBufferRepository, final Scheduler ioScheduler)
     {
         this.dataBufferRepository = dataBufferRepository;
-    }
-
-    private static ByteBuffer extractHeaders(ServerHttpRequest request)
-    {
-        RawHttpHeaders.Builder builder = RawHttpHeaders.newBuilder();
-        request.getHeaders().forEach((name, values) -> values.forEach(value -> builder.with(name, value)));
-        final ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        try
-        {
-            final RawHttpHeaders headers = builder.build();
-            headers.writeTo(baos);
-            return ByteBuffer.wrap(baos.toByteArray());
-        }
-        catch (IOException e)
-        {
-            throw new UncheckedIOException(e);
-        }
+        this.ioScheduler = ioScheduler;
     }
 
     @Override
     public @Nonnull Mono<ServerResponse> handle(@Nonnull ServerRequest serverRequest)
     {
+        final String requestId = serverRequest.exchange().getRequest().getId();
         final Optional<Exception> exc = serverRequest.attribute(ServerWebExchangeUtils.CIRCUITBREAKER_EXECUTION_EXCEPTION_ATTR).map(Exception.class::cast);
-        exc.ifPresent(e -> logger.warn("An error occurred when routing request {} upstream: {}", serverRequest.exchange().getRequest().getId(), e.getMessage()));
+
+        exc.ifPresent(e -> logger.warn("Circuit breaker fallback for request {}: {}", requestId, e.getMessage()));
 
         final Optional<PredicateConfig> config = ContextUtil.getLoggingConfig(serverRequest);
-        logger.debug("Reading logging config: {}", config.orElse(null));
-
-        final Mono<ServerResponse> response = ServerResponse.status(504).build();
+        final Mono<ServerResponse> gatewayTimeoutResponse = ServerResponse.status(HttpStatus.GATEWAY_TIMEOUT).build();
 
         return config
-                .map(p ->
-                {
-                    if (p.request().mustBuffer())
+                .filter(p -> p.request().mustBuffer())
+                .map(p -> drainRequestBody(serverRequest).then(gatewayTimeoutResponse))
+                .orElse(gatewayTimeoutResponse);
+    }
+
+    /**
+     * Drains the request body into the repository so it can be logged,
+     * even though there is no upstream to consume it.
+     */
+    private Mono<Void> drainRequestBody(ServerRequest serverRequest)
+    {
+        final String requestId = serverRequest.exchange().getRequest().getId();
+
+        return serverRequest.bodyToFlux(DataBuffer.class)
+                .doOnNext(db -> offloadWrite(db, requestId))
+                .then();
+    }
+
+    private void offloadWrite(DataBuffer db, String requestId)
+    {
+        // Retain to protect from Netty recycling during async offload
+        DataBufferUtils.retain(db);
+
+        Mono.fromRunnable(() -> {
+                    try (DataBuffer.ByteBufferIterator iterator = db.readableByteBuffers())
                     {
-                        return saveIncomingRequest(serverRequest)
-                                .then(response);
+                        while (iterator.hasNext())
+                        {
+                            // Synchronous write to the body-only file
+                            dataBufferRepository.writeSync(ServerDirection.REQUEST, requestId, iterator.next());
+                        }
+                    } finally
+                    {
+                        // Release back to Netty pool
+                        DataBufferUtils.release(db);
                     }
-                    return response;
                 })
-                .orElse(response);
-    }
-
-    private Mono<ServerResponse> saveIncomingRequest(ServerRequest serverRequest)
-    {
-        final ServerHttpRequest request = serverRequest.exchange().getRequest();
-        final String requestId = request.getId();
-        final HttpMethod method = request.getMethod();
-
-        final ByteBuffer fakeRequestLine = ByteBuffer.wrap((method.name() + " / HTTP/1.1\r\n").getBytes(StandardCharsets.UTF_8));
-        dataBufferRepository.write(ServerDirection.REQUEST, requestId, fakeRequestLine).join();
-        dataBufferRepository.write(ServerDirection.REQUEST, requestId, extractHeaders(request)).join();
-
-        return serverRequest.exchange().getRequest().getBody()
-                .publishOn(Schedulers.boundedElastic())
-                .flatMapSequential(dataBuffer -> saveDataChunk(requestId, dataBuffer))
-                .then(Mono.empty());
-    }
-
-    private Mono<Long> saveDataChunk(String requestId, DataBuffer dataBuffer)
-    {
-        try (final DataBuffer.ByteBufferIterator iter = dataBuffer.readableByteBuffers())
-        {
-            long written = 0;
-            while (iter.hasNext())
-            {
-                final ByteBuffer byteBuffer = iter.next();
-                written += dataBufferRepository.write(ServerDirection.REQUEST, requestId, byteBuffer).join();
-            }
-            return Mono.just(written);
-        } finally
-        {
-            DataBufferUtils.release(dataBuffer);
-        }
+                .subscribeOn(ioScheduler)
+                .subscribe();
     }
 }

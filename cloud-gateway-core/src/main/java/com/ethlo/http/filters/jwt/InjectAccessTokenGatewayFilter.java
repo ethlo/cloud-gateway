@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Objects;
 
 import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,8 +56,9 @@ public class InjectAccessTokenGatewayFilter implements GatewayFilter
         return errorAttributes;
     }
 
+    @NotNull
     @Override
-    public Mono<Void> filter(@NotNull ServerWebExchange exchange, @NotNull GatewayFilterChain chain)
+    public Mono<@NonNull Void> filter(@NotNull ServerWebExchange exchange, @NotNull GatewayFilterChain chain)
     {
         if (jwt == null)
         {
@@ -83,7 +85,7 @@ public class InjectAccessTokenGatewayFilter implements GatewayFilter
                 + ", token-url" + config.getTokenUrl() + "}";
     }
 
-    private Mono<Void> writeBodyJson(Object body, ServerWebExchange exchange)
+    private Mono<@NonNull Void> writeBodyJson(Object body, ServerWebExchange exchange)
     {
         return exchange.getResponse().writeWith(
                 jacksonEncoder.encode(

@@ -1,9 +1,9 @@
 package com.ethlo.http.filters.jwt;
 
-import jakarta.validation.constraints.NotEmpty;
-
 import java.time.Duration;
 import java.util.Optional;
+
+import jakarta.validation.constraints.NotEmpty;
 
 public class InjectAccessTokenConfig
 {

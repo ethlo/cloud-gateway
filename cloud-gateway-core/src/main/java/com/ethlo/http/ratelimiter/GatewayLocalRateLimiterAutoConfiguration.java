@@ -16,6 +16,7 @@
 
 package com.ethlo.http.ratelimiter;
 
+import org.jspecify.annotations.NonNull;
 import org.springframework.boot.autoconfigure.AutoConfigureBefore;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -33,7 +34,7 @@ public class GatewayLocalRateLimiterAutoConfiguration
 {
     @Bean
     @ConditionalOnMissingBean
-    public RateLimiter<LocalRateLimiter.Config> localRateLimiter(ConfigurationService configurationService)
+    public RateLimiter<LocalRateLimiter.@NonNull Config> localRateLimiter(ConfigurationService configurationService)
     {
         return new LocalRateLimiter(configurationService);
     }

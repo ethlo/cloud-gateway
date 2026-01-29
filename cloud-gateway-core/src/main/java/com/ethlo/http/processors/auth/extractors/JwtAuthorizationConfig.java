@@ -1,13 +1,13 @@
 package com.ethlo.http.processors.auth.extractors;
 
-import java.util.Optional;
-import java.util.regex.Pattern;
+import com.ethlo.http.processors.FeatureToggle;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.validation.annotation.Validated;
 
-import com.ethlo.http.processors.FeatureToggle;
+import java.util.Optional;
+import java.util.regex.Pattern;
 
 /**
  * Capture authentication information from the JWT contained in 'Authorization: Bearer ey...' header

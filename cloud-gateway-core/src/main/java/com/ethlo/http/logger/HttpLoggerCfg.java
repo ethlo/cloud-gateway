@@ -29,10 +29,11 @@ public class HttpLoggerCfg
                             return factories.stream().filter(f -> f.getName().equalsIgnoreCase(name)).findFirst()
                                     .orElseThrow(() -> new IllegalArgumentException("No factory for logging provider '" + name + "'"))
                                     .getInstance(loggingFilterService, entry.getValue(), (beanName, instance) ->
-                                    {
-                                        applicationContext.getBeanFactory().registerSingleton(beanName, instance);
-                                        return null;
-                                    });
+                                            {
+                                                applicationContext.getBeanFactory().registerSingleton(beanName, instance);
+                                                return null;
+                                            }
+                                    );
                         })
                         .toList()).orElse(List.of());
         return new SequentialDelegateLogger(loggers);

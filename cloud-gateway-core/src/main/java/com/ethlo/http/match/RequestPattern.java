@@ -1,12 +1,12 @@
 package com.ethlo.http.match;
 
+import org.springframework.http.HttpMethod;
+import org.springframework.http.server.reactive.ServerHttpRequest;
+
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.StringJoiner;
-
-import org.springframework.http.HttpMethod;
-import org.springframework.http.server.reactive.ServerHttpRequest;
 
 public class RequestPattern
 {

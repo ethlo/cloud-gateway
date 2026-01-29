@@ -1,11 +1,12 @@
 package com.ethlo.http.logger;
 
-import java.util.concurrent.CompletableFuture;
+import org.jspecify.annotations.NonNull;
 
 import com.ethlo.http.model.AccessLogResult;
 import com.ethlo.http.model.WebExchangeDataProvider;
+import reactor.core.publisher.Mono;
 
 public interface HttpLogger
 {
-    CompletableFuture<AccessLogResult> accessLog(WebExchangeDataProvider dataProvider);
+    Mono<@NonNull AccessLogResult> accessLog(WebExchangeDataProvider dataProvider);
 }

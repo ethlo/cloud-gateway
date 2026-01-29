@@ -38,11 +38,26 @@ public class WebExchangeDataProvider
     private InetSocketAddress remoteAddress;
     private RealmUser user;
     private Throwable exception;
+    private Runnable cleanupTask;
 
     public WebExchangeDataProvider(DataBufferRepository dataBufferRepository, final PredicateConfig predicateConfig)
     {
         this.dataBufferRepository = Objects.requireNonNull(dataBufferRepository);
         this.predicateConfig = predicateConfig;
+    }
+
+    public WebExchangeDataProvider cleanupTask(Runnable cleanupTask)
+    {
+        this.cleanupTask = cleanupTask;
+        return this;
+    }
+
+    public void cleanup()
+    {
+        if (cleanupTask != null)
+        {
+            cleanupTask.run();
+        }
     }
 
     public WebExchangeDataProvider requestId(String requestId)
@@ -105,14 +120,14 @@ public class WebExchangeDataProvider
         return this;
     }
 
-    public Optional<RawProvider> getRawRequest()
+    public Optional<BodyProvider> getRequestBody()
     {
-        return dataBufferRepository.get(ServerDirection.REQUEST, requestId);
+        return dataBufferRepository.get(ServerDirection.REQUEST, requestId, requestHeaders.getFirst(HttpHeaders.CONTENT_ENCODING));
     }
 
-    public Optional<RawProvider> getRawResponse()
+    public Optional<BodyProvider> getResponseBody()
     {
-        return dataBufferRepository.get(ServerDirection.RESPONSE, requestId);
+        return dataBufferRepository.get(ServerDirection.RESPONSE, requestId, responseHeaders.getFirst(HttpHeaders.CONTENT_ENCODING));
     }
 
     public String getRequestId()

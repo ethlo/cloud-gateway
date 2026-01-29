@@ -3,34 +3,31 @@ package com.ethlo.http.model;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.ethlo.http.netty.PredicateConfig;
-
 public class AccessLogResult
 {
-    private final PredicateConfig predicateConfig;
+    private final WebExchangeDataProvider webExchangeDataProvider;
     private final List<? extends Exception> processingErrors;
 
-    private AccessLogResult(final PredicateConfig predicateConfig, final List<? extends Exception> processingErrors)
+    private AccessLogResult(final WebExchangeDataProvider webExchangeDataProvider, final List<? extends Exception> processingErrors)
     {
-        this.predicateConfig = predicateConfig;
+        this.webExchangeDataProvider = webExchangeDataProvider;
         this.processingErrors = processingErrors;
     }
 
-    public static AccessLogResult ok(PredicateConfig predicateConfig)
+    public static AccessLogResult ok(final WebExchangeDataProvider webExchangeDataProvider)
     {
-        return new AccessLogResult(predicateConfig, List.of());
+        return new AccessLogResult(webExchangeDataProvider, List.of());
     }
 
-    public static AccessLogResult error(PredicateConfig predicateConfig, List<? extends Exception> processingErrors)
+    public static AccessLogResult error(final WebExchangeDataProvider webExchangeDataProvider, List<? extends Exception> processingErrors)
     {
-        return new AccessLogResult(predicateConfig, processingErrors);
+        return new AccessLogResult(webExchangeDataProvider, processingErrors);
     }
 
-    public PredicateConfig getPredicateConfig()
+    public void cleanup()
     {
-        return predicateConfig;
+        webExchangeDataProvider.cleanup();
     }
-
 
     public List<? extends Exception> getProcessingErrors()
     {
@@ -41,7 +38,12 @@ public class AccessLogResult
     {
         final List<Exception> combined = new ArrayList<>(this.processingErrors);
         combined.addAll(other.processingErrors);
-        return new AccessLogResult(predicateConfig, combined);
+        return new AccessLogResult(webExchangeDataProvider, combined);
+    }
+
+    public WebExchangeDataProvider getWebExchangeDataProvider()
+    {
+        return webExchangeDataProvider;
     }
 
     public boolean isOk()

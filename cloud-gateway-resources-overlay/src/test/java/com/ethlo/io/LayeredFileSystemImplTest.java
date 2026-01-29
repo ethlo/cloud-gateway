@@ -1,13 +1,6 @@
 package com.ethlo.io;
 
-import com.ethlo.http.io.FileSystemProperties;
-import com.ethlo.http.io.LayeredFileSystem;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.file.PathUtils;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.core.io.Resource;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -19,15 +12,25 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.file.PathUtils;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.core.io.Resource;
 
-class LayeredFileSystemImplTest {
+import com.ethlo.http.io.FileSystemProperties;
+import com.ethlo.http.io.LayeredFileSystem;
+
+class LayeredFileSystemImplTest
+{
     private Path layer1;
     private Path layer2;
     private LayeredFileSystem fileSystem;
 
     @BeforeEach
-    void setUp() throws IOException {
+    void setUp() throws IOException
+    {
         // Create two temporary directories (layers)
         layer1 = Files.createTempDirectory("layer1_");
         layer2 = Files.createTempDirectory("layer2_");
@@ -45,7 +48,8 @@ class LayeredFileSystemImplTest {
     }
 
     @AfterEach
-    void tearDown() throws IOException {
+    void tearDown() throws IOException
+    {
         // Clean up temporary directories
         PathUtils.delete(layer1);
         PathUtils.delete(layer2);
@@ -55,9 +59,11 @@ class LayeredFileSystemImplTest {
     }
 
     @Test
-    void testListRootFiles() throws IOException {
+    void testListRootFiles() throws IOException
+    {
         // List files in the root directory
-        try (Stream<Path> files = fileSystem.list(Paths.get(""))) {
+        try (Stream<Path> files = fileSystem.list(Paths.get("")))
+        {
             assertThat(files).containsExactly(
                     Path.of("file1.txt"),
                     Path.of("file2.txt"),
@@ -68,21 +74,26 @@ class LayeredFileSystemImplTest {
     }
 
     @Test
-    void testFindFileInLayer1() {
+    void testFindFileInLayer1()
+    {
         // Find file1.txt in layer1
         Optional<Resource> resource = fileSystem.find(Paths.get("file1.txt"));
         assertResource(layer1, "file1.txt", resource, "layer1_file1.txt");
     }
 
-    private void assertResource(Path layer, String file, @SuppressWarnings("OptionalUsedAsFieldOrParameterType") Optional<Resource> resource, final String expectedContents) {
+    private void assertResource(Path layer, String file, @SuppressWarnings("OptionalUsedAsFieldOrParameterType") Optional<Resource> resource, final String expectedContents)
+    {
         assertThat(resource).isPresent();
 
         final Resource res = resource.get();
 
         assertThat(res).extracting(r -> {
-                    try {
+                    try
+                    {
                         return r.getContentAsString(StandardCharsets.UTF_8);
-                    } catch (IOException e) {
+                    }
+                    catch (IOException e)
+                    {
                         throw new RuntimeException(e);
                     }
                 })
@@ -91,9 +102,12 @@ class LayeredFileSystemImplTest {
         assertThat(res)
                 .extracting(r ->
                 {
-                    try {
+                    try
+                    {
                         return r.getFile().toPath().toString();
-                    } catch (IOException e) {
+                    }
+                    catch (IOException e)
+                    {
                         throw new RuntimeException(e);
                     }
                 })
@@ -101,21 +115,24 @@ class LayeredFileSystemImplTest {
     }
 
     @Test
-    void testFindFileInLayer2_HappyPath() {
+    void testFindFileInLayer2_HappyPath()
+    {
         // Find file2.txt in layer2
         Optional<Resource> resource = fileSystem.find(Paths.get("file2.txt"));
         assertResource(layer2, "file2.txt", resource, "layer2_file2.txt");
     }
 
     @Test
-    void testFindFileNotExist() {
+    void testFindFileNotExist()
+    {
         // Try to find a file that doesn't exist
         Optional<Resource> resource = fileSystem.find(Paths.get("nonexistent.txt"));
         assertThat(resource).isNotPresent();
     }
 
     @Test
-    void testListFilesUsesFallback() throws IOException {
+    void testListFilesUsesFallback() throws IOException
+    {
         // Simulate IOException by deleting the layer directory before listing
         FileUtils.deleteDirectory(layer1.toFile());
         assertThat(Files.exists(layer1)).isFalse();
@@ -129,7 +146,8 @@ class LayeredFileSystemImplTest {
     }
 
     @Test
-    void testFileWatcherCacheInvalidation() throws IOException, InterruptedException {
+    void testFileWatcherCacheInvalidation() throws IOException, InterruptedException
+    {
         // Find file1.txt to add it to the cache
         final Path relativePath = Paths.get("file3.txt");
         Optional<Resource> resource = fileSystem.find(relativePath);

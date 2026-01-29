@@ -59,10 +59,11 @@ public class CloudGatewayStatusEndpoint
         final Map<String, Double> committedMemory = getMetrics("jvm.memory.committed");
         final Map<String, Double> maxMemory = getMetrics("jvm.memory.max");
         model.put("memory_summary", Map.of(
-                "used", sumMem(usedMemory),
-                "committed", sumMem(committedMemory),
-                "max", sumMem(maxMemory)
-        ));
+                        "used", sumMem(usedMemory),
+                        "committed", sumMem(committedMemory),
+                        "max", sumMem(maxMemory)
+                )
+        );
         model.put("memory", overlay(usedMemory, committedMemory, maxMemory));
 
         if (clickHouseStatsEndpoint != null)
@@ -121,7 +122,8 @@ public class CloudGatewayStatusEndpoint
                         m.getId().getTags().stream()
                                 .map(t -> t.getKey() + ":" + t.getValue())
                                 .collect(Collectors.joining(", ")), m -> m.measure()
-                        .iterator().next().getValue())));
+                        .iterator().next().getValue()
+                )));
     }
 
     private Map<String, Object> preProcess(Map<String, Object> map)
