@@ -124,7 +124,7 @@ public class DataBufferRepository
         {
             try
             {
-                return Optional.of(new BodyProvider(id, dir, path, FileChannel.open(path, StandardOpenOption.READ), contentEncoding));
+                return Optional.of(new BodyProvider(path, FileChannel.open(path, StandardOpenOption.READ), contentEncoding));
             }
             catch (IOException e)
             {
@@ -136,7 +136,7 @@ public class DataBufferRepository
             try
             {
                 // This works even after the writer channel is closed.
-                return Optional.of(new BodyProvider(id, dir, path, FileChannel.open(path, StandardOpenOption.READ), contentEncoding));
+                return Optional.of(new BodyProvider(path, FileChannel.open(path, StandardOpenOption.READ), contentEncoding));
             }
             catch (IOException e)
             {

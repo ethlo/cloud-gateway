@@ -24,27 +24,28 @@ public class PebbleRenderer
     {
         final Map<String, Filter> filters = new TreeMap<>();
         filters.put("sizeformat", new Filter()
-        {
-            @Override
-            public Object apply(final Object input, final Map<String, Object> args, final PebbleTemplate self, final EvaluationContext context, final int lineNumber) throws PebbleException
-            {
-                if (input == null)
                 {
-                    return null;
-                }
-                else if (input instanceof Number)
-                {
-                    return IoUtil.formatSize(((Number) input).longValue());
-                }
-                return input;
-            }
+                    @Override
+                    public Object apply(final Object input, final Map<String, Object> args, final PebbleTemplate self, final EvaluationContext context, final int lineNumber) throws PebbleException
+                    {
+                        if (input == null)
+                        {
+                            return null;
+                        }
+                        else if (input instanceof Number)
+                        {
+                            return IoUtil.formatSize(((Number) input).longValue());
+                        }
+                        return input;
+                    }
 
-            @Override
-            public List<String> getArgumentNames()
-            {
-                return null;
-            }
-        });
+                    @Override
+                    public List<String> getArgumentNames()
+                    {
+                        return null;
+                    }
+                }
+        );
 
         engine = new PebbleEngine.Builder()
                 .strictVariables(strict)

@@ -139,29 +139,30 @@ public class HttpUpstreamServicesUpdateServiceImpl implements HttpUpstreamServic
 
             // Compare the payload hash to the previous payload hash
             lastModified.compute(uri, (k, v) ->
-            {
-                if (v == null || !v.hash.equals(hash))
-                {
-                    // We have new data or no data previously
-                    try
                     {
-                        final Map<String, RouteDefinition> routeDefinitions = parse(configSourceData);
-                        refreshRequired.set(true);
-                        logger.info("{} upstream config for {}", v == null ? "New" : "Updated", upstreamService);
-                        return new LastModifiedRouteDefinition(routeDefinitions, hash, OffsetDateTime.now());
+                        if (v == null || !v.hash.equals(hash))
+                        {
+                            // We have new data or no data previously
+                            try
+                            {
+                                final Map<String, RouteDefinition> routeDefinitions = parse(configSourceData);
+                                refreshRequired.set(true);
+                                logger.info("{} upstream config for {}", v == null ? "New" : "Updated", upstreamService);
+                                return new LastModifiedRouteDefinition(routeDefinitions, hash, OffsetDateTime.now());
+                            }
+                            catch (IOException e)
+                            {
+                                logger.warn("Unable to parse config for upstream service {}: {}", upstreamService, e.toString());
+                                return null;
+                            }
+                        }
+                        else
+                        {
+                            // Old data matches hash
+                            return v;
+                        }
                     }
-                    catch (IOException e)
-                    {
-                        logger.warn("Unable to parse config for upstream service {}: {}", upstreamService, e.toString());
-                        return null;
-                    }
-                }
-                else
-                {
-                    // Old data matches hash
-                    return v;
-                }
-            });
+            );
         });
 
         final Map<String, RouteDefinition> collapsed = lastModified.entrySet().stream()

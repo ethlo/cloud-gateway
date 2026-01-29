@@ -56,7 +56,8 @@ public class LocalRateLimiter extends AbstractRateLimiter<LocalRateLimiter.Confi
                         .timeoutDuration(Duration.ZERO)
                         .limitRefreshPeriod(refreshPeriod)
                         .limitForPeriod(replenishRate)
-                        .build());
+                        .build()
+                );
 
         final boolean allowed = rateLimiter.acquirePermission(tokensRequiredForRequest);
         final Long tokensLeft = (long) rateLimiter.getMetrics().getAvailablePermissions();
