@@ -1,5 +1,6 @@
 package com.ethlo.http.model;
 
+import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -38,7 +39,7 @@ public class BodyProvider
     {
         try
         {
-            final InputStream rawStream = Files.newInputStream(this.file);
+            final InputStream rawStream = new BufferedInputStream(Files.newInputStream(this.file));
 
             if ("gzip".equalsIgnoreCase(contentEncoding))
             {
