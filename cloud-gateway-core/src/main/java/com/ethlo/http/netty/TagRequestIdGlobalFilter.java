@@ -65,6 +65,8 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
     @Override
     public @Nonnull Mono<@NonNull Void> filter(@Nonnull ServerWebExchange exchange, @org.jetbrains.annotations.NotNull GatewayFilterChain chain)
     {
+        final long started = System.nanoTime();
+
         final ServerHttpRequest requestWithId = new RequestIdWrapper(exchange.getRequest(), RequestIdWrapper.generateId());
         final ServerWebExchange exchangeWithId = exchange.mutate().request(requestWithId).build();
 
@@ -75,14 +77,13 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
                 .map(Optional::of)
                 .defaultIfEmpty(Optional.empty())
                 .flatMap(configOpt -> configOpt
-                        .map(config -> prepareLogging(exchangeWithId, chain, loggingFilterService.merge(config)))
+                        .map(config -> prepareLogging(started, exchangeWithId, chain, loggingFilterService.merge(config)))
                         .orElseGet(() -> wrapChainWithStatusMapping(exchangeWithId, chain)) // Handle status even if not logging
                 );
     }
 
-    private Mono<@NonNull Void> prepareLogging(ServerWebExchange exchange, GatewayFilterChain chain, PredicateConfig config)
+    private Mono<@NonNull Void> prepareLogging(final long started, ServerWebExchange exchange, GatewayFilterChain chain, PredicateConfig config)
     {
-        final long start = System.nanoTime();
         final String id = exchange.getRequest().getId();
 
         final ServerWebExchange decorated = exchange.mutate()
@@ -95,7 +96,7 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
                 .doOnError(e -> decorated.getAttributes().put(EXCEPTION_ATTRIBUTE_NAME, e))
                 .doFinally(sig -> {
                     Throwable exc = (Throwable) decorated.getAttribute(EXCEPTION_ATTRIBUTE_NAME);
-                    saveLog(decorated, config, id, start, exc)
+                    saveLog(decorated, config, id, started, exc)
                             .subscribeOn(ioScheduler)
                             .subscribe();
                 });

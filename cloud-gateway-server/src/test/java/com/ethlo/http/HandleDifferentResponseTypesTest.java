@@ -19,14 +19,13 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.ethlo.http.logger.delegate.SequentialDelegateLogger;
 import com.ethlo.http.model.AccessLogResult;
 import com.ethlo.http.model.WebExchangeDataProvider;
 import com.github.tomakehurst.wiremock.http.Fault;
 import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
-
-import org.springframework.web.server.ResponseStatusException;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class HandleDifferentResponseTypesTest extends BaseTest
@@ -143,10 +142,12 @@ class HandleDifferentResponseTypesTest extends BaseTest
                         finalResult.getProcessingErrors()
                 )
                 .isTrue();
+
+        assertThat(finalResult.getWebExchangeDataProvider().getDuration()).isCloseTo(Duration.ofSeconds(3), Duration.ofMillis(100));
     }
 
     @Test
-    void    testUpstreamDown()
+    void testUpstreamDown()
     {
         // 1. Setup the observer for the background logging task
         final AtomicReference<AccessLogResult> logResultCapture = new AtomicReference<>();
@@ -159,7 +160,7 @@ class HandleDifferentResponseTypesTest extends BaseTest
                         .withFault(Fault.CONNECTION_RESET_BY_PEER)));
 
         // 3. Execute the request
-        // We expect a 504 (if the circuit breaker is active) or a 500/502 (if not)
+        // We expect a 502
         client.get()
                 .uri("/get")
                 .exchange()
