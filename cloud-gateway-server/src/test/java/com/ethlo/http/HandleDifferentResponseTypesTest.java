@@ -5,6 +5,10 @@ import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
+
+import java.time.Duration;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
@@ -16,6 +20,8 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
+import com.ethlo.http.logger.delegate.SequentialDelegateLogger;
+import com.ethlo.http.model.AccessLogResult;
 import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -28,6 +34,9 @@ class HandleDifferentResponseTypesTest extends BaseTest
 
     @Autowired
     private WebTestClient client;
+
+    @Autowired
+    private SequentialDelegateLogger sequentialDelegateLogger;
 
     @DynamicPropertySource
     static void additionalConfigureProperties(DynamicPropertyRegistry registry)
@@ -50,6 +59,8 @@ class HandleDifferentResponseTypesTest extends BaseTest
         registry.add("spring.cloud.gateway.server.webflux.routes[0].filters[1].args.name", () -> "x-realm");
         registry.add("spring.cloud.gateway.server.webflux.routes[0].filters[1].args.value", () -> "baz");
 
+        registry.add("spring.cloud.gateway.http-client.response-timeout", () -> "5s");
+
         // Point the gateway route to the dynamic WireMock port
         registry.add("spring.cloud.gateway.server.webflux.routes[0].uri",
                 () -> "http://localhost:" + server.getPort()
@@ -59,41 +70,51 @@ class HandleDifferentResponseTypesTest extends BaseTest
     }
 
     @Test
-    void testChunkedGet()
+    void testChunkedGetWithLoggingVerification()
     {
-        // We simulate a chunked response by providing the body and NOT setting content-length.
-        // WireMock handles the chunking mechanics.
-        // If you want to force distinct chunks for testing timing, use withChunkedDribbleDelay.
+        // 1. Setup an observer for the background logging task
+        AtomicReference<AccessLogResult> logResultCapture = new AtomicReference<>();
+        sequentialDelegateLogger.getResults()
+                .subscribe(logResultCapture::set);
+
+        // 2. Mock WireMock
         server.stubFor(get(urlPathEqualTo("/get"))
                 .willReturn(aResponse()
                         .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                        // This forces WireMock to send Transfer-Encoding: chunked
-                        // and break the body into pieces over time (5 chunks, 1000ms total)
-                        .withChunkedDribbleDelay(5, 1000)
+                        .withChunkedDribbleDelay(5, 500)
                         .withBody("Mozilla Developer Network")));
 
-        final String body = client.get()
-                .uri("/get")
-                .exchange()
-                .expectStatus().isOk()
-                .expectBody(String.class)
-                .returnResult()
-                .getResponseBody();
+        // 3. Execute the request
+        client.get().uri("/get").exchange().expectStatus().isOk();
 
-        // The WebClient (Netty) automatically decodes the chunks,
-        // so we assert on the final re-assembled string.
-        assertThat(body).isEqualTo("Mozilla Developer Network");
+        // 4. SIGNAL THE TEST: Wait for the background task to finish and check for failures
+        // This solves the "async failure is just logged" problem
+        await().atMost(Duration.ofSeconds(5)).until(() -> logResultCapture.get() != null);
+
+        AccessLogResult finalResult = logResultCapture.get();
+
+        // If the background logging failed, this assertion will fail your test!
+        assertThat(finalResult.isOk())
+                .withFailMessage("Logging failed with errors: %s", finalResult.getProcessingErrors())
+                .isTrue();
     }
 
     @Test
     void testSlowResponse()
     {
+        // 1. Setup the observer for the background logging task
+        final AtomicReference<AccessLogResult> logResultCapture = new AtomicReference<>();
+        sequentialDelegateLogger.getResults()
+                .subscribe(logResultCapture::set);
+
+        // 2. Mock a slow response (3 seconds)
         server.stubFor(get(urlPathEqualTo("/get"))
                 .willReturn(aResponse()
                         .withFixedDelay(3_000)
                         .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                         .withBody("Mozilla Developer Network")));
 
+        // 3. Execute the request
         final String body = client.get()
                 .uri("/get")
                 .exchange()
@@ -102,6 +123,23 @@ class HandleDifferentResponseTypesTest extends BaseTest
                 .returnResult()
                 .getResponseBody();
 
+        // 4. Verify the response content
         assertThat(body).isEqualTo("Mozilla Developer Network");
+
+        // 5. WAIT for the background logging to complete.
+        // Even though the response is slow, the logger should trigger as soon as
+        // the Flux completes in the ResponsePayloadCaptureDecorator.
+        await()
+                .atMost(Duration.ofSeconds(10)) // 3s delay + safety margin
+                .pollInterval(Duration.ofMillis(100))
+                .until(() -> logResultCapture.get() != null);
+
+        // 6. Assert that the background task actually succeeded
+        final AccessLogResult finalResult = logResultCapture.get();
+        assertThat(finalResult.isOk())
+                .withFailMessage("Logging failed for slow response. Errors: %s",
+                        finalResult.getProcessingErrors()
+                )
+                .isTrue();
     }
 }

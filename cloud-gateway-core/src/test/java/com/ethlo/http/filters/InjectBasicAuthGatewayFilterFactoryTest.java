@@ -2,6 +2,7 @@ package com.ethlo.http.filters;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.Test;
 import org.springframework.cloud.gateway.filter.factory.GatewayFilterFactory;
 import org.springframework.http.HttpHeaders;
@@ -24,7 +25,7 @@ class InjectBasicAuthGatewayFilterFactoryTest extends AbstractFilterTest<InjectB
     }
 
     @Override
-    protected GatewayFilterFactory<InjectBasicAuthGatewayFilterFactory.Config> filterFactory()
+    protected GatewayFilterFactory<InjectBasicAuthGatewayFilterFactory.@NonNull Config> filterFactory()
     {
         return new InjectBasicAuthGatewayFilterFactory();
     }

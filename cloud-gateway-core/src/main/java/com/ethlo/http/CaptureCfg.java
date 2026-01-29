@@ -17,6 +17,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -56,7 +57,7 @@ public class CaptureCfg
     @Bean
     public CircuitBreakerHandler circuitBreakerHandler(DataBufferRepository dataBufferRepository)
     {
-        return new CircuitBreakerHandler(dataBufferRepository);
+        return new CircuitBreakerHandler(dataBufferRepository, Schedulers.boundedElastic());
     }
 
     @Bean
@@ -83,14 +84,14 @@ public class CaptureCfg
     }
 
     @Bean
-    RouterFunction<ServerResponse> routes(CircuitBreakerHandler circuitBreakerHandler)
+    RouterFunction<@NonNull ServerResponse> routes(CircuitBreakerHandler circuitBreakerHandler)
     {
         return nest(path("/upstream-down"), route(RequestPredicates.all(), circuitBreakerHandler));
     }
 
     @Bean
     @RefreshScope
-    public RoutePredicateLocator routePredicateLocator(final List<RoutePredicateFactory> predicateFactories, final ConfigurationService configurationService)
+    public RoutePredicateLocator routePredicateLocator(final List<@NonNull RoutePredicateFactory> predicateFactories, final ConfigurationService configurationService)
     {
         return new RoutePredicateLocator(predicateFactories, configurationService);
     }
@@ -113,7 +114,8 @@ public class CaptureCfg
                     return t;
                 }),
                 queueBlockPolicy
-        )), linkedBlockingDeque, queueSize, queueBlockPolicy.rejectedDelayCounter, queueBlockPolicy.rejectedDelay);
+        )), linkedBlockingDeque, queueSize, queueBlockPolicy.rejectedDelayCounter, queueBlockPolicy.rejectedDelay
+        );
     }
 
     static class WaitForCapacityPolicy implements RejectedExecutionHandler

@@ -19,6 +19,7 @@ import com.ethlo.http.logger.HttpLoggerFactory;
 import com.ethlo.http.logger.LoggingFilterService;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import reactor.core.scheduler.Schedulers;
 
 @ConditionalOnProperty(prefix = "http-logging.providers.clickhouse", name = "enabled", havingValue = "true")
 @Component
@@ -41,7 +42,7 @@ public class ClickhouseHttpLoggerFactory implements HttpLoggerFactory
 
         beanRegistration.apply("clickHouseStatsEndpoint", clickHouseStatsEndpoint(tpl));
 
-        return new ClickHouseLogger(loggingFilterService, new ClickHouseLoggerRepository(tpl));
+        return new ClickHouseLogger(loggingFilterService, new ClickHouseLoggerRepository(tpl), Schedulers.boundedElastic());
     }
 
     private NamedParameterJdbcTemplate namedParameterJdbcTemplate(ClickHouseProviderConfig clickHouseProviderConfig)

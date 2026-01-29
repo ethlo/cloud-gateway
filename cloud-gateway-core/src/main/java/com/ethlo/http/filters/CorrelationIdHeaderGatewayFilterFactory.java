@@ -2,6 +2,8 @@ package com.ethlo.http.filters;
 
 import java.util.List;
 
+import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
@@ -12,20 +14,22 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 @Component
-public class CorrelationIdHeaderGatewayFilterFactory extends AbstractGatewayFilterFactory<CorrelationIdHeaderGatewayFilterFactory.Config>
+public class CorrelationIdHeaderGatewayFilterFactory extends AbstractGatewayFilterFactory<CorrelationIdHeaderGatewayFilterFactory.@NonNull Config>
 {
     public CorrelationIdHeaderGatewayFilterFactory()
     {
         super(Config.class);
     }
 
+    @NotNull
     @Override
     public GatewayFilter apply(Config config)
     {
         return new GatewayFilter()
         {
+            @NotNull
             @Override
-            public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain)
+            public Mono<@NonNull Void> filter(@NotNull ServerWebExchange exchange, @NotNull GatewayFilterChain chain)
             {
                 final String internalRequestId = exchange.getRequest().getId();
                 final ServerHttpRequest updatedRequest = exchange.getRequest().mutate().header(config.getHeaderName(), internalRequestId).build();
@@ -62,10 +66,9 @@ public class CorrelationIdHeaderGatewayFilterFactory extends AbstractGatewayFilt
             return headerName;
         }
 
-        public Config setHeaderName(final String requestHeaderName)
+        public void setHeaderName(final String requestHeaderName)
         {
             this.headerName = requestHeaderName;
-            return this;
         }
     }
 }
