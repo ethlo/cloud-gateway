@@ -73,7 +73,7 @@ class HandleDifferentResponseTypesTest extends BaseTest
     void testChunkedGetWithLoggingVerification()
     {
         // 1. Setup an observer for the background logging task
-        AtomicReference<AccessLogResult> logResultCapture = new AtomicReference<>();
+        final AtomicReference<AccessLogResult> logResultCapture = new AtomicReference<>();
         sequentialDelegateLogger.getResults()
                 .subscribe(logResultCapture::set);
 
@@ -88,12 +88,10 @@ class HandleDifferentResponseTypesTest extends BaseTest
         client.get().uri("/get").exchange().expectStatus().isOk();
 
         // 4. SIGNAL THE TEST: Wait for the background task to finish and check for failures
-        // This solves the "async failure is just logged" problem
         await().atMost(Duration.ofSeconds(5)).until(() -> logResultCapture.get() != null);
 
         AccessLogResult finalResult = logResultCapture.get();
 
-        // If the background logging failed, this assertion will fail your test!
         assertThat(finalResult.isOk())
                 .withFailMessage("Logging failed with errors: %s", finalResult.getProcessingErrors())
                 .isTrue();
