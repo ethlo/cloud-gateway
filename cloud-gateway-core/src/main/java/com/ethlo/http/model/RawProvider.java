@@ -61,7 +61,7 @@ public class RawProvider
         catch (IOException e)
         {
             logger.error(e.getMessage(), e);
-            return Optional.empty();
+            throw new UncheckedIOException(e);
         }
     }
 }
