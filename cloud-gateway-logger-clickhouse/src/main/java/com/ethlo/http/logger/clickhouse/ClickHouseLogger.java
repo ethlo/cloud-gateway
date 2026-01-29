@@ -6,6 +6,7 @@ import static com.ethlo.http.match.LogOptions.ContentProcessing.STORE;
 import static com.ethlo.http.netty.ServerDirection.REQUEST;
 import static com.ethlo.http.netty.ServerDirection.RESPONSE;
 
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -51,22 +52,41 @@ public class ClickHouseLogger implements HttpLogger
             return Mono.empty();
         }
 
-        return Mono.fromCallable(() ->
-                rawProvider.getBuffer().map(buffer ->
+        // We use Mono.fromRunnable or fromCallable to wrap the blocking I/O
+        // explicitly on the ioScheduler.
+        return Mono.<Void>fromRunnable(() ->
+        {
+            final Optional<ByteBuffer> bufferOpt = rawProvider.getBuffer();
+            if (bufferOpt.isPresent())
+            {
+                final ByteBuffer buffer = bufferOpt.get();
+                final byte[] body = new byte[buffer.remaining()];
+                buffer.get(body);
+
+                final String prefix = dir.name().toLowerCase();
+                params.put(prefix + "_total_size", body.length);
+                params.put(prefix + "_body_size", body.length);
+
+                if (logConfig.body() == STORE || logConfig.raw() == STORE)
                 {
-                    final byte[] body = new byte[buffer.remaining()];
-                    buffer.get(body);
+                    params.put(prefix + "_body", body);
+                }
+            }
+        }).subscribeOn(ioScheduler);
+    }
 
-                    final String prefix = dir.name().toLowerCase();
-                    params.put(prefix + "_total_size", body.length);
-                    params.put(prefix + "_body_size", body.length);
-
-                    if (logConfig.body() == STORE || logConfig.raw() == STORE)
-                    {
-                        params.put(prefix + "_body", body);
-                    }
-                    return true;
-                }).orElse(false)).subscribeOn(ioScheduler).then();
+    private void initializeParams(Map<String, Object> params)
+    {
+        final List<String> prefixes = List.of("request", "response");
+        for (String prefix : prefixes)
+        {
+            params.put(prefix + "_raw", null);
+            params.put(prefix + "_body", null);
+            params.put(prefix + "_body_size", null);
+            params.put(prefix + "_total_size", null);
+        }
+        params.put("exception_type", null);
+        params.put("exception_message", null);
     }
 
     @Override
@@ -78,28 +98,17 @@ public class ClickHouseLogger implements HttpLogger
         final PredicateConfig predicateConfig = loggingFilterService.merge(logConfigOpt.get());
         final Map<String, Object> params = dataProvider.asMetaMap();
 
-        // Default values
-        params.put("request_raw", null);
-        params.put("request_body", null);
-        params.put("request_body_size", null);
-        params.put("request_total_size", null);
-
-        params.put("response_raw", null);
-        params.put("response_body", null);
-        params.put("response_body_size", null);
-        params.put("response_total_size", null);
-
-        params.put("exception_type", null);
-        params.put("exception_message", null);
+        initializeParams(params);
 
         // Metadata processing
         prepareHeaders(dataProvider, predicateConfig, params);
-        dataProvider.getException().ifPresent(exc -> {
+        dataProvider.getException().ifPresent(exc ->
+        {
             params.put("exception_type", exc.getClass().getName());
             params.put("exception_message", exc.getMessage());
         });
 
-        // Async content loading and DB insertion
+        // The entire chain (loading files + DB insertion) is offloaded to the ioScheduler
         return Mono.when(
                         processContentReactive(predicateConfig.request(), dataProvider.getRawRequest().orElse(null), REQUEST, params),
                         processContentReactive(predicateConfig.response(), dataProvider.getRawResponse().orElse(null), RESPONSE, params)
