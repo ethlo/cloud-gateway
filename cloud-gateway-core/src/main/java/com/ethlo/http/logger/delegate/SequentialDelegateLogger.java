@@ -36,11 +36,11 @@ public class SequentialDelegateLogger
                             logger.error("Logger {} failed for request {}", httpLogger, dataProvider.getRequestId(), e);
                             // Explicitly cast or wrap to match your error signature
                             final Exception ex = e instanceof Exception ? (Exception) e : new RuntimeException(e);
-                            return Mono.just(AccessLogResult.error(predicateConfig, List.of(ex)));
+                            return Mono.just(AccessLogResult.error(dataProvider, List.of(ex)));
                         }))
-                .reduce(AccessLogResult.ok(predicateConfig), AccessLogResult::combine)
+                .reduce(AccessLogResult.ok(dataProvider), AccessLogResult::combine)
                 .doOnError(e -> {
-                    resultSink.tryEmitNext(AccessLogResult.error(predicateConfig, List.of(new Exception(e))));
+                    resultSink.tryEmitNext(AccessLogResult.error(dataProvider, List.of(new Exception(e))));
                 })
                 .doOnNext(resultSink::tryEmitNext); // Broadcast the result
     }

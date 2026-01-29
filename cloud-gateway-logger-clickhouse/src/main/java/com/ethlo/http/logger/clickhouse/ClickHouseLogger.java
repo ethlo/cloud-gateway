@@ -24,7 +24,7 @@ import com.ethlo.http.logger.RedactUtil;
 import com.ethlo.http.match.HeaderProcessing;
 import com.ethlo.http.match.LogOptions;
 import com.ethlo.http.model.AccessLogResult;
-import com.ethlo.http.model.RawProvider;
+import com.ethlo.http.model.BodyProvider;
 import com.ethlo.http.model.WebExchangeDataProvider;
 import com.ethlo.http.netty.PredicateConfig;
 import com.ethlo.http.netty.ServerDirection;
@@ -45,7 +45,7 @@ public class ClickHouseLogger implements HttpLogger
         this.ioScheduler = ioScheduler;
     }
 
-    private Mono<@NonNull Void> processContentReactive(LogOptions logConfig, RawProvider rawProvider, ServerDirection dir, Map<String, Object> params)
+    private Mono<@NonNull Void> processContentReactive(LogOptions logConfig, BodyProvider rawProvider, ServerDirection dir, Map<String, Object> params)
     {
         if (rawProvider == null)
         {
@@ -110,14 +110,14 @@ public class ClickHouseLogger implements HttpLogger
 
         // The entire chain (loading files + DB insertion) is offloaded to the ioScheduler
         return Mono.when(
-                        processContentReactive(predicateConfig.request(), dataProvider.getRawRequest().orElse(null), REQUEST, params),
-                        processContentReactive(predicateConfig.response(), dataProvider.getRawResponse().orElse(null), RESPONSE, params)
+                        processContentReactive(predicateConfig.request(), dataProvider.getRequestBody().orElse(null), REQUEST, params),
+                        processContentReactive(predicateConfig.response(), dataProvider.getResponseBody().orElse(null), RESPONSE, params)
                 )
                 .then(Mono.fromRunnable(() -> {
                     logger.debug("Inserting data into ClickHouse for request {}", dataProvider.getRequestId());
                     clickHouseLoggerRepository.insert(params);
                 }))
-                .thenReturn(AccessLogResult.ok(predicateConfig))
+                .thenReturn(AccessLogResult.ok(dataProvider))
                 .subscribeOn(ioScheduler);
     }
 

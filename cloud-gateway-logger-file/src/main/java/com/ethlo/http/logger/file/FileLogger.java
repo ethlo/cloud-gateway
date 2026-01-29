@@ -31,9 +31,9 @@ public class FileLogger implements HttpLogger
                 {
                     final Map<String, Object> metaMap = dataProvider.asMetaMap();
                     accessLogLogger.info(accessLogTemplateRenderer.render(metaMap));
-                    return AccessLogResult.ok(dataProvider.getPredicateConfig().orElseThrow(() -> new IllegalStateException("No predicate config found for request " + dataProvider.getRequestId())));
+                    return AccessLogResult.ok(dataProvider);
                 })
-                .subscribeOn(ioScheduler); // Ensure template rendering/logging offloads from EventLoop
+                .subscribeOn(ioScheduler);
     }
 
     @Override

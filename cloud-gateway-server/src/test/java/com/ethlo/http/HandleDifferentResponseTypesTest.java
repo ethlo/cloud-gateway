@@ -22,7 +22,11 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 
 import com.ethlo.http.logger.delegate.SequentialDelegateLogger;
 import com.ethlo.http.model.AccessLogResult;
+import com.ethlo.http.model.WebExchangeDataProvider;
+import com.github.tomakehurst.wiremock.http.Fault;
 import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
+
+import org.springframework.web.server.ResponseStatusException;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class HandleDifferentResponseTypesTest extends BaseTest
@@ -139,5 +143,49 @@ class HandleDifferentResponseTypesTest extends BaseTest
                         finalResult.getProcessingErrors()
                 )
                 .isTrue();
+    }
+
+    @Test
+    void    testUpstreamDown()
+    {
+        // 1. Setup the observer for the background logging task
+        final AtomicReference<AccessLogResult> logResultCapture = new AtomicReference<>();
+        sequentialDelegateLogger.getResults()
+                .subscribe(logResultCapture::set);
+
+        // 2. Mock a "Connection Reset" or "Connection Refused" behavior
+        server.stubFor(get(urlPathEqualTo("/get"))
+                .willReturn(aResponse()
+                        .withFault(Fault.CONNECTION_RESET_BY_PEER)));
+
+        // 3. Execute the request
+        // We expect a 504 (if the circuit breaker is active) or a 500/502 (if not)
+        client.get()
+                .uri("/get")
+                .exchange()
+                .expectStatus().isEqualTo(502);
+
+        // 4. WAIT for the background logging to complete.
+        // In a "down" scenario, the logging is triggered by the error signal
+        // or the circuit breaker fallback.
+        await()
+                .atMost(Duration.ofSeconds(5))
+                .pollInterval(Duration.ofMillis(100))
+                .until(() -> logResultCapture.get() != null);
+
+        // 5. Assertions
+        final AccessLogResult finalResult = logResultCapture.get();
+        assertThat(finalResult.isOk()).isTrue();
+
+        // 6. Verify the metadata captured for the failed request
+        final WebExchangeDataProvider provider = finalResult.getWebExchangeDataProvider();
+
+        assertThat(provider.getStatusCode().value()).isEqualTo(502);
+
+        assertThat(provider.getException()).isPresent();
+        assertThat(provider.getException().get()).isInstanceOf(ResponseStatusException.class);
+
+        // Verify no response content was logged (since the peer reset)
+        assertThat(provider.getResponseBody()).isEmpty();
     }
 }

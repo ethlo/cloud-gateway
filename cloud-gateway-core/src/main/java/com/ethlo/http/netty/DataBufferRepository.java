@@ -17,7 +17,7 @@ import org.springframework.data.util.Pair;
 
 import ch.qos.logback.core.util.CloseUtil;
 import com.ethlo.http.logger.CaptureConfiguration;
-import com.ethlo.http.model.RawProvider;
+import com.ethlo.http.model.BodyProvider;
 
 public class DataBufferRepository
 {
@@ -114,7 +114,7 @@ public class DataBufferRepository
         );
     }
 
-    public Optional<RawProvider> get(ServerDirection dir, String id)
+    public Optional<BodyProvider> get(ServerDirection dir, String id)
     {
         final Path path = getPath(dir, id);
         // If it's in the pool, it means it's currently being written/active
@@ -123,7 +123,7 @@ public class DataBufferRepository
             try
             {
                 // Return a fresh read-only channel for the logger
-                return Optional.of(new RawProvider(id, dir, path,
+                return Optional.of(new BodyProvider(id, dir, path,
                         FileChannel.open(path, StandardOpenOption.READ)
                 ));
             }

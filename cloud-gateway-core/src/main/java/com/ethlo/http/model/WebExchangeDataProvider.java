@@ -105,12 +105,12 @@ public class WebExchangeDataProvider
         return this;
     }
 
-    public Optional<RawProvider> getRawRequest()
+    public Optional<BodyProvider> getRequestBody()
     {
         return dataBufferRepository.get(ServerDirection.REQUEST, requestId);
     }
 
-    public Optional<RawProvider> getRawResponse()
+    public Optional<BodyProvider> getResponseBody()
     {
         return dataBufferRepository.get(ServerDirection.RESPONSE, requestId);
     }

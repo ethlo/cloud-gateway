@@ -7,6 +7,7 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -75,7 +76,7 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
                 .defaultIfEmpty(Optional.empty())
                 .flatMap(configOpt -> configOpt
                         .map(config -> prepareLogging(exchangeWithId, chain, loggingFilterService.merge(config)))
-                        .orElseGet(() -> chain.filter(exchangeWithId))
+                        .orElseGet(() -> wrapChainWithStatusMapping(exchangeWithId, chain)) // Handle status even if not logging
                 );
     }
 
@@ -89,15 +90,35 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
                 .response(new ResponseCapture(exchange.getResponse(), id))
                 .build();
 
-        return chain.filter(decorated)
+        // Wrap the chain filter call with the error mapper
+        return wrapChainWithStatusMapping(decorated, chain)
                 .doOnError(e -> decorated.getAttributes().put(EXCEPTION_ATTRIBUTE_NAME, e))
                 .doFinally(sig -> {
-                    // We fire the logging chain here
                     Throwable exc = (Throwable) decorated.getAttribute(EXCEPTION_ATTRIBUTE_NAME);
                     saveLog(decorated, config, id, start, exc)
-                            .subscribeOn(ioScheduler) // Offload the final aggregation and cleanup
+                            .subscribeOn(ioScheduler)
                             .subscribe();
                 });
+    }
+
+    private Mono<@NonNull Void> wrapChainWithStatusMapping(ServerWebExchange exchange, GatewayFilterChain chain)
+    {
+        return chain.filter(exchange)
+                .onErrorResume(ex ->
+                {
+                    if (isReset(ex))
+                    {
+                        exchange.getResponse().setStatusCode(HttpStatus.BAD_GATEWAY);
+                        return Mono.error(new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Upstream Reset", ex));
+                    }
+                    return Mono.error(ex);
+                });
+    }
+
+    private boolean isReset(Throwable ex)
+    {
+        return ex instanceof io.netty.channel.unix.Errors.NativeIoException ||
+                (ex != null && ex.getMessage() != null && ex.getMessage().contains("Connection reset"));
     }
 
     private Mono<@NonNull Void> saveLog(ServerWebExchange exchange, PredicateConfig config, String id, long start, Throwable exc)
@@ -139,10 +160,13 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
                 .timestamp(OffsetDateTime.now()).duration(d).remoteAddress(exchange.getRequest().getRemoteAddress());
     }
 
-    private String getProtocol(ServerWebExchange exchange)
+    private HttpStatusCode determineStatusCode(Throwable e, @Nullable HttpStatusCode statusCode)
     {
-        return Optional.ofNullable(exchange.getRequest().getHeaders().getFirst("X-Forwarded-Proto"))
-                .map(p -> p.toUpperCase() + "/1.1").orElse("HTTP/1.1");
+        if (isReset(e))
+        {
+            return HttpStatus.BAD_GATEWAY;
+        }
+        return statusCode;
     }
 
     private void offload(DataBuffer db, ServerDirection dir, String id)
@@ -158,12 +182,6 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
                 DataBufferUtils.release(db);
             }
         }).subscribeOn(ioScheduler).subscribe();
-    }
-
-    private HttpStatusCode determineStatusCode(Throwable exc, HttpStatusCode res)
-    {
-        if (exc instanceof ResponseStatusException r) return r.getStatusCode();
-        return exc != null ? HttpStatus.INTERNAL_SERVER_ERROR : res;
     }
 
     @Override
