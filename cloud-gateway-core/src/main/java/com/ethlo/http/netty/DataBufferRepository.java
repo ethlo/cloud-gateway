@@ -13,6 +13,8 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.jspecify.annotations.NonNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.util.Pair;
 
 import ch.qos.logback.core.util.CloseUtil;
@@ -21,6 +23,7 @@ import com.ethlo.http.model.BodyProvider;
 
 public class DataBufferRepository
 {
+    private static final Logger logger = LoggerFactory.getLogger(DataBufferRepository.class);
     private final Path basePath;
     private final ConcurrentMap<Path, FileHandle> pool = new ConcurrentHashMap<>();
 
@@ -33,15 +36,15 @@ public class DataBufferRepository
     {
         final Path path = getPath(direction, requestId);
         final FileHandle handle = getHandle(path);
-
         final int bytesToWrite = data.remaining();
         try
         {
-            // Lock-free position calculation
-            final long writeAt = handle.position().getAndAdd(bytesToWrite);
-
-            // Thread-safe positioned write
-            return handle.channel().write(data, writeAt);
+            long currentPos = handle.position().getAndAdd(bytesToWrite);
+            while (data.hasRemaining())
+            { // Ensure all bytes land on disk
+                currentPos += handle.channel().write(data, currentPos);
+            }
+            return bytesToWrite;
         }
         catch (IOException e)
         {
@@ -76,7 +79,6 @@ public class DataBufferRepository
 
     private void closeFile(Path path)
     {
-        // Atomically remove the entire handle (Channel + Position)
         final FileHandle handle = pool.remove(path);
         if (handle != null)
         {
@@ -86,6 +88,7 @@ public class DataBufferRepository
 
     public void cleanup(String requestId)
     {
+        logger.debug("Cleanup {}", requestId);
         close(requestId);
         delete(getPath(ServerDirection.REQUEST, requestId));
         delete(getPath(ServerDirection.RESPONSE, requestId));
@@ -114,18 +117,26 @@ public class DataBufferRepository
         );
     }
 
-    public Optional<BodyProvider> get(ServerDirection dir, String id)
+    public Optional<BodyProvider> get(ServerDirection dir, String id, String contentEncoding)
     {
         final Path path = getPath(dir, id);
-        // If it's in the pool, it means it's currently being written/active
         if (pool.containsKey(path))
         {
             try
             {
-                // Return a fresh read-only channel for the logger
-                return Optional.of(new BodyProvider(id, dir, path,
-                        FileChannel.open(path, StandardOpenOption.READ)
-                ));
+                return Optional.of(new BodyProvider(id, dir, path, FileChannel.open(path, StandardOpenOption.READ), contentEncoding));
+            }
+            catch (IOException e)
+            {
+                throw new UncheckedIOException(e);
+            }
+        }
+        else if (Files.exists(path))
+        {
+            try
+            {
+                // This works even after the writer channel is closed.
+                return Optional.of(new BodyProvider(id, dir, path, FileChannel.open(path, StandardOpenOption.READ), contentEncoding));
             }
             catch (IOException e)
             {

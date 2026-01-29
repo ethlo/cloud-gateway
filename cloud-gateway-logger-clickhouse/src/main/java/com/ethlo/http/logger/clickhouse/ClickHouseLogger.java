@@ -6,7 +6,9 @@ import static com.ethlo.http.match.LogOptions.ContentProcessing.STORE;
 import static com.ethlo.http.netty.ServerDirection.REQUEST;
 import static com.ethlo.http.netty.ServerDirection.RESPONSE;
 
-import java.nio.ByteBuffer;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -45,24 +47,18 @@ public class ClickHouseLogger implements HttpLogger
         this.ioScheduler = ioScheduler;
     }
 
-    private Mono<@NonNull Void> processContentReactive(LogOptions logConfig, BodyProvider rawProvider, ServerDirection dir, Map<String, Object> params)
+    private Mono<@NonNull Void> processContentReactive(LogOptions logConfig, BodyProvider bodyProvider, ServerDirection dir, Map<String, Object> params)
     {
-        if (rawProvider == null)
+        if (bodyProvider == null)
         {
             return Mono.empty();
         }
 
-        // We use Mono.fromRunnable or fromCallable to wrap the blocking I/O
-        // explicitly on the ioScheduler.
         return Mono.<Void>fromRunnable(() ->
         {
-            final Optional<ByteBuffer> bufferOpt = rawProvider.getBuffer();
-            if (bufferOpt.isPresent())
+            try (final InputStream inputStream = bodyProvider.getInputStream())
             {
-                final ByteBuffer buffer = bufferOpt.get();
-                final byte[] body = new byte[buffer.remaining()];
-                buffer.get(body);
-
+                final byte[] body = inputStream.readAllBytes();
                 final String prefix = dir.name().toLowerCase();
                 params.put(prefix + "_total_size", body.length);
                 params.put(prefix + "_body_size", body.length);
@@ -71,6 +67,10 @@ public class ClickHouseLogger implements HttpLogger
                 {
                     params.put(prefix + "_body", body);
                 }
+            }
+            catch (IOException e)
+            {
+                throw new UncheckedIOException(e);
             }
         }).subscribeOn(ioScheduler);
     }
@@ -93,7 +93,10 @@ public class ClickHouseLogger implements HttpLogger
     public Mono<@NonNull AccessLogResult> accessLog(final WebExchangeDataProvider dataProvider)
     {
         final Optional<PredicateConfig> logConfigOpt = dataProvider.getPredicateConfig();
-        if (logConfigOpt.isEmpty()) return Mono.empty();
+        if (logConfigOpt.isEmpty())
+        {
+            return Mono.empty();
+        }
 
         final PredicateConfig predicateConfig = loggingFilterService.merge(logConfigOpt.get());
         final Map<String, Object> params = dataProvider.asMetaMap();

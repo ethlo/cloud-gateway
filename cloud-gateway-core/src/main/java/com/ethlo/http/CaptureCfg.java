@@ -20,6 +20,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.cloud.gateway.handler.predicate.RoutePredicateFactory;
@@ -74,13 +75,14 @@ public class CaptureCfg
                                                              final LogPreProcessor logPreProcessor,
                                                              final RoutePredicateLocator routePredicateLocator,
                                                              final HttpLoggingConfiguration httpLoggingConfiguration,
-                                                             final Scheduler ioScheduler)
+                                                             final Scheduler ioScheduler,
+                                                             @Value("${content-logging.buffer-files.cleanup:true}") final boolean autoCleanup)
     {
         final List<PredicateConfig> predicateConfigs = httpLoggingConfiguration.getMatchers()
                 .stream()
                 .map(c -> new PredicateConfig(c.id(), routePredicateLocator.getPredicates(c.predicates()), c.request(), c.response()))
                 .toList();
-        return new TagRequestIdGlobalFilter(loggingFilterService, httpLogger, dataBufferRepository, logPreProcessor, predicateConfigs, ioScheduler);
+        return new TagRequestIdGlobalFilter(loggingFilterService, httpLogger, dataBufferRepository, logPreProcessor, predicateConfigs, ioScheduler, autoCleanup);
     }
 
     @Bean

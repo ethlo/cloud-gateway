@@ -24,6 +24,11 @@ public class AccessLogResult
         return new AccessLogResult(webExchangeDataProvider, processingErrors);
     }
 
+    public void cleanup()
+    {
+        webExchangeDataProvider.cleanup();
+    }
+
     public List<? extends Exception> getProcessingErrors()
     {
         return processingErrors;

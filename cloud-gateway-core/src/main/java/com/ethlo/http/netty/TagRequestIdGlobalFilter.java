@@ -4,8 +4,8 @@ import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
@@ -49,10 +49,12 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
     private final LogPreProcessor logPreProcessor;
     private final List<PredicateConfig> predicateConfigs;
     private final Scheduler ioScheduler;
+    private final boolean autoCleanup;
 
     public TagRequestIdGlobalFilter(LoggingFilterService loggingFilterService, SequentialDelegateLogger httpLogger,
                                     DataBufferRepository repository, LogPreProcessor logPreProcessor,
-                                    List<PredicateConfig> predicateConfigs, Scheduler ioScheduler)
+                                    List<PredicateConfig> predicateConfigs, Scheduler ioScheduler,
+                                    final boolean autoCleanup)
     {
         this.loggingFilterService = loggingFilterService;
         this.httpLogger = httpLogger;
@@ -60,6 +62,7 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
         this.logPreProcessor = logPreProcessor;
         this.predicateConfigs = predicateConfigs;
         this.ioScheduler = ioScheduler;
+        this.autoCleanup = autoCleanup;
     }
 
     @Override
@@ -91,15 +94,15 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
                 .response(new ResponseCapture(exchange.getResponse(), id))
                 .build();
 
-        // Wrap the chain filter call with the error mapper
         return wrapChainWithStatusMapping(decorated, chain)
                 .doOnError(e -> decorated.getAttributes().put(EXCEPTION_ATTRIBUTE_NAME, e))
-                .doFinally(sig -> {
-                    Throwable exc = (Throwable) decorated.getAttribute(EXCEPTION_ATTRIBUTE_NAME);
-                    saveLog(decorated, config, id, started, exc)
-                            .subscribeOn(ioScheduler)
-                            .subscribe();
-                });
+                // Use flatMap (via onErrorResume/then) to ensure the logging completes
+                // BEFORE the exchange signal is finalized
+                .onErrorResume(e -> saveLog(decorated, config, id, started, e).then(Mono.error(e)))
+                .then(Mono.defer(() -> {
+                    final Throwable exc = decorated.getAttribute(EXCEPTION_ATTRIBUTE_NAME);
+                    return saveLog(decorated, config, id, started, exc);
+                }));
     }
 
     private Mono<@NonNull Void> wrapChainWithStatusMapping(ServerWebExchange exchange, GatewayFilterChain chain)
@@ -127,12 +130,24 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
         final Duration duration = Duration.ofNanos(System.nanoTime() - start);
         final WebExchangeDataProvider provider = createProvider(exchange, id, config, duration, exc);
 
+        final Runnable cleanupTask = () ->
+        {
+            repository.close(id);
+            repository.cleanup(id);
+        };
+
+        provider.cleanupTask(cleanupTask);
+
         return httpLogger.accessLog(logPreProcessor.process(provider))
                 .flatMap(res -> {
+                    // Perform cleanup ONLY after accessLog is done
                     repository.close(id);
                     if (res.isOk())
                     {
-                        repository.cleanup(id);
+                        if (autoCleanup)
+                        {
+                            cleanupTask.run();
+                        }
                     }
                     else
                     {
@@ -140,6 +155,8 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
                     }
                     return Mono.empty();
                 })
+                // Explicitly ensure this whole sequence runs on the IO thread
+                .subscribeOn(ioScheduler)
                 .then();
     }
 
@@ -170,19 +187,21 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
         return statusCode;
     }
 
-    private void offload(DataBuffer db, ServerDirection dir, String id)
+    private Mono<Void> offload(DataBuffer db, ServerDirection dir, String id)
     {
-        DataBufferUtils.retain(db);
-        Mono.fromRunnable(() ->
-        {
+        DataBufferUtils.retain(db); // Hold the memory
+        return Mono.fromRunnable(() -> {
             try (DataBuffer.ByteBufferIterator it = db.readableByteBuffers())
             {
-                while (it.hasNext()) repository.writeSync(dir, id, it.next());
+                while (it.hasNext())
+                {
+                    repository.writeSync(dir, id, it.next());
+                }
             } finally
             {
-                DataBufferUtils.release(db);
+                DataBufferUtils.release(db); // Release ONLY after IO is done
             }
-        }).subscribeOn(ioScheduler).subscribe();
+        }).subscribeOn(ioScheduler).then(); // Ensure this runs on the IO thread
     }
 
     @Override
@@ -194,7 +213,6 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
     private class RequestCapture extends ServerHttpRequestDecorator
     {
         private final String requestId;
-        private final AtomicBoolean head = new AtomicBoolean();
 
         RequestCapture(ServerHttpRequest serverHttpRequest, String requestId)
         {
@@ -202,17 +220,20 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
             this.requestId = requestId;
         }
 
+        @NotNull
         @Override
-        public @Nonnull Flux<@NonNull DataBuffer> getBody()
+        public Flux<@NonNull DataBuffer> getBody()
         {
-            return super.getBody().doOnNext(db -> offload(db, ServerDirection.REQUEST, requestId));
+            return super.getBody().concatMap(db ->
+                    offload(db, ServerDirection.REQUEST, requestId)
+                            .then(Mono.just(db)) // Don't release 'db' back to the stream until offload is done
+            );
         }
     }
 
     private class ResponseCapture extends ServerHttpResponseDecorator
     {
         private final String requestId;
-        private final AtomicBoolean head = new AtomicBoolean();
 
         ResponseCapture(ServerHttpResponse serverHttpResponse, String requestId)
         {
@@ -220,10 +241,14 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
             this.requestId = requestId;
         }
 
+        @NotNull
         @Override
-        public @Nonnull Mono<@NonNull Void> writeWith(@Nonnull Publisher<? extends DataBuffer> body)
+        public Mono<@NonNull Void> writeWith(@NotNull Publisher<? extends DataBuffer> body)
         {
-            return super.writeWith(Flux.from(body).doOnNext(db -> offload(db, ServerDirection.RESPONSE, requestId)));
+            return super.writeWith(Flux.from(body).concatMap(db ->
+                    offload(db, ServerDirection.RESPONSE, requestId)
+                            .then(Mono.just(db))
+            ));
         }
     }
 }

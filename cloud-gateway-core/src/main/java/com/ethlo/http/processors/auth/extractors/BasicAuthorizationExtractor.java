@@ -27,14 +27,14 @@ public class BasicAuthorizationExtractor implements AuthorizationExtractor
     }
 
     @Override
-    public Optional<RealmUser> getUser(final HttpHeaders headers, final HttpHeaders responseHeaders)
+    public Optional<RealmUser> getUser(final HttpHeaders requestHeaders, final HttpHeaders responseHeaders)
     {
         if (!config.isEnabled())
         {
             return Optional.empty();
         }
 
-        return Optional.ofNullable(headers.getFirst(HttpHeaders.AUTHORIZATION))
+        return Optional.ofNullable(requestHeaders.getFirst(HttpHeaders.AUTHORIZATION))
                 .filter(headerValue -> headerValue.toLowerCase().startsWith("basic "))
                 .flatMap(headerValue ->
                         decode(headerValue.substring(6)).map(usernameAndPassword ->
@@ -42,7 +42,7 @@ public class BasicAuthorizationExtractor implements AuthorizationExtractor
                             final String[] parts = usernameAndPassword.split(":");
                             if (parts.length == 2)
                             {
-                                final String realm = headers.getFirst(config.getRealmHeaderName());
+                                final String realm = requestHeaders.getFirst(config.getRealmHeaderName());
                                 return new RealmUser(realm, parts[0]);
                             }
                             return null;
