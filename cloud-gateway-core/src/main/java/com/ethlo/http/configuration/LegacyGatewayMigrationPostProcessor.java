@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.boot.env.EnvironmentPostProcessor;
@@ -17,7 +18,7 @@ import org.springframework.core.env.PropertySource;
  * Manually migrates "spring.cloud.gateway.*" properties to "spring.cloud.gateway.server.webflux.*"
  * to ensure backward compatibility for Docker users.
  */
-public class LegacyGatewayMigrationPostProcessor implements EnvironmentPostProcessor, ApplicationListener<ApplicationReadyEvent>
+public class LegacyGatewayMigrationPostProcessor implements EnvironmentPostProcessor, ApplicationListener<@NonNull ApplicationReadyEvent>
 {
     private static final DeferredLog logger = new DeferredLog();
     private static final String OLD_PREFIX = "spring.cloud.gateway.";

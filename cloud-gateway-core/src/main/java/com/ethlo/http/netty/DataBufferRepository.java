@@ -10,9 +10,9 @@ import java.nio.file.StandardOpenOption;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicLong;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.jspecify.annotations.NonNull;
 import org.springframework.data.util.Pair;
 
 import ch.qos.logback.core.util.CloseUtil;
@@ -21,9 +21,8 @@ import com.ethlo.http.model.RawProvider;
 
 public class DataBufferRepository
 {
-    private static final Logger logger = LoggerFactory.getLogger(DataBufferRepository.class);
     private final Path basePath;
-    private final ConcurrentMap<Path, FileChannel> pool = new ConcurrentHashMap<>();
+    private final ConcurrentMap<Path, FileHandle> pool = new ConcurrentHashMap<>();
 
     public DataBufferRepository(CaptureConfiguration config) throws IOException
     {
@@ -32,13 +31,17 @@ public class DataBufferRepository
 
     public int writeSync(ServerDirection direction, String requestId, ByteBuffer data)
     {
-        final FileChannel fc = getChannel(direction, requestId);
+        final Path path = getPath(direction, requestId);
+        final FileHandle handle = getHandle(path);
+
+        final int bytesToWrite = data.remaining();
         try
         {
-            synchronized (fc)
-            {
-                return fc.write(data);
-            }
+            // Lock-free position calculation
+            final long writeAt = handle.position().getAndAdd(bytesToWrite);
+
+            // Thread-safe positioned write
+            return handle.channel().write(data, writeAt);
         }
         catch (IOException e)
         {
@@ -46,13 +49,16 @@ public class DataBufferRepository
         }
     }
 
-    private FileChannel getChannel(ServerDirection direction, String requestId)
+    private FileHandle getHandle(Path path)
     {
-        final Path path = getPath(direction, requestId);
         return pool.computeIfAbsent(path, p -> {
                     try
                     {
-                        return FileChannel.open(p, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+                        final FileChannel fc = FileChannel.open(p,
+                                StandardOpenOption.CREATE,
+                                StandardOpenOption.WRITE
+                        );
+                        return new FileHandle(fc, new AtomicLong(0));
                     }
                     catch (IOException e)
                     {
@@ -70,7 +76,12 @@ public class DataBufferRepository
 
     private void closeFile(Path path)
     {
-        Optional.ofNullable(pool.remove(path)).ifPresent(CloseUtil::closeQuietly);
+        // Atomically remove the entire handle (Channel + Position)
+        final FileHandle handle = pool.remove(path);
+        if (handle != null)
+        {
+            CloseUtil.closeQuietly(handle.channel());
+        }
     }
 
     public void cleanup(String requestId)
@@ -96,7 +107,7 @@ public class DataBufferRepository
         return basePath.resolve(id + "_" + dir.name().toLowerCase() + ".raw");
     }
 
-    public Pair<String, String> getBufferFileNames(String requestId)
+    public Pair<@NonNull String, @NonNull String> getBufferFileNames(String requestId)
     {
         return Pair.of(getPath(ServerDirection.REQUEST, requestId).getFileName().toString(),
                 getPath(ServerDirection.RESPONSE, requestId).getFileName().toString()
@@ -106,16 +117,26 @@ public class DataBufferRepository
     public Optional<RawProvider> get(ServerDirection dir, String id)
     {
         final Path path = getPath(dir, id);
-        return Optional.ofNullable(pool.get(path)).map(fc ->
+        // If it's in the pool, it means it's currently being written/active
+        if (pool.containsKey(path))
         {
             try
             {
-                return new RawProvider(id, dir, path, FileChannel.open(path));
+                // Return a fresh read-only channel for the logger
+                return Optional.of(new RawProvider(id, dir, path,
+                        FileChannel.open(path, StandardOpenOption.READ)
+                ));
             }
             catch (IOException e)
             {
                 throw new UncheckedIOException(e);
             }
-        });
+        }
+        return Optional.empty();
+    }
+
+    // Internal record to group the channel and its state
+    private record FileHandle(FileChannel channel, AtomicLong position)
+    {
     }
 }

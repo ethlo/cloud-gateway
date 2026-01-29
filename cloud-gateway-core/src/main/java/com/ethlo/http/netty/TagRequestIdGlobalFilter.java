@@ -148,7 +148,8 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
     private void offload(DataBuffer db, ServerDirection dir, String id)
     {
         DataBufferUtils.retain(db);
-        Mono.fromRunnable(() -> {
+        Mono.fromRunnable(() ->
+        {
             try (DataBuffer.ByteBufferIterator it = db.readableByteBuffers())
             {
                 while (it.hasNext()) repository.writeSync(dir, id, it.next());
