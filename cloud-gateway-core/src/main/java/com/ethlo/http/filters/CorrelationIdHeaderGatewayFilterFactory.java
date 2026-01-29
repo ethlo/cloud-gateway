@@ -66,9 +66,10 @@ public class CorrelationIdHeaderGatewayFilterFactory extends AbstractGatewayFilt
             return headerName;
         }
 
-        public void setHeaderName(final String requestHeaderName)
+        public Config setHeaderName(final String requestHeaderName)
         {
             this.headerName = requestHeaderName;
+            return this;
         }
     }
 }
