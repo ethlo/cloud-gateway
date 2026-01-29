@@ -120,23 +120,12 @@ public class DataBufferRepository
     public Optional<BodyProvider> get(ServerDirection dir, String id, String contentEncoding)
     {
         final Path path = getPath(dir, id);
-        if (pool.containsKey(path))
+
+        if (Files.exists(path))
         {
             try
             {
-                return Optional.of(new BodyProvider(path, FileChannel.open(path, StandardOpenOption.READ), contentEncoding));
-            }
-            catch (IOException e)
-            {
-                throw new UncheckedIOException(e);
-            }
-        }
-        else if (Files.exists(path))
-        {
-            try
-            {
-                // This works even after the writer channel is closed.
-                return Optional.of(new BodyProvider(path, FileChannel.open(path, StandardOpenOption.READ), contentEncoding));
+                return Optional.of(new BodyProvider(path, contentEncoding, Files.size(path)));
             }
             catch (IOException e)
             {
