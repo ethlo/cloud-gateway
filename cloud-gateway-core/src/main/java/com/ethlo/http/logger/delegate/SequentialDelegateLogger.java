@@ -12,6 +12,7 @@ import com.ethlo.http.model.WebExchangeDataProvider;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
+import reactor.core.scheduler.Schedulers;
 
 public class SequentialDelegateLogger
 {
@@ -27,18 +28,35 @@ public class SequentialDelegateLogger
 
     public Mono<@NonNull AccessLogResult> accessLog(final WebExchangeDataProvider dataProvider)
     {
-        return Flux.fromIterable(httpLoggers)
-                .flatMap(httpLogger -> httpLogger.accessLog(dataProvider)
-                        .onErrorResume(e -> {
-                            logger.error("Logger {} failed for request {}", httpLogger, dataProvider.getRequestId(), e);
-                            final Exception ex = e instanceof Exception ? (Exception) e : new RuntimeException(e);
-                            return Mono.just(AccessLogResult.error(dataProvider, List.of(ex)));
-                        }))
-                .reduce(AccessLogResult.ok(dataProvider), AccessLogResult::combine)
-                .doOnError(e -> {
-                    resultSink.tryEmitNext(AccessLogResult.error(dataProvider, List.of(new Exception(e))));
+        // Emit to the sink for external subscribers (e.g., metrics or UI)
+        return Mono.fromCallable(() ->
+                {
+                    AccessLogResult combinedResult = AccessLogResult.ok(dataProvider);
+
+                    for (HttpLogger httpLogger : httpLoggers)
+                    {
+                        try
+                        {
+                            // Execution is now linear and blocking on the IO thread
+                            final AccessLogResult result = httpLogger.accessLog(dataProvider);
+                            combinedResult = combinedResult.combine(result);
+                        }
+                        catch (Exception e)
+                        {
+                            logger.error("Logger {} failed for request {}", httpLogger.getClass().getSimpleName(), dataProvider.getRequestId(), e);
+                            combinedResult = combinedResult.combine(AccessLogResult.error(dataProvider, List.of(e)));
+                        }
+                    }
+                    return combinedResult;
                 })
-                .doOnNext(resultSink::tryEmitNext);
+                // Crucial: Offload the entire blocking loop to the IO scheduler
+                .subscribeOn(Schedulers.boundedElastic())
+                .doOnNext(resultSink::tryEmitNext)
+                .doOnError(e ->
+                {
+                    final Exception ex = e instanceof Exception ? (Exception) e : new RuntimeException(e);
+                    resultSink.tryEmitNext(AccessLogResult.error(dataProvider, List.of(ex)));
+                });
     }
 
     public Flux<@NonNull AccessLogResult> getResults()

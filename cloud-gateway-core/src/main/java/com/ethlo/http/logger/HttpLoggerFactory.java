@@ -11,7 +11,7 @@ public interface HttpLoggerFactory
 {
     String getName();
 
-    HttpLogger getInstance(final LoggingFilterService loggingFilterService, Map<String, Object> configuration, BiFunction<String, Object, Object> beanRegistration);
+    HttpLogger getInstance(Map<String, Object> configuration, BiFunction<String, Object, Object> beanRegistration);
 
     default <T> T load(Map<String, Object> configuration, Class<T> configType)
     {

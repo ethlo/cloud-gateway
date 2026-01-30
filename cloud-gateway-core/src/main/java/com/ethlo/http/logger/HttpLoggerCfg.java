@@ -20,7 +20,7 @@ public class HttpLoggerCfg
     }
 
     @Bean
-    SequentialDelegateLogger sequentialDelegateLogger(final LoggingFilterService loggingFilterService, final GenericApplicationContext applicationContext, final HttpLoggingConfiguration httpLoggingConfiguration, List<HttpLoggerFactory> factories)
+    SequentialDelegateLogger sequentialDelegateLogger(final GenericApplicationContext applicationContext, final HttpLoggingConfiguration httpLoggingConfiguration, List<HttpLoggerFactory> factories)
     {
         final List<HttpLogger> loggers = Optional.ofNullable(httpLoggingConfiguration.getProviders())
                 .map(providers -> providers.entrySet().stream().map(entry ->
@@ -28,7 +28,7 @@ public class HttpLoggerCfg
                             final String name = entry.getKey();
                             return factories.stream().filter(f -> f.getName().equalsIgnoreCase(name)).findFirst()
                                     .orElseThrow(() -> new IllegalArgumentException("No factory for logging provider '" + name + "'"))
-                                    .getInstance(loggingFilterService, entry.getValue(), (beanName, instance) ->
+                                    .getInstance(entry.getValue(), (beanName, instance) ->
                                             {
                                                 applicationContext.getBeanFactory().registerSingleton(beanName, instance);
                                                 return null;

@@ -32,6 +32,24 @@ public class DataBufferRepository
         this.basePath = Files.createDirectories(config.getLogDirectory());
     }
 
+    public void markComplete(ServerDirection direction, String requestId)
+    {
+        final Path path = getPath(direction, requestId);
+        final FileHandle handle = pool.get(path);
+        if (handle != null)
+        {
+            try
+            {
+                logger.debug("Closing channel for {} {}: {} bytes", requestId, direction, handle.position().get());
+                handle.channel().close();
+            }
+            catch (IOException e)
+            {
+                logger.warn("Error closing channel for {} {}", requestId, direction, e);
+            }
+        }
+    }
+
     public int writeSync(ServerDirection direction, String requestId, ByteBuffer data)
     {
         final Path path = getPath(direction, requestId);
@@ -39,12 +57,16 @@ public class DataBufferRepository
         final int bytesToWrite = data.remaining();
         try
         {
-            long currentPos = handle.position().getAndAdd(bytesToWrite);
-            while (data.hasRemaining())
-            { // Ensure all bytes land on disk
-                currentPos += handle.channel().write(data, currentPos);
+            // Reserve the space for this chunk atomically
+            final long startOffset = handle.position().getAndAdd(bytesToWrite);
+
+            // Positional write is thread-safe and doesn't change the channel's position property
+            int totalWritten = 0;
+            while (totalWritten < bytesToWrite)
+            {
+                totalWritten += handle.channel().write(data, startOffset + totalWritten);
             }
-            return bytesToWrite;
+            return totalWritten;
         }
         catch (IOException e)
         {
@@ -120,22 +142,13 @@ public class DataBufferRepository
     public Optional<BodyProvider> get(ServerDirection dir, String id, String contentEncoding)
     {
         final Path path = getPath(dir, id);
-
         if (Files.exists(path))
         {
-            try
-            {
-                return Optional.of(new BodyProvider(path, contentEncoding, Files.size(path)));
-            }
-            catch (IOException e)
-            {
-                throw new UncheckedIOException(e);
-            }
+            return Optional.of(new BodyProvider(path, contentEncoding));
         }
         return Optional.empty();
     }
 
-    // Internal record to group the channel and its state
     private record FileHandle(FileChannel channel, AtomicLong position)
     {
     }

@@ -9,7 +9,7 @@ import java.nio.file.Path;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.InflaterInputStream;
 
-public record BodyProvider(Path file, String contentEncoding, long size)
+public record BodyProvider(Path file, String contentEncoding)
 {
     public InputStream getInputStream()
     {

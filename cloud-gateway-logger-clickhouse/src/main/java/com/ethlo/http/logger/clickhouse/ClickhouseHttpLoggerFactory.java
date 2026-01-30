@@ -32,7 +32,7 @@ public class ClickhouseHttpLoggerFactory implements HttpLoggerFactory
     }
 
     @Override
-    public HttpLogger getInstance(final LoggingFilterService loggingFilterService, final Map<String, Object> configuration, BiFunction<String, Object, Object> beanRegistration)
+    public HttpLogger getInstance(final Map<String, Object> configuration, BiFunction<String, Object, Object> beanRegistration)
     {
         final ClickHouseProviderConfig clickHouseProviderConfig = load(configuration, ClickHouseProviderConfig.class);
 
@@ -42,7 +42,7 @@ public class ClickhouseHttpLoggerFactory implements HttpLoggerFactory
 
         beanRegistration.apply("clickHouseStatsEndpoint", clickHouseStatsEndpoint(tpl));
 
-        return new ClickHouseLogger(loggingFilterService, new ClickHouseLoggerRepository(tpl), Schedulers.boundedElastic());
+        return new ClickHouseLogger(new ClickHouseLoggerRepository(tpl));
     }
 
     private NamedParameterJdbcTemplate namedParameterJdbcTemplate(ClickHouseProviderConfig clickHouseProviderConfig)

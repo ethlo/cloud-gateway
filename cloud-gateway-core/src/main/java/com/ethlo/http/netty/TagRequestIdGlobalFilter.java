@@ -70,7 +70,8 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
     {
         final long started = System.nanoTime();
 
-        final ServerHttpRequest requestWithId = new RequestIdWrapper(exchange.getRequest(), RequestIdWrapper.generateId());
+        final String requestId = RequestIdWrapper.generateId();
+        final ServerHttpRequest requestWithId = new RequestIdWrapper(exchange.getRequest(), requestId);
         final ServerWebExchange exchangeWithId = exchange.mutate().request(requestWithId).build();
 
         //noinspection unchecked
@@ -128,6 +129,10 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
     private Mono<@NonNull Void> saveLog(ServerWebExchange exchange, PredicateConfig config, String id, long start, Throwable exc)
     {
         final Duration duration = Duration.ofNanos(System.nanoTime() - start);
+
+        repository.markComplete(ServerDirection.REQUEST, id);
+        repository.markComplete(ServerDirection.RESPONSE, id);
+
         final WebExchangeDataProvider provider = createProvider(exchange, id, config, duration, exc);
 
         final Runnable cleanupTask = () ->
@@ -187,21 +192,23 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
         return statusCode;
     }
 
-    private Mono<Void> offload(DataBuffer db, ServerDirection dir, String id)
+    private Mono<@NonNull Void> offload(DataBuffer db, ServerDirection dir, String id)
     {
         DataBufferUtils.retain(db); // Hold the memory
-        return Mono.fromRunnable(() -> {
-            try (DataBuffer.ByteBufferIterator it = db.readableByteBuffers())
-            {
-                while (it.hasNext())
+        return Mono.fromRunnable(() ->
                 {
-                    repository.writeSync(dir, id, it.next());
-                }
-            } finally
-            {
-                DataBufferUtils.release(db); // Release ONLY after IO is done
-            }
-        }).subscribeOn(ioScheduler).then(); // Ensure this runs on the IO thread
+                    try (DataBuffer.ByteBufferIterator it = db.readableByteBuffers())
+                    {
+                        while (it.hasNext())
+                        {
+                            repository.writeSync(dir, id, it.next());
+                        }
+                    } finally
+                    {
+                        DataBufferUtils.release(db); // Release ONLY after IO is done
+                    }
+                }).subscribeOn(ioScheduler)
+                .then(); // Ensure this runs on the IO thread
     }
 
     @Override
@@ -226,7 +233,7 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
         {
             return super.getBody().concatMap(db ->
                     offload(db, ServerDirection.REQUEST, requestId)
-                            .then(Mono.just(db)) // Don't release 'db' back to the stream until offload is done
+                            .then(Mono.just(db)) // IMPORTANT: Don't release 'db' back to the stream until offload is done
             );
         }
     }

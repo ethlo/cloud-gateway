@@ -12,16 +12,13 @@ import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
-import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 
 import com.ethlo.http.logger.HttpLogger;
-import com.ethlo.http.logger.LoggingFilterService;
 import com.ethlo.http.logger.RedactUtil;
 import com.ethlo.http.match.HeaderProcessing;
 import com.ethlo.http.match.LogOptions;
@@ -30,49 +27,67 @@ import com.ethlo.http.model.BodyProvider;
 import com.ethlo.http.model.WebExchangeDataProvider;
 import com.ethlo.http.netty.PredicateConfig;
 import com.ethlo.http.netty.ServerDirection;
-import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Scheduler;
 
 public class ClickHouseLogger implements HttpLogger
 {
     private static final Logger logger = LoggerFactory.getLogger(ClickHouseLogger.class);
-    private final LoggingFilterService loggingFilterService;
     private final ClickHouseLoggerRepository clickHouseLoggerRepository;
-    private final Scheduler ioScheduler;
 
-    public ClickHouseLogger(LoggingFilterService loggingFilterService, ClickHouseLoggerRepository clickHouseLoggerRepository, Scheduler ioScheduler)
+    public ClickHouseLogger(ClickHouseLoggerRepository clickHouseLoggerRepository)
     {
-        this.loggingFilterService = loggingFilterService;
         this.clickHouseLoggerRepository = clickHouseLoggerRepository;
-        this.ioScheduler = ioScheduler;
     }
 
-    private Mono<@NonNull Void> processContentReactive(LogOptions logConfig, BodyProvider bodyProvider, ServerDirection dir, Map<String, Object> params)
+    @Override
+    public AccessLogResult accessLog(final WebExchangeDataProvider dataProvider)
     {
-        if (bodyProvider == null)
+        final PredicateConfig predicateConfig = dataProvider.getPredicateConfig();
+        final Map<String, Object> params = dataProvider.asMetaMap();
+
+        initializeParams(params);
+
+        prepareHeaders(dataProvider, predicateConfig, params);
+        dataProvider.getException().ifPresent(exc -> {
+            params.put("exception_type", exc.getClass().getName());
+            params.put("exception_message", exc.getMessage());
+        });
+
+        dataProvider.getRequestBody().ifPresent(bodyProvider -> processContentSync(predicateConfig.request(), bodyProvider, REQUEST, params));
+        dataProvider.getResponseBody().ifPresent(bodyProvider -> processContentSync(predicateConfig.response(), bodyProvider, RESPONSE, params));
+
+        try
         {
-            return Mono.empty();
+            logger.debug("Inserting data into ClickHouse for request {}", dataProvider.getRequestId());
+            clickHouseLoggerRepository.insert(params);
+            return AccessLogResult.ok(dataProvider);
         }
-
-        return Mono.<Void>fromRunnable(() ->
+        catch (Exception e)
         {
-            try (final InputStream inputStream = bodyProvider.getInputStream())
-            {
-                final byte[] body = inputStream.readAllBytes();
-                final String prefix = dir.name().toLowerCase();
-                params.put(prefix + "_total_size", body.length);
-                params.put(prefix + "_body_size", body.length);
+            logger.error("Failed to insert log into Clickhouse for request {}", dataProvider.getRequestId(), e);
+            return AccessLogResult.error(dataProvider, List.of(e));
+        }
+    }
 
-                if (logConfig.body() == STORE || logConfig.raw() == STORE)
-                {
-                    params.put(prefix + "_body", body);
-                }
-            }
-            catch (IOException e)
+    private void processContentSync(LogOptions logConfig, BodyProvider bodyProvider, ServerDirection dir, Map<String, Object> params)
+    {
+        try (final InputStream inputStream = bodyProvider.getInputStream())
+        {
+            final byte[] body = inputStream.readAllBytes();
+            final String prefix = dir.name().toLowerCase();
+
+            params.put(prefix + "_total_size", body.length);
+            params.put(prefix + "_body_size", body.length);
+
+            if (logConfig.body() == STORE || logConfig.raw() == STORE)
             {
-                throw new UncheckedIOException(e);
+                params.put(prefix + "_body", body);
             }
-        }).subscribeOn(ioScheduler);
+        }
+        catch (IOException e)
+        {
+            logger.error("Failed to read captured body file for {} direction: {}", dir, bodyProvider.file(), e);
+            throw new UncheckedIOException(e);
+        }
     }
 
     private void initializeParams(Map<String, Object> params)
@@ -87,41 +102,6 @@ public class ClickHouseLogger implements HttpLogger
         }
         params.put("exception_type", null);
         params.put("exception_message", null);
-    }
-
-    @Override
-    public Mono<@NonNull AccessLogResult> accessLog(final WebExchangeDataProvider dataProvider)
-    {
-        final Optional<PredicateConfig> logConfigOpt = dataProvider.getPredicateConfig();
-        if (logConfigOpt.isEmpty())
-        {
-            return Mono.empty();
-        }
-
-        final PredicateConfig predicateConfig = loggingFilterService.merge(logConfigOpt.get());
-        final Map<String, Object> params = dataProvider.asMetaMap();
-
-        initializeParams(params);
-
-        // Metadata processing
-        prepareHeaders(dataProvider, predicateConfig, params);
-        dataProvider.getException().ifPresent(exc ->
-        {
-            params.put("exception_type", exc.getClass().getName());
-            params.put("exception_message", exc.getMessage());
-        });
-
-        // The entire chain (loading files + DB insertion) is offloaded to the ioScheduler
-        return Mono.when(
-                        processContentReactive(predicateConfig.request(), dataProvider.getRequestBody().orElse(null), REQUEST, params),
-                        processContentReactive(predicateConfig.response(), dataProvider.getResponseBody().orElse(null), RESPONSE, params)
-                )
-                .then(Mono.fromRunnable(() -> {
-                    logger.debug("Inserting data into ClickHouse for request {}", dataProvider.getRequestId());
-                    clickHouseLoggerRepository.insert(params);
-                }))
-                .thenReturn(AccessLogResult.ok(dataProvider))
-                .subscribeOn(ioScheduler);
     }
 
     private void prepareHeaders(WebExchangeDataProvider dataProvider, PredicateConfig predicateConfig, Map<String, Object> params)
@@ -143,11 +123,17 @@ public class ClickHouseLogger implements HttpLogger
 
     private void processHeader(HeaderProcessing processing, HttpHeaders headers, String name)
     {
-        if (processing == DELETE) headers.remove(name);
+        if (processing == DELETE)
+        {
+            headers.remove(name);
+        }
         else if (processing == REDACT)
         {
-            List<String> values = headers.get(name);
-            if (values != null) headers.put(name, RedactUtil.redactAll(values));
+            final List<String> values = headers.get(name);
+            if (values != null)
+            {
+                headers.put(name, RedactUtil.redactAll(values));
+            }
         }
     }
 

@@ -43,13 +43,12 @@ public class WebExchangeDataProvider
     public WebExchangeDataProvider(DataBufferRepository dataBufferRepository, final PredicateConfig predicateConfig)
     {
         this.dataBufferRepository = Objects.requireNonNull(dataBufferRepository);
-        this.predicateConfig = predicateConfig;
+        this.predicateConfig = Objects.requireNonNull(predicateConfig);
     }
 
-    public WebExchangeDataProvider cleanupTask(Runnable cleanupTask)
+    public void cleanupTask(Runnable cleanupTask)
     {
         this.cleanupTask = cleanupTask;
-        return this;
     }
 
     public void cleanup()
@@ -228,9 +227,9 @@ public class WebExchangeDataProvider
         return Optional.ofNullable(user);
     }
 
-    public Optional<PredicateConfig> getPredicateConfig()
+    public PredicateConfig getPredicateConfig()
     {
-        return Optional.ofNullable(predicateConfig);
+        return predicateConfig;
     }
 
     public WebExchangeDataProvider exception(Throwable exc)
