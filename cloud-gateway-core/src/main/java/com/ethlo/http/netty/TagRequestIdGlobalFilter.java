@@ -130,28 +130,37 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
     {
         final Duration duration = Duration.ofNanos(System.nanoTime() - start);
 
-        // 1. Mark both finished. This flushes and closes the write-channels
-        // so the loggers can safely read the files.
-        repository.close(id);
+        repository.markComplete(ServerDirection.REQUEST, id);
+        repository.markComplete(ServerDirection.RESPONSE, id);
 
         final WebExchangeDataProvider provider = createProvider(exchange, id, config, duration, exc);
 
-        // 2. Execute loggers
+        final Runnable cleanupTask = () ->
+        {
+            repository.close(id);
+            repository.cleanup(id);
+        };
+
+        provider.cleanupTask(cleanupTask);
+
         return httpLogger.accessLog(logPreProcessor.process(provider))
-                .doOnNext(res -> {
-                    if (!res.isOk()) {
+                .flatMap(res -> {
+                    // Perform cleanup ONLY after accessLog is done
+                    repository.close(id);
+                    if (res.isOk())
+                    {
+                        if (autoCleanup)
+                        {
+                            cleanupTask.run();
+                        }
+                    }
+                    else
+                    {
                         warnLeftoverFiles(id, res);
                     }
+                    return Mono.empty();
                 })
-                // 3. The "Terminal" Hook. This replaces the flatMap for cleanup.
-                // This is guaranteed to run after the loggers finish,
-                // even if they throw an error or return Mono.empty()
-                .doFinally(signal -> {
-                    if (autoCleanup)
-                    {
-                        repository.cleanup(id);
-                    }
-                })
+                // Explicitly ensure this whole sequence runs on the IO thread
                 .subscribeOn(ioScheduler)
                 .then();
     }
