@@ -32,24 +32,6 @@ public class DataBufferRepository
         this.basePath = Files.createDirectories(config.getLogDirectory());
     }
 
-    public void markComplete(ServerDirection direction, String requestId)
-    {
-        final Path path = getPath(direction, requestId);
-        final FileHandle handle = pool.get(path);
-        if (handle != null)
-        {
-            try
-            {
-                logger.debug("Closing channel for {} {}: {} bytes", requestId, direction, handle.position().get());
-                handle.channel().close();
-            }
-            catch (IOException e)
-            {
-                logger.warn("Error closing channel for {} {}", requestId, direction, e);
-            }
-        }
-    }
-
     public int writeSync(ServerDirection direction, String requestId, ByteBuffer data)
     {
         final Path path = getPath(direction, requestId);
@@ -104,6 +86,7 @@ public class DataBufferRepository
         final FileHandle handle = pool.remove(path);
         if (handle != null)
         {
+            logger.debug("Closing channel for {}: {} bytes", path, handle.position().get());
             CloseUtil.closeQuietly(handle.channel());
         }
     }
@@ -129,7 +112,7 @@ public class DataBufferRepository
 
     private Path getPath(ServerDirection dir, String id)
     {
-        return basePath.resolve(id + "_" + dir.name().toLowerCase() + ".raw");
+        return basePath.resolve(id + "_" + dir.name().toLowerCase() + ".body");
     }
 
     public Pair<@NonNull String, @NonNull String> getBufferFileNames(String requestId)
