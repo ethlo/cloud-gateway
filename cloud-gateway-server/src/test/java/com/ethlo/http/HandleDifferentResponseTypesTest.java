@@ -13,6 +13,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.Random;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.GZIPOutputStream;
 
@@ -278,7 +279,7 @@ class HandleDifferentResponseTypesTest extends BaseTest
     }
 
     @Test
-    void testUpstreamDown()
+    void testUpstreamDown() throws IOException
     {
         // 1. Setup the observer for the background logging task
         final AtomicReference<AccessLogResult> logResultCapture = new AtomicReference<>();
@@ -286,15 +287,24 @@ class HandleDifferentResponseTypesTest extends BaseTest
                 .subscribe(logResultCapture::set);
 
         // 2. Mock a "Connection Reset" or "Connection Refused" behavior
-        server.stubFor(get(urlPathEqualTo("/get"))
+        server.stubFor(post(urlPathEqualTo("/post"))
                 .willReturn(aResponse()
                         .withFault(Fault.CONNECTION_RESET_BY_PEER)));
 
         // 3. Execute the request
-        // We expect a 502
-        client.get()
-                .uri("/get")
+        final byte[] largeData = new byte[10 * 1024 * 1024];
+        new Random().nextBytes(largeData);
+        byte[] compressedRequestData = gzipCompress(largeData);
+
+        client.post()
+                .uri("/post")
+                // Use a Flux and specify the element class to signal a streaming body
+                .body(Flux.defer(() -> Flux.just(DefaultDataBufferFactory.sharedInstance.wrap(compressedRequestData))), DataBuffer.class)
+                .header(HttpHeaders.CONTENT_ENCODING, "gzip")
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_OCTET_STREAM_VALUE)
                 .header("Authorization", "Basic YWRtaW46YWRtaW4=")
+                // Optional: Explicitly ensure Content-Length is not present if your client bean has defaults
+                .headers(headers -> headers.remove(HttpHeaders.CONTENT_LENGTH))
                 .exchange()
                 .expectStatus().isEqualTo(502);
 
@@ -314,6 +324,12 @@ class HandleDifferentResponseTypesTest extends BaseTest
         final WebExchangeDataProvider provider = finalResult.getWebExchangeDataProvider();
 
         assertThat(provider.getStatusCode().value()).isEqualTo(502);
+
+        // Verify the REQUEST body was captured despite the upstream failure
+        assertThat(provider.getRequestBody()).isPresent();
+
+        // verify the size matches the 'largeData'
+        assertThat(provider.getRequestBody().get().getInputStream().readAllBytes()).hasSameSizeAs(largeData);
 
         assertThat(provider.getException()).isPresent();
         assertThat(provider.getException().get()).isInstanceOf(ResponseStatusException.class);

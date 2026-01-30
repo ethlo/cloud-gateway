@@ -110,26 +110,36 @@ public class DataBufferRepository
 
     public void cleanup(String requestId)
     {
-        logger.debug("Cleanup {}", requestId);
         close(requestId);
-        delete(getPath(ServerDirection.REQUEST, requestId));
-        delete(getPath(ServerDirection.RESPONSE, requestId));
+
+        cleanupDirection(ServerDirection.REQUEST, requestId);
+        cleanupDirection(ServerDirection.RESPONSE, requestId);
     }
 
-    private void delete(Path path)
+    private void cleanupDirection(ServerDirection dir, String requestId)
+    {
+        final Path path = getPath(dir, requestId);
+        if (delete(path))
+        {
+            logger.debug("Deleted {} file: {}", dir, path);
+        }
+    }
+
+    private boolean delete(Path path)
     {
         try
         {
-            Files.deleteIfExists(path);
+            return Files.deleteIfExists(path);
         }
         catch (IOException ignored)
         {
         }
+        return false;
     }
 
     private Path getPath(ServerDirection dir, String id)
     {
-        return basePath.resolve(id + "_" + dir.name().toLowerCase() + ".raw");
+        return basePath.resolve(id + "_" + dir.name().toLowerCase() + ".body");
     }
 
     public Pair<@NonNull String, @NonNull String> getBufferFileNames(String requestId)

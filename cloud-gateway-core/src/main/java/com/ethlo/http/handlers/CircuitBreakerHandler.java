@@ -2,6 +2,7 @@ package com.ethlo.http.handlers;
 
 import java.util.Optional;
 
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
@@ -20,7 +21,7 @@ import jakarta.annotation.Nonnull;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Scheduler;
 
-public class CircuitBreakerHandler implements HandlerFunction<ServerResponse>
+public class CircuitBreakerHandler implements HandlerFunction<@NonNull ServerResponse>
 {
     private static final Logger logger = LoggerFactory.getLogger(CircuitBreakerHandler.class);
     private final DataBufferRepository dataBufferRepository;
@@ -33,7 +34,7 @@ public class CircuitBreakerHandler implements HandlerFunction<ServerResponse>
     }
 
     @Override
-    public @Nonnull Mono<ServerResponse> handle(@Nonnull ServerRequest serverRequest)
+    public @Nonnull Mono<@NonNull ServerResponse> handle(@Nonnull ServerRequest serverRequest)
     {
         final String requestId = serverRequest.exchange().getRequest().getId();
         final Optional<Exception> exc = serverRequest.attribute(ServerWebExchangeUtils.CIRCUITBREAKER_EXECUTION_EXCEPTION_ATTR).map(Exception.class::cast);
@@ -41,7 +42,7 @@ public class CircuitBreakerHandler implements HandlerFunction<ServerResponse>
         exc.ifPresent(e -> logger.warn("Circuit breaker fallback for request {}: {}", requestId, e.getMessage()));
 
         final Optional<PredicateConfig> config = ContextUtil.getLoggingConfig(serverRequest);
-        final Mono<ServerResponse> gatewayTimeoutResponse = ServerResponse.status(HttpStatus.GATEWAY_TIMEOUT).build();
+        final Mono<@NonNull ServerResponse> gatewayTimeoutResponse = ServerResponse.status(HttpStatus.GATEWAY_TIMEOUT).build();
 
         return config
                 .filter(p -> p.request().mustBuffer())
@@ -53,7 +54,7 @@ public class CircuitBreakerHandler implements HandlerFunction<ServerResponse>
      * Drains the request body into the repository so it can be logged,
      * even though there is no upstream to consume it.
      */
-    private Mono<Void> drainRequestBody(ServerRequest serverRequest)
+    private Mono<@NonNull Void> drainRequestBody(ServerRequest serverRequest)
     {
         final String requestId = serverRequest.exchange().getRequest().getId();
 

@@ -135,32 +135,29 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
 
         final WebExchangeDataProvider provider = createProvider(exchange, id, config, duration, exc);
 
-        final Runnable cleanupTask = () ->
+        provider.cleanupTask(() ->
         {
             repository.close(id);
             repository.cleanup(id);
-        };
-
-        provider.cleanupTask(cleanupTask);
+        });
 
         return httpLogger.accessLog(logPreProcessor.process(provider))
-                .flatMap(res -> {
-                    // Perform cleanup ONLY after accessLog is done
-                    repository.close(id);
-                    if (res.isOk())
-                    {
-                        if (autoCleanup)
-                        {
-                            cleanupTask.run();
-                        }
-                    }
-                    else
+                .doOnNext(res ->
+                {
+                    if (!res.isOk())
                     {
                         warnLeftoverFiles(id, res);
                     }
-                    return Mono.empty();
                 })
-                // Explicitly ensure this whole sequence runs on the IO thread
+                // GUARANTEED to run.
+                .doFinally(signal ->
+                {
+                    repository.close(id);
+                    if (autoCleanup)
+                    {
+                        repository.cleanup(id);
+                    }
+                })
                 .subscribeOn(ioScheduler)
                 .then();
     }
@@ -231,10 +228,15 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
         @Override
         public Flux<@NonNull DataBuffer> getBody()
         {
-            return super.getBody().concatMap(db ->
-                    offload(db, ServerDirection.REQUEST, requestId)
-                            .then(Mono.just(db)) // IMPORTANT: Don't release 'db' back to the stream until offload is done
-            );
+            return super.getBody()
+                    .doOnNext(db ->
+                    {
+                        if (logger.isTraceEnabled())
+                        {
+                            logger.trace("Streaming chunk for {}: {} bytes", requestId, db.readableByteCount());
+                        }
+                    })
+                    .concatMap(db -> offload(db, ServerDirection.REQUEST, requestId).then(Mono.just(db)));
         }
     }
 
