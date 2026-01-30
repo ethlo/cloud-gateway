@@ -17,16 +17,14 @@ public record BodyProvider(Path file, String contentEncoding, long size)
         {
             final InputStream rawStream = new BufferedInputStream(Files.newInputStream(this.file));
 
-            if ("gzip".equalsIgnoreCase(contentEncoding))
-            {
-                return new GZIPInputStream(rawStream);
-            }
-            else if ("deflate".equalsIgnoreCase(contentEncoding))
-            {
-                return new InflaterInputStream(rawStream);
-            }
+            if (contentEncoding == null) return rawStream;
 
-            return rawStream;
+            return switch (contentEncoding.toLowerCase())
+            {
+                case "gzip" -> new GZIPInputStream(rawStream);
+                case "deflate" -> new InflaterInputStream(rawStream);
+                default -> rawStream;
+            };
         }
         catch (IOException exc)
         {

@@ -161,9 +161,7 @@ class HandleDifferentResponseTypesTest extends BaseTest
         server.stubFor(post(urlPathEqualTo("/post"))
                 .withRequestBody(binaryEqualTo(largeData))
                 .willReturn(aResponse()
-                        //.withHeader("Content-Encoding", "identity") // Tells the gateway: DO NOT COMPRESS
                         .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_OCTET_STREAM_VALUE)
-                        // 5 chunks, spread over 500ms
                         // This forces the 'Transfer-Encoding: chunked' header
                         .withChunkedDribbleDelay(5, 500)
                         .withBody(largeData)));
