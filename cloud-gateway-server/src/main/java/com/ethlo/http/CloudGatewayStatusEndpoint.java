@@ -19,7 +19,7 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 
-import com.ethlo.http.configuration.HttpLoggingConfiguration;
+import com.ethlo.http.blocking.configuration.HttpLoggingConfiguration;
 import com.ethlo.http.logger.clickhouse.ClickHouseStatsEndpoint;
 import com.ethlo.http.util.IoUtil;
 import io.micrometer.core.instrument.Meter;
@@ -35,17 +35,14 @@ public class CloudGatewayStatusEndpoint
     private final MeterRegistry meterRegistry;
     private final HttpLoggingConfiguration httpLoggingConfiguration;
     private final ClickHouseStatsEndpoint clickHouseStatsEndpoint;
-    private final IOStatusEndpoint ioStatusEndpoint;
 
     public CloudGatewayStatusEndpoint(final MeterRegistry meterRegistry,
                                       final HttpLoggingConfiguration httpLoggingConfiguration,
-                                      @Autowired(required = false) ClickHouseStatsEndpoint clickHouseStatsEndpoint,
-                                      @Autowired(required = false) IOStatusEndpoint ioStatusEndpoint)
+                                      @Autowired(required = false) ClickHouseStatsEndpoint clickHouseStatsEndpoint)
     {
         this.meterRegistry = meterRegistry;
         this.httpLoggingConfiguration = httpLoggingConfiguration;
         this.clickHouseStatsEndpoint = clickHouseStatsEndpoint;
-        this.ioStatusEndpoint = ioStatusEndpoint;
     }
 
     @ReadOperation(produces = MediaType.APPLICATION_JSON_VALUE)
@@ -79,10 +76,6 @@ public class CloudGatewayStatusEndpoint
             model.put("clickhouse_day_queries", clickHouseStatsEndpoint.getInsertStats(Duration.ofDays(1), 10).stream().map(this::preProcess).toList());
         }
 
-        if (ioStatusEndpoint != null)
-        {
-            model.put("logio", preProcess(ioStatusEndpoint.getLogio()));
-        }
         return model;
     }
 

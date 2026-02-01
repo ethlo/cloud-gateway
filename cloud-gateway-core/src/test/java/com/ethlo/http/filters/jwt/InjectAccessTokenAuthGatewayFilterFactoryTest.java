@@ -12,6 +12,8 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.Base64;
 
+import com.ethlo.http.blocking.filters.jwt.TokenFetchException;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;

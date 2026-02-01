@@ -7,7 +7,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.support.GenericApplicationContext;
 
-import com.ethlo.http.configuration.HttpLoggingConfiguration;
+import com.ethlo.http.blocking.configuration.HttpLoggingConfiguration;
 import com.ethlo.http.logger.delegate.SequentialDelegateLogger;
 
 @Configuration

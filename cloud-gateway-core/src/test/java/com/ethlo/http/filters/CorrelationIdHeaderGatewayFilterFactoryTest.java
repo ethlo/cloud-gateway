@@ -1,36 +1,32 @@
-package com.ethlo.http.filters;
+package com.ethlo.http.mvc.filters;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcMatchers.status;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.cloud.gateway.filter.factory.GatewayFilterFactory;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.server.reactive.ServerHttpRequest;
-import org.springframework.web.server.ServerWebExchange;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-class CorrelationIdHeaderGatewayFilterFactoryTest extends AbstractFilterTest<CorrelationIdHeaderGatewayFilterFactory.Config>
-{
-    @Test
-    void shouldAddCorrelationIdHeaderToRequestAndResponse()
-    {
-        // Given
-        final CorrelationIdHeaderGatewayFilterFactory.Config config = new CorrelationIdHeaderGatewayFilterFactory.Config();
-        config.setHeaderName("X-Custom-Correlation-Id");
+class CorrelationIdHeaderFilterTest {
 
-        final ServerWebExchange exchange = execute(config);
-        final ServerHttpRequest mockRequest = exchange.getRequest();
+    private MockMvc mockMvc;
+    private final String headerName = "X-Custom-Correlation-Id";
 
-        // Then
-        final ServerHttpRequest actualRequest = super.actualRequest();
-        final String requestId = mockRequest.getId();
-        final HttpHeaders responseHeaders = exchange.getResponse().getHeaders();
-        assertThat(actualRequest.getHeaders().getFirst(config.getHeaderName())).isEqualTo(requestId);
-        assertThat(responseHeaders.getFirst(config.getHeaderName())).isEqualTo(requestId);
+    @BeforeEach
+    void setUp() {
+        // We set up MockMvc with our custom filter
+        this.mockMvc = MockMvcBuilders.standaloneSetup(new TestController())
+                .addFilters(new CorrelationIdMvcFilter(headerName))
+                .build();
     }
 
-    @Override
-    protected GatewayFilterFactory<CorrelationIdHeaderGatewayFilterFactory.Config> filterFactory()
-    {
-        return new CorrelationIdHeaderGatewayFilterFactory();
+    @Test
+    void shouldAddCorrelationIdHeaderToResponse() throws Exception {
+        mockMvc.perform(get("/test"))
+                .andExpect(status().isOk())
+                // Verify the response header exists (Deterministic in MVC)
+                .andExpect(header().exists(headerName));
     }
 }

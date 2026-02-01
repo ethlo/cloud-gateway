@@ -7,7 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.stereotype.Component;
 
-import com.ethlo.http.model.WebExchangeDataProvider;
+import com.ethlo.http.blocking.model.WebExchangeDataProvider;
 import com.ethlo.http.processors.auth.RealmUser;
 import com.ethlo.http.processors.auth.extractors.AuthorizationExtractor;
 import com.ethlo.http.processors.auth.extractors.DelegateAuthorizationExtractor;

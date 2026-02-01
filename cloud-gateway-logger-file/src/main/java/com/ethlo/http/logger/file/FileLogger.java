@@ -7,7 +7,7 @@ import org.slf4j.LoggerFactory;
 
 import com.ethlo.http.logger.HttpLogger;
 import com.ethlo.http.model.AccessLogResult;
-import com.ethlo.http.model.WebExchangeDataProvider;
+import com.ethlo.http.blocking.model.WebExchangeDataProvider;
 
 public class FileLogger implements HttpLogger
 {

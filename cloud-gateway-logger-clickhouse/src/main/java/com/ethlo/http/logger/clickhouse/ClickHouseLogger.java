@@ -23,8 +23,8 @@ import com.ethlo.http.logger.RedactUtil;
 import com.ethlo.http.match.HeaderProcessing;
 import com.ethlo.http.match.LogOptions;
 import com.ethlo.http.model.AccessLogResult;
-import com.ethlo.http.model.BodyProvider;
-import com.ethlo.http.model.WebExchangeDataProvider;
+import com.ethlo.http.blocking.model.BodyProvider;
+import com.ethlo.http.blocking.model.WebExchangeDataProvider;
 import com.ethlo.http.netty.PredicateConfig;
 import com.ethlo.http.netty.ServerDirection;
 

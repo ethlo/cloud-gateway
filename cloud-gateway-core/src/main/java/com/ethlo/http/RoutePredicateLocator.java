@@ -1,83 +1,101 @@
 package com.ethlo.http;
 
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.BiFunction;
+import java.util.function.Predicate;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.cloud.gateway.event.PredicateArgsEvent;
-import org.springframework.cloud.gateway.handler.AsyncPredicate;
-import org.springframework.cloud.gateway.handler.predicate.PredicateDefinition;
-import org.springframework.cloud.gateway.handler.predicate.RoutePredicateFactory;
-import org.springframework.cloud.gateway.support.ConfigurationService;
-import org.springframework.context.ApplicationEvent;
-import org.springframework.web.server.ServerWebExchange;
+import org.springframework.cloud.gateway.server.mvc.predicate.GatewayRequestPredicates;
+import org.springframework.http.HttpMethod;
+import org.springframework.stereotype.Component;
+import org.springframework.web.servlet.function.RequestPredicate;
+import org.springframework.web.servlet.function.ServerRequest;
 
+import com.ethlo.http.blocking.MvcPredicateDefinition;
+import jakarta.servlet.http.HttpServletRequest;
+
+@Component
 public class RoutePredicateLocator
 {
-    private static final Logger logger = LoggerFactory.getLogger(RoutePredicateLocator.class);
-    private final Map<String, RoutePredicateFactory<?>> predicateFactories = new LinkedHashMap<>();
-    private final ConfigurationService configurationService;
 
-    public RoutePredicateLocator(final List<RoutePredicateFactory> predicateFactories, final ConfigurationService configurationService)
+    /**
+     * Resolves MvcPredicateDefinitions into a single executable Predicate.
+     */
+    public Predicate<HttpServletRequest> getPredicates(List<MvcPredicateDefinition> definitions)
     {
-        this.configurationService = configurationService;
-        initFactories(predicateFactories);
-    }
-
-    public AsyncPredicate<?> getPredicates(List<PredicateDefinition> predicates)
-    {
-        return combinePredicates(predicates);
-    }
-
-    private void initFactories(List<RoutePredicateFactory> predicateFactories)
-    {
-        predicateFactories.forEach(factory ->
+        if (definitions == null || definitions.isEmpty())
         {
-            String key = factory.name();
-            if (this.predicateFactories.containsKey(key))
+            return request -> true;
+        }
+
+        // Combine all definitions into one RequestPredicate
+        RequestPredicate combined = definitions.stream()
+                .map(this::mapToPredicate)
+                .reduce(RequestPredicate::and)
+                .orElse(request -> true);
+
+        // Convert the RequestPredicate test to work on the HttpServletRequest
+        return servletRequest -> {
+            final ServerRequest serverRequest = ServerRequest.create(servletRequest, List.of());
+            return combined.test(serverRequest);
+        };
+    }
+
+    private RequestPredicate mapToPredicate(MvcPredicateDefinition def)
+    {
+        final String name = def.name();
+        final Map<String, String> args = def.args();
+
+        // MVC Gateway provides a helper that mimics the YAML naming convention
+        return switch (name.toLowerCase())
+        {
+            case "path" -> GatewayRequestPredicates.path(args.get("pattern"));
+            case "method" -> GatewayRequestPredicates.method(HttpMethod.valueOf(args.get("method").toUpperCase()));
+            case "header" -> GatewayRequestPredicates.header(args.get("header"), args.get("regexp"));
+            case "host" -> GatewayRequestPredicates.host(args.get("pattern"));
+            case "query" -> GatewayRequestPredicates.query(args.get("param"), args.get("regexp"));
+
+            case "extension" ->
             {
-                logger.warn("A RoutePredicateFactory named {} already exists, class: {}. It will be overwritten.", key, this.predicateFactories.get(key));
+                // In GATHER_LIST mode, arguments usually come in as _gen_0, _gen_1...
+                // or we can just parse the comma-separated string if that's how your YAML loads
+                List<String> extensions = extractList(args, "extensions");
+                yield extensionPredicate(extensions);
             }
-            this.predicateFactories.put(key, factory);
-        });
+
+            default -> throw new IllegalArgumentException("Unsupported MVC predicate: " + name);
+        };
     }
 
-    private AsyncPredicate<ServerWebExchange> combinePredicates(List<PredicateDefinition> predicates)
+    // Helper to handle the "GATHER_LIST" style arguments from YAML
+    private List<String> extractList(Map<String, String> args, String key)
     {
-        AsyncPredicate<ServerWebExchange> predicate = lookup(predicates.get(0));
-        for (PredicateDefinition andPredicate : predicates.subList(1, predicates.size()))
+        // If the YAML was "Extension: jpg, png", args might have key "extensions"
+        // If it was shortcut style, they might be indexed.
+        String val = args.get(key);
+        if (val != null)
         {
-            AsyncPredicate<ServerWebExchange> found = lookup(andPredicate);
-            predicate = predicate.and(found);
+            return List.of(val.split("\\s*,\\s*"));
         }
-
-        return predicate;
+        return args.values().stream().toList();
     }
 
-    private AsyncPredicate<ServerWebExchange> lookup(PredicateDefinition predicate)
+    private RequestPredicate extensionPredicate(List<String> extensions)
     {
-        final RoutePredicateFactory factory = this.predicateFactories.get(predicate.getName());
-        if (factory == null)
-        {
-            throw new IllegalArgumentException("Unable to find RoutePredicateFactory with name " + predicate.getName());
-        }
+        return request -> {
+            // request is org.springframework.web.servlet.function.ServerRequest
+            final String path = request.path();
+            final int lastDot = path.lastIndexOf('.');
 
-        Object config = this.configurationService.with(factory)
-                .name(predicate.getName())
-                .properties(predicate.getArgs())
-                .eventFunction(new BiFunction<Object, Map<String, Object>, ApplicationEvent>()
+            if (lastDot != -1 && lastDot < path.length() - 1)
+            {
+                if (extensions.isEmpty())
                 {
-                    @Override
-                    public ApplicationEvent apply(final Object bound, final Map<String, Object> properties)
-                    {
-                        return new PredicateArgsEvent(RoutePredicateLocator.this, predicate.getName(), properties);
-                    }
-                })
-                .bind();
-
-        return factory.applyAsync(config);
+                    return true; // Match any extension if list is empty
+                }
+                final String ext = path.substring(lastDot + 1);
+                return extensions.stream().anyMatch(e -> e.equalsIgnoreCase(ext));
+            }
+            return false;
+        };
     }
 }

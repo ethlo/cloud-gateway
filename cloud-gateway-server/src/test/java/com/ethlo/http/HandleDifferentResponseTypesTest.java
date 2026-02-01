@@ -33,8 +33,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.ethlo.http.logger.delegate.SequentialDelegateLogger;
 import com.ethlo.http.model.AccessLogResult;
-import com.ethlo.http.model.BodyProvider;
-import com.ethlo.http.model.WebExchangeDataProvider;
+import com.ethlo.http.blocking.model.BodyProvider;
+import com.ethlo.http.blocking.model.WebExchangeDataProvider;
 import com.github.tomakehurst.wiremock.http.Fault;
 import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
 import reactor.core.publisher.Flux;
