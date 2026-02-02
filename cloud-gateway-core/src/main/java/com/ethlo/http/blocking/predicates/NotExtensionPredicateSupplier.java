@@ -9,25 +9,25 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.function.RequestPredicate;
 
 @Component
-public class NotExtensionPredicateSupplier implements PredicateSupplier 
+public class NotExtensionPredicateSupplier implements PredicateSupplier
 {
     /**
      * Maps to "NotExtension" in YAML.
      * We leverage the static Extension method from our previous supplier and negate it.
      */
-    public static RequestPredicate NotExtension(ExtensionPredicateSupplier.Config config) 
+    public static RequestPredicate notExtension(ExtensionPredicateSupplier.Config config)
     {
-        return ExtensionPredicateSupplier.Extension(config).negate();
+        return ExtensionPredicateSupplier.extension(config).negate();
     }
 
     @Override
-    public Collection<Method> get() 
+    public Collection<Method> get()
     {
-        try 
+        try
         {
-            return List.of(this.getClass().getMethod("NotExtension", ExtensionPredicateSupplier.Config.class));
-        } 
-        catch (NoSuchMethodException e) 
+            return List.of(this.getClass().getMethod("notExtension", ExtensionPredicateSupplier.Config.class));
+        }
+        catch (NoSuchMethodException e)
         {
             throw new RuntimeException(e);
         }

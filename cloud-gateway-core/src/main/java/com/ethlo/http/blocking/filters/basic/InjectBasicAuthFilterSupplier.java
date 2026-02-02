@@ -35,7 +35,8 @@ public class InjectBasicAuthFilterSupplier implements FilterSupplier
         );
         final String authValue = "Basic " + base64Encoded;
 
-        return (request, next) -> {
+        return (request, next) ->
+        {
             // MVC uses ServerRequest.from(request) for mutations
             logger.debug("Sending Authorization header (redacted): Basic {}", RedactUtil.redact(base64Encoded, 3));
 

@@ -1,44 +1,60 @@
-package com.ethlo.http.predicates;
+package com.ethlo.http.blocking.predicates;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
-import org.springframework.mock.web.server.MockServerWebExchange;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.web.servlet.function.ServerRequest;
 
-class ExtensionRoutePredicateFactoryTest
+class ExtensionRoutePredicateSupplierTest
 {
     @Test
     void matchEmptyAll()
     {
-        final ExtensionRoutePredicateFactory.Config config = new ExtensionRoutePredicateFactory.Config().setExtensions(List.of());
-        final MockServerWebExchange exchange = new MockServerWebExchange.Builder(MockServerHttpRequest.get("/hello/there/image.jpg").build()).build();
-        assertThat(new ExtensionRoutePredicateFactory().apply(config).test(exchange)).isTrue();
+        final ExtensionPredicateSupplier.Config config = new ExtensionPredicateSupplier.Config()
+                .setExtensions(List.of());
+        final ServerRequest request = createRequest("/hello/there/image.jpg");
+        assertThat(ExtensionPredicateSupplier.extension(config).test(request)).isTrue();
     }
 
     @Test
     void matchSpecific()
     {
-        final ExtensionRoutePredicateFactory.Config config = new ExtensionRoutePredicateFactory.Config().setExtensions(List.of("jpg"));
-        final MockServerWebExchange exchange = new MockServerWebExchange.Builder(MockServerHttpRequest.get("/hello/there/image.jpg").build()).build();
-        assertThat(new ExtensionRoutePredicateFactory().apply(config).test(exchange)).isTrue();
+        final ExtensionPredicateSupplier.Config config = new ExtensionPredicateSupplier.Config()
+                .setExtensions(List.of("jpg"));
+
+        final ServerRequest request = createRequest("/hello/there/image.jpg");
+
+        assertThat(ExtensionPredicateSupplier.extension(config).test(request)).isTrue();
     }
 
     @Test
     void nonMatchSpecific()
     {
-        final ExtensionRoutePredicateFactory.Config config = new ExtensionRoutePredicateFactory.Config().setExtensions(List.of("gif"));
-        final MockServerWebExchange exchange = new MockServerWebExchange.Builder(MockServerHttpRequest.get("/hello/there/image.jpg").build()).build();
-        assertThat(new ExtensionRoutePredicateFactory().apply(config).test(exchange)).isFalse();
+        final ExtensionPredicateSupplier.Config config = new ExtensionPredicateSupplier.Config()
+                .setExtensions(List.of("gif"));
+
+        final ServerRequest request = createRequest("/hello/there/image.jpg");
+
+        assertThat(ExtensionPredicateSupplier.extension(config).test(request)).isFalse();
     }
 
     @Test
     void emptyExtensionPath()
     {
-        final ExtensionRoutePredicateFactory.Config config = new ExtensionRoutePredicateFactory.Config().setExtensions(List.of("gif"));
-        final MockServerWebExchange exchange = new MockServerWebExchange.Builder(MockServerHttpRequest.get("/hello/there/image.").build()).build();
-        assertThat(new ExtensionRoutePredicateFactory().apply(config).test(exchange)).isFalse();
+        final ExtensionPredicateSupplier.Config config = new ExtensionPredicateSupplier.Config()
+                .setExtensions(List.of("gif"));
+
+        final ServerRequest request = createRequest("/hello/there/image.");
+
+        assertThat(ExtensionPredicateSupplier.extension(config).test(request)).isFalse();
+    }
+
+    private ServerRequest createRequest(String path)
+    {
+        // Creates a synchronous ServerRequest from a MockHttpServletRequest
+        return ServerRequest.create(new MockHttpServletRequest("GET", path), List.of());
     }
 }

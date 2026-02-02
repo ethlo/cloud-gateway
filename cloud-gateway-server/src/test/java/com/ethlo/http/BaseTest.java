@@ -6,6 +6,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTestClient;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.clickhouse.ClickHouseContainer;
 import org.testcontainers.lifecycle.Startables;
 import org.testcontainers.utility.DockerImageName;
@@ -27,6 +28,7 @@ public class BaseTest
         Startables.deepStart(Stream.of(CLICKHOUSE)).join();
     }
 
+    @DynamicPropertySource
     public static void configureClickHouseProperties(DynamicPropertyRegistry registry)
     {
         registry.add("http-logging.providers.clickhouse.url", CLICKHOUSE::getJdbcUrl);

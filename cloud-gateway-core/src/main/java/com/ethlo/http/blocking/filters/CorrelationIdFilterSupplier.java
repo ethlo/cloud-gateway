@@ -8,6 +8,7 @@ import org.springframework.cloud.gateway.server.mvc.common.Configurable;
 import org.springframework.cloud.gateway.server.mvc.filter.FilterSupplier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.function.HandlerFilterFunction;
+import org.springframework.web.servlet.function.ServerRequest;
 import org.springframework.web.servlet.function.ServerResponse;
 
 @Component
@@ -21,14 +22,19 @@ public class CorrelationIdFilterSupplier implements FilterSupplier
     @Configurable
     public static HandlerFilterFunction<ServerResponse, ServerResponse> correlationIdHeader(Config config)
     {
-        return (request, next) -> {
-            String id = (String) request.attribute("requestId").orElse(request.servletRequest().getHeader("X-Request-Id"));
-            ServerResponse response = next.handle(request);
-            if (id != null)
-            {
-                response.headers().add(config.getHeaderName(), id);
-            }
-            return response;
+        return (request, next) ->
+        {
+            String requestId = (String) request.attribute("requestId").orElse("unknown");
+
+            ServerRequest mutatedRequest = ServerRequest.from(request)
+                    .header(config.getHeaderName(), requestId)
+                    .build();
+
+            ServerResponse response = next.handle(mutatedRequest);
+
+            return ServerResponse.from(response)
+                    .header(config.getHeaderName(), requestId)
+                    .build();
         };
     }
 

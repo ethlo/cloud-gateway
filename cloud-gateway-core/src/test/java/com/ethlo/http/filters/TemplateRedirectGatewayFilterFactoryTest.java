@@ -3,44 +3,65 @@ package com.ethlo.http.filters;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.cloud.gateway.server.mvc.filter.FilterSupplier;
 import org.springframework.http.HttpHeaders;
-import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
-import org.springframework.web.server.ServerWebExchange;
+import org.springframework.http.HttpStatus;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.web.servlet.function.ServerResponse;
 
-class TemplateRedirectGatewayFilterFactoryTest extends AbstractFilterTest<TemplateRedirectGatewayFilterFactory.Config>
+import com.ethlo.http.blocking.filters.AbstractFilterTest;
+import com.ethlo.http.blocking.filters.TemplateRedirectFilterSupplier;
+
+class TemplateRedirectFilterSupplierTest extends AbstractFilterTest<TemplateRedirectFilterSupplier.Config>
 {
+    @Override
+    protected FilterSupplier filterSupplier()
+    {
+        return new TemplateRedirectFilterSupplier();
+    }
 
     @Override
-    protected TemplateRedirectGatewayFilterFactory filterFactory()
+    protected String getFilterName()
     {
-        return new TemplateRedirectGatewayFilterFactory();
+        return "templateRedirect";
     }
 
     @Test
-    void testRedirect()
+    void testRedirect() throws Exception
     {
         // Given
-        final TemplateRedirectGatewayFilterFactory.Config config = new TemplateRedirectGatewayFilterFactory.Config()
+        final TemplateRedirectFilterSupplier.Config config = new TemplateRedirectFilterSupplier.Config()
                 .setSource("/foo/bar/(?<myvar>[a-z]+)")
                 .setTarget("http://foo/target/{{myvar}}?internal_param={{query.myparam[0]}}");
+
+        final MockHttpServletRequest mockRequest = new MockHttpServletRequest("GET", "/foo/bar/baz");
+        mockRequest.setQueryString("myparam=hello");
+        mockRequest.addParameter("myparam", "hello");
+
         // When
-        final ServerWebExchange exchange = execute(config, MockServerHttpRequest.get("https://proxy.com/foo/bar/baz?myparam=hello"));
+        final ServerResponse response = execute(config, mockRequest);
 
         // Then
-        assertThat(exchange.getResponse().getHeaders().getFirst(HttpHeaders.LOCATION)).isEqualTo("http://foo/target/baz?internal_param=hello");
+        assertThat(response.statusCode()).isEqualTo(HttpStatus.FOUND);
+        assertThat(response.headers().getFirst(HttpHeaders.LOCATION))
+                .isEqualTo("http://foo/target/baz?internal_param=hello");
     }
 
     @Test
-    void testRedirectMissingParam()
+    void testRedirectMissingParam() throws Exception
     {
         // Given
-        final TemplateRedirectGatewayFilterFactory.Config config = new TemplateRedirectGatewayFilterFactory.Config()
+        final TemplateRedirectFilterSupplier.Config config = new TemplateRedirectFilterSupplier.Config()
                 .setSource("/foo/bar/(?<myvar>[a-z]+)")
                 .setTarget("http://foo/target/{{myvar}}?internal_param={{query.myparam[0]}}");
+
+        final MockHttpServletRequest mockRequest = new MockHttpServletRequest("GET", "/foo/bar/baz");
+
         // When
-        final ServerWebExchange exchange = execute(config, MockServerHttpRequest.get("https://proxy.com/foo/bar/baz"));
+        final ServerResponse response = execute(config, mockRequest);
 
         // Then
-        assertThat(exchange.getResponse().getHeaders().getFirst(HttpHeaders.LOCATION)).isEqualTo("http://foo/target/baz?internal_param=");
+        assertThat(response.headers().getFirst(HttpHeaders.LOCATION))
+                .isEqualTo("http://foo/target/baz?internal_param=");
     }
 }

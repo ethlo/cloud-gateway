@@ -1,26 +1,5 @@
 package com.ethlo.http.blocking;
 
-import java.io.IOException;
-import java.math.BigInteger;
-import java.net.URI;
-import java.time.Duration;
-import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.util.List;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.function.Predicate;
-
-import org.jetbrains.annotations.NotNull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cloud.gateway.server.mvc.common.MvcUtils;
-import org.springframework.core.Ordered;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Component;
-import org.springframework.web.filter.OncePerRequestFilter;
-
 import com.ethlo.http.DataBufferRepository;
 import com.ethlo.http.RoutePredicateLocator;
 import com.ethlo.http.blocking.configuration.HttpLoggingConfiguration;
@@ -33,6 +12,30 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+
+import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.gateway.server.mvc.common.MvcUtils;
+import org.springframework.core.NestedExceptionUtils;
+import org.springframework.core.Ordered;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+import java.math.BigInteger;
+import java.net.SocketException;
+import java.net.URI;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Predicate;
 
 //@RefreshScope
 @Component
@@ -78,8 +81,15 @@ public class TagRequestIdMvcFilter extends OncePerRequestFilter implements Order
     @NotNull
     private static Route getRoute(MvcRequestCapture req)
     {
-        final String routeId = (String) req.getAttribute(MvcUtils.GATEWAY_ROUTE_ID_ATTR);
-        final URI routeUri = (URI) req.getAttribute(MvcUtils.GATEWAY_REQUEST_URL_ATTR);
+        // Attributes are null if the request didn't match any route (e.g., a 404)
+        final String routeId = Optional.ofNullable(req.getAttribute(MvcUtils.GATEWAY_ROUTE_ID_ATTR))
+                .map(Object::toString)
+                .orElse("unmatched");
+
+        // Fallback to a safe, non-null URI if the gateway hasn't determined a target
+        final URI routeUri = Optional.ofNullable((URI) req.getAttribute(MvcUtils.GATEWAY_REQUEST_URL_ATTR))
+                .orElse(URI.create("unknown://404"));
+
         return new Route(routeId, routeUri);
     }
 
@@ -102,6 +112,8 @@ public class TagRequestIdMvcFilter extends OncePerRequestFilter implements Order
         }
 
         final String requestId = generateId();
+
+        request.setAttribute("requestId", requestId);
 
         // We use your repository to stream directly to disk instead of memory
         final MvcRequestCapture wrappedRequest = new MvcRequestCapture(request, requestId, repository);
@@ -170,6 +182,7 @@ public class TagRequestIdMvcFilter extends OncePerRequestFilter implements Order
 
     private void handleException(Throwable e, HttpServletResponse response)
     {
+        logger.warn("Exception occurred during request processing", e);
         if (isReset(e))
         {
             response.setStatus(HttpStatus.BAD_GATEWAY.value());
@@ -178,8 +191,10 @@ public class TagRequestIdMvcFilter extends OncePerRequestFilter implements Order
 
     private boolean isReset(Throwable ex)
     {
-        return ex.getMessage() != null && ex.getMessage().contains("reset");
+        final Throwable rootCause = NestedExceptionUtils.getMostSpecificCause(ex);
+        return rootCause instanceof SocketException;
     }
+
 
     @Override
     public int getOrder()
