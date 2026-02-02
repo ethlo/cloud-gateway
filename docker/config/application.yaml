@@ -38,13 +38,13 @@ http-logging:
       response:
         body: STORE
         raw: STORE
-logging:
-  level:
-    com.ethlo.http: DEBUG
-    org.springframework.cloud.gateway: INFO
-    org.springframework.cloud.gateway.server.mvc.config: TRACE
-    org.springframework.cloud.gateway.server.mvc.predicate: TRACE
-    org.springframework.cloud.gateway.server.mvc.filter: TRACE
+#logging:
+  #level:
+    #com.ethlo.http: DEBUG
+    #org.springframework.cloud.gateway: INFO
+    #org.springframework.cloud.gateway.server.mvc.config: TRACE
+    #org.springframework.cloud.gateway.server.mvc.predicate: TRACE
+    #org.springframework.cloud.gateway.server.mvc.filter: TRACE
 management:
   endpoints:
     web:
@@ -56,11 +56,11 @@ management:
 spring:
   cloud:
     gateway:
-      #filter:
-      #  request-rate-limiter:
-      #    enabled: true
-      #    deny-empty-key: false
-      #    empty-key-status-code: 403
+      filter:
+        request-rate-limiter:
+          enabled: true
+          deny-empty-key: false
+          empty-key-status-code: 403
       metrics:
         tags:
           path:
@@ -87,11 +87,11 @@ spring:
                 username: foo
                 password: bar
             - SetRequestHeader=x-realm,baz
-            - name: InjectAccessTokenAuth
-              args:
-                client-id: my-client
-                token-url: https://login.example.com/auth/realms/my-realm/protocol/openid-connect/token
-                refresh-token: ey...
+            #- name: InjectAccessTokenAuth
+            #  args:
+            #    client-id: my-client
+            #    token-url: https://login.example.com/auth/realms/my-realm/protocol/openid-connect/token
+            #    refresh-token: ey...
         - id: http-bin-anything
           uri: https://httpbin.org/anything
           predicates:

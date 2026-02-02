@@ -6,8 +6,6 @@ import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Predicate;
@@ -18,20 +16,17 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.server.mvc.common.MvcUtils;
 import org.springframework.core.Ordered;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
-import org.springframework.web.servlet.function.RequestPredicate;
-import org.springframework.web.servlet.function.ServerRequest;
 
 import com.ethlo.http.DataBufferRepository;
 import com.ethlo.http.RoutePredicateLocator;
 import com.ethlo.http.blocking.configuration.HttpLoggingConfiguration;
+import com.ethlo.http.blocking.model.WebExchangeDataProvider;
 import com.ethlo.http.logger.LoggingFilterService;
 import com.ethlo.http.logger.delegate.SequentialDelegateLogger;
-import com.ethlo.http.blocking.model.WebExchangeDataProvider;
 import com.ethlo.http.netty.PredicateConfig;
 import com.ethlo.http.processors.LogPreProcessor;
 import jakarta.servlet.FilterChain;
@@ -39,13 +34,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-import static com.ethlo.http.blocking.ServletUtil.extractHeaders;
-
-/**
- * Deterministic MVC version of the logging filter.
- * Runs on standard Servlet threads (or Virtual Threads).
- */
-
+//@RefreshScope
 @Component
 public class TagRequestIdMvcFilter extends OncePerRequestFilter implements Ordered
 {
@@ -73,8 +62,8 @@ public class TagRequestIdMvcFilter extends OncePerRequestFilter implements Order
         this.autoCleanup = autoCleanup;
         this.predicateConfigs = httpLoggingConfiguration.getMatchers()
                 .stream()
-                .map(c -> {
-                    // 1. Convert your config definitions to MvcPredicateDefinitions
+                .map(c ->
+                {
                     List<MvcPredicateDefinition> mvcDefs = c.predicates().stream()
                             .map(p -> new MvcPredicateDefinition(p.name(), p.args()))
                             .toList();
@@ -92,19 +81,6 @@ public class TagRequestIdMvcFilter extends OncePerRequestFilter implements Order
         final String routeId = (String) req.getAttribute(MvcUtils.GATEWAY_ROUTE_ID_ATTR);
         final URI routeUri = (URI) req.getAttribute(MvcUtils.GATEWAY_REQUEST_URL_ATTR);
         return new Route(routeId, routeUri);
-    }
-
-    private boolean matches(HttpServletRequest request, List<MvcPredicateDefinition> definitions)
-    {
-        if (definitions.isEmpty()) return true;
-
-        // Combine all definitions into a single RequestPredicate
-        RequestPredicate combined = definitions.stream()
-                .map(MvcPredicateDefinition::toRequestPredicate)
-                .reduce(RequestPredicate::and)
-                .orElse(r -> true);
-
-        return combined.test(ServerRequest.create(request, List.of()));
     }
 
     @Override

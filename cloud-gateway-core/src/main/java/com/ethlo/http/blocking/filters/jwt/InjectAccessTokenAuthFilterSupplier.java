@@ -43,7 +43,7 @@ public class InjectAccessTokenAuthFilterSupplier implements FilterSupplier
         }
         catch (NoSuchMethodException e)
         {
-            throw new RuntimeException("Filter method 'InjectAccessTokenAuth' not found!", e);
+            throw new RuntimeException("Filter method 'injectAccessTokenAuth' not found!", e);
         }
     }
 }

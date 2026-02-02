@@ -1,13 +1,16 @@
 package com.ethlo.http.blocking.filters.ratelimiter;
 
 import java.lang.reflect.Method;
+import java.net.InetSocketAddress;
+import java.time.Duration;
 import java.util.Collection;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
+import org.jspecify.annotations.NonNull;
 import org.springframework.cloud.gateway.server.mvc.common.Configurable;
+import org.springframework.cloud.gateway.server.mvc.common.MvcUtils;
 import org.springframework.cloud.gateway.server.mvc.filter.FilterSupplier;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -16,65 +19,103 @@ import org.springframework.web.servlet.function.ServerResponse;
 
 import com.ethlo.http.blocking.configuration.BeanProvider;
 import com.ethlo.http.blocking.filters.RequestKeyResolver;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import io.github.bucket4j.Bandwidth;
+import io.github.bucket4j.Bucket;
 
 @Component
 public class RateLimiterFilterSupplier implements FilterSupplier
 {
-    private static final ConcurrentMap<String, BucketState> buckets = new ConcurrentHashMap<>();
+    private static final Cache<@NonNull String, Bucket> BUCKETS = Caffeine.newBuilder()
+            .maximumSize(10_000)
+            .expireAfterAccess(60, TimeUnit.MINUTES)
+            .build();
 
     @Configurable
-    public static HandlerFilterFunction<ServerResponse, ServerResponse> requestRateLimiter(Config config)
+    public static HandlerFilterFunction<@NonNull ServerResponse, @NonNull ServerResponse> requestRateLimiter(Config config)
     {
-        return (request, next) -> {
-            int capacity = config.getReplenishRate();
-            long refillIntervalMs = config.getRefreshPeriod() * 1000L;
+        return (request, next) ->
+        {
+            final String routeId = request.attribute(MvcUtils.GATEWAY_ROUTE_ID_ATTR)
+                    .map(Object::toString).orElse("default");
 
-            final String key = config.getKeyResolverImpl().apply(request);
+            String userKey = config.getKeyResolver().apply(request);
 
-            final BucketState bucket = buckets.computeIfAbsent(
-                    key,
-                    k -> new BucketState(new AtomicLong(capacity), new AtomicLong(System.currentTimeMillis()))
-            );
-
-            refill(bucket, capacity, refillIntervalMs);
-
-            if (bucket.tokens().getAndDecrement() > 0)
+            if (userKey == null || userKey.isBlank())
             {
-                return next.handle(request);
+                if (config.isDenyEmptyKey())
+                {
+                    return ServerResponse.status(config.getEmptyKeyStatus())
+                            .header(config.getReasonHeader(), "missing-key")
+                            .build();
+                }
+                userKey = request.remoteAddress().map(InetSocketAddress::toString).orElse("unknown");
             }
 
-            bucket.tokens().incrementAndGet();
-            return ServerResponse.status(HttpStatus.TOO_MANY_REQUESTS).build();
+            final String namespacedKey = routeId + ":" + userKey;
+            final Bucket bucket = Objects.requireNonNull(BUCKETS.get(namespacedKey, k -> createNewBucket(config)));
+
+            final boolean consumed = bucket.tryConsume(1);
+            final long remaining = bucket.getAvailableTokens();
+
+            if (consumed)
+            {
+                ServerResponse response = next.handle(request);
+                response.headers().add("X-RateLimit-Limit", String.valueOf(config.getReplenishRate()));
+                response.headers().add("X-RateLimit-Remaining", String.valueOf(remaining));
+                return response;
+            }
+
+            if (config.isLogDenials())
+            {
+                request.servletRequest().setAttribute("RATE_LIMIT_DENIED", true);
+            }
+
+            return ServerResponse.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .header("X-RateLimit-Limit", String.valueOf(config.getReplenishRate()))
+                    .header("X-RateLimit-Remaining", String.valueOf(remaining))
+                    .header("Retry-After", String.valueOf(config.getRefreshPeriod()))
+                    .header(config.getReasonHeader(), config.getDenialReason())
+                    .build();
         };
     }
 
-    private static void refill(BucketState bucket, long capacity, long intervalMs)
+    private static Bucket createNewBucket(Config config)
     {
-        long now = System.currentTimeMillis();
-        long last = bucket.lastRefillTime().get();
+        final Bandwidth limit = Bandwidth.builder()
+                .capacity(config.getBurstCapacity())
+                .refillGreedy(config.getReplenishRate(), Duration.ofSeconds(config.getRefreshPeriod()))
+                .build();
 
-        if (now - last >= intervalMs &&
-                bucket.lastRefillTime().compareAndSet(last, now))
-        {
-            bucket.tokens().set(capacity);
-        }
+        return Bucket.builder()
+                .addLimit(limit)
+                .build();
     }
 
     @Override
     public Collection<Method> get()
     {
-        return List.of(RateLimiterFilterSupplier.class.getMethods());
-    }
-
-    private record BucketState(AtomicLong tokens, AtomicLong lastRefillTime)
-    {
+        try
+        {
+            return List.of(RateLimiterFilterSupplier.class.getMethod("requestRateLimiter", Config.class));
+        }
+        catch (NoSuchMethodException e)
+        {
+            throw new RuntimeException(e);
+        }
     }
 
     public static class Config
     {
-        private int replenishRate;
-        private int refreshPeriod;
-
+        private int replenishRate = 10;
+        private int refreshPeriod = 1;
+        private int burstCapacity = 10;
+        private boolean denyEmptyKey = true;
+        private int emptyKeyStatus = 403;
+        private String reasonHeader = "RateLimit-Reason";
+        private String denialReason = "quota-exceeded";
+        private boolean logDenials = true;
 
         public int getReplenishRate()
         {
@@ -96,7 +137,67 @@ public class RateLimiterFilterSupplier implements FilterSupplier
             this.refreshPeriod = refreshPeriod;
         }
 
-        public RequestKeyResolver getKeyResolverImpl()
+        public int getBurstCapacity()
+        {
+            return burstCapacity;
+        }
+
+        public void setBurstCapacity(int burstCapacity)
+        {
+            this.burstCapacity = burstCapacity;
+        }
+
+        public boolean isDenyEmptyKey()
+        {
+            return denyEmptyKey;
+        }
+
+        public void setDenyEmptyKey(boolean denyEmptyKey)
+        {
+            this.denyEmptyKey = denyEmptyKey;
+        }
+
+        public int getEmptyKeyStatus()
+        {
+            return emptyKeyStatus;
+        }
+
+        public void setEmptyKeyStatus(int emptyKeyStatus)
+        {
+            this.emptyKeyStatus = emptyKeyStatus;
+        }
+
+        public String getReasonHeader()
+        {
+            return reasonHeader;
+        }
+
+        public void setReasonHeader(String reasonHeader)
+        {
+            this.reasonHeader = reasonHeader;
+        }
+
+        public String getDenialReason()
+        {
+            return denialReason;
+        }
+
+        public void setDenialReason(String denialReason)
+        {
+            this.denialReason = denialReason;
+        }
+
+        public boolean isLogDenials()
+        {
+            return logDenials;
+        }
+
+        public void setLogDenials(boolean logDenials)
+        {
+            this.logDenials = logDenials;
+        }
+
+        public RequestKeyResolver getKeyResolver()
         {
             return BeanProvider.get(RequestKeyResolver.class);
         }
