@@ -42,8 +42,9 @@ logging:
   level:
     com.ethlo.http: DEBUG
     org.springframework.cloud.gateway: INFO
-    org.springframework.cloud.gateway.server.mvc.config.RouterFunctionHolderFactory: TRACE
-    org.springframework.cloud.gateway.server.mvc.common.ArgumentSupplierBeanPostProcessor: TRACE
+    org.springframework.cloud.gateway.server.mvc.config: TRACE
+    org.springframework.cloud.gateway.server.mvc.predicate: TRACE
+    org.springframework.cloud.gateway.server.mvc.filter: TRACE
 management:
   endpoints:
     web:
@@ -80,27 +81,29 @@ spring:
           uri: https://httpbin.org/get
           predicates:
             - Path=/get
-          #filters:
-          #  - name: InjectBasicAuth
-          #    args:
-          #      username: foo
-          #      password: bar
-          #  - SetRequestHeader=x-realm,baz
-            #- name: InjectAccessTokenAuth
-            #  args:
-            #    client-id: my-client
-            #    token-url: https://login.example.com/auth/realms/my-realm/protocol/openid-connect/token
-            #    refresh-token: ey...
+          filters:
+            - name: InjectBasicAuth
+              args:
+                username: foo
+                password: bar
+            - SetRequestHeader=x-realm,baz
+            - name: InjectAccessTokenAuth
+              args:
+                client-id: my-client
+                token-url: https://login.example.com/auth/realms/my-realm/protocol/openid-connect/token
+                refresh-token: ey...
         - id: http-bin-anything
           uri: https://httpbin.org/anything
           predicates:
             - Path=/anything
           filters:
             - name: CorrelationIdHeader
+              args:
+                headerName: Correlation-Id
             - name: RequestRateLimiter
               args:
-                replenish-rate: 2
-                refresh-period: 10
+                replenishRate: 2
+                refreshPeriod: 10
         - id: http-upstream-missing
           uri: http://192.0.0.255
           predicates:

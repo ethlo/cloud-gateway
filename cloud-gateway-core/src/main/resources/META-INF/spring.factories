@@ -1,16 +1,2 @@
 org.springframework.boot.env.EnvironmentPostProcessor=\
 com.ethlo.http.blocking.configuration.LegacyGatewayMigrationPostProcessor
-
-# Predicate Suppliers
-org.springframework.cloud.gateway.server.mvc.predicate.PredicateSupplier=\
-com.ethlo.http.blocking.predicates.NotHostPredicateSupplier,\
-com.ethlo.http.blocking.predicates.ExtensionPredicateSupplier,\
-com.ethlo.http.blocking.predicates.NotExtensionPredicateSupplier,\
-com.ethlo.http.blocking.predicates.NotMethodPredicateSupplier,\
-com.ethlo.http.blocking.predicates.NotPathPredicateSupplier
-
-# Filter Suppliers
-org.springframework.cloud.gateway.server.mvc.filter.FilterSupplier=\
-com.ethlo.http.blocking.filters.CorrelationIdFilterSupplier,\
-com.ethlo.http.blocking.filters.ratelimiter.RateLimiterFilterSupplier,\
-com.ethlo.http.blocking.filters.jwt.InjectAccessTokenAuthFilterSupplier

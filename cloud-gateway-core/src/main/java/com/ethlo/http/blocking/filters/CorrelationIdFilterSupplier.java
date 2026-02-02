@@ -4,7 +4,7 @@ import java.lang.reflect.Method;
 import java.util.Collection;
 import java.util.List;
 
-import org.jspecify.annotations.NonNull;
+import org.springframework.cloud.gateway.server.mvc.common.Configurable;
 import org.springframework.cloud.gateway.server.mvc.filter.FilterSupplier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.function.HandlerFilterFunction;
@@ -18,7 +18,8 @@ public class CorrelationIdFilterSupplier implements FilterSupplier
         return correlationIdHeader(new Config());
     }
 
-    public static HandlerFilterFunction<@NonNull ServerResponse, @NonNull ServerResponse> correlationIdHeader(Config config)
+    @Configurable
+    public static HandlerFilterFunction<ServerResponse, ServerResponse> correlationIdHeader(Config config)
     {
         return (request, next) -> {
             String id = (String) request.attribute("requestId").orElse(request.servletRequest().getHeader("X-Request-Id"));
@@ -32,13 +33,17 @@ public class CorrelationIdFilterSupplier implements FilterSupplier
     }
 
     @Override
-    public Collection<Method> get() {
-        try {
+    public Collection<Method> get()
+    {
+        try
+        {
             return List.of(
                     this.getClass().getMethod("correlationIdHeader"),
                     this.getClass().getMethod("correlationIdHeader", Config.class)
             );
-        } catch (NoSuchMethodException e) {
+        }
+        catch (NoSuchMethodException e)
+        {
             throw new RuntimeException(e);
         }
     }

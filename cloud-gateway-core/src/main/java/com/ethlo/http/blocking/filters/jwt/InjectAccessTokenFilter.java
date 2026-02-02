@@ -18,6 +18,7 @@ import org.springframework.web.servlet.function.ServerRequest;
 import org.springframework.web.servlet.function.ServerResponse;
 
 import com.auth0.jwt.interfaces.DecodedJWT;
+import com.ethlo.http.blocking.configuration.BeanProvider;
 import com.ethlo.http.logger.RedactUtil;
 
 public class InjectAccessTokenFilter implements HandlerFilterFunction<ServerResponse, ServerResponse>
@@ -28,9 +29,10 @@ public class InjectAccessTokenFilter implements HandlerFilterFunction<ServerResp
     private final InjectAccessTokenConfig config;
     private volatile DecodedJWT jwt;
 
-    public InjectAccessTokenFilter(InjectAccessTokenConfig config, TaskScheduler taskScheduler)
+    public InjectAccessTokenFilter(InjectAccessTokenConfig config)
     {
         this.config = config;
+        final TaskScheduler taskScheduler = BeanProvider.get(TaskScheduler.class);
         taskScheduler.scheduleWithFixedDelay(this::scheduledRefreshAccessToken, Duration.ofSeconds(10));
     }
 

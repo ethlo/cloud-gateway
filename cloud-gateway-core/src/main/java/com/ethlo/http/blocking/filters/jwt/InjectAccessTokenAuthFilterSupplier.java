@@ -4,7 +4,7 @@ import java.lang.reflect.Method;
 import java.util.Collection;
 import java.util.List;
 
-import org.springframework.cloud.gateway.server.mvc.common.Shortcut;
+import org.springframework.cloud.gateway.server.mvc.common.Configurable;
 import org.springframework.cloud.gateway.server.mvc.filter.FilterSupplier;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.stereotype.Component;
@@ -26,12 +26,11 @@ public class InjectAccessTokenAuthFilterSupplier implements FilterSupplier
      * The @Shortcut annotation allows Spring to bind positional arguments from YAML
      * (e.g., InjectAccessTokenAuth=my-client-id,my-url) to the Config object.
      */
-    @Shortcut
-    public static HandlerFilterFunction<ServerResponse, ServerResponse> InjectAccessTokenAuth(
-            InjectAccessTokenConfig config,
-            TaskScheduler taskScheduler)
+    @Configurable
+    public static HandlerFilterFunction<ServerResponse, ServerResponse> injectAccessTokenAuth(
+            InjectAccessTokenConfig config)
     {
-        return new InjectAccessTokenFilter(config, taskScheduler);
+        return new InjectAccessTokenFilter(config);
     }
 
     @Override
@@ -40,7 +39,7 @@ public class InjectAccessTokenAuthFilterSupplier implements FilterSupplier
         try
         {
             // We return the static method defined above
-            return List.of(this.getClass().getMethod("InjectAccessTokenAuth", InjectAccessTokenConfig.class, TaskScheduler.class));
+            return List.of(this.getClass().getMethod("injectAccessTokenAuth", InjectAccessTokenConfig.class));
         }
         catch (NoSuchMethodException e)
         {

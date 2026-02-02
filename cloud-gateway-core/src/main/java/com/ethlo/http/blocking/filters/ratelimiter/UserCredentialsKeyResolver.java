@@ -1,16 +1,15 @@
 package com.ethlo.http.blocking.filters.ratelimiter;
 
-import java.util.function.BiFunction;
-
+import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.function.ServerRequest;
 
 import com.ethlo.http.blocking.ServletUtil;
+import com.ethlo.http.blocking.filters.RequestKeyResolver;
 import com.ethlo.http.processors.auth.extractors.AuthorizationExtractor;
-import jakarta.servlet.http.HttpServletResponse;
 
 @Component
-public class UserCredentialsKeyResolver implements BiFunction<ServerRequest, HttpServletResponse, String>
+public class UserCredentialsKeyResolver implements RequestKeyResolver
 {
     private final AuthorizationExtractor authorizationExtractor;
 
@@ -20,9 +19,9 @@ public class UserCredentialsKeyResolver implements BiFunction<ServerRequest, Htt
     }
 
     @Override
-    public String apply(final ServerRequest serverRequest, final HttpServletResponse httpServletResponse)
+    public String apply(final ServerRequest serverRequest)
     {
-        return authorizationExtractor.getUser(ServletUtil.extractHeaders(serverRequest.servletRequest()), ServletUtil.extractHeaders(httpServletResponse))
+        return authorizationExtractor.getUser(ServletUtil.extractHeaders(serverRequest.servletRequest()), new HttpHeaders())
                 .map(realmUser -> realmUser.realm() + " - " + realmUser.username()).orElse(null);
     }
 }
