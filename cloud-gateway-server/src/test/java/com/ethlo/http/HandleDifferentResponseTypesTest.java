@@ -37,8 +37,8 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.web.client.DefaultResponseErrorHandler;
 import org.springframework.web.client.RestTemplate;
 
-import com.ethlo.http.blocking.model.BodyProvider;
-import com.ethlo.http.blocking.model.WebExchangeDataProvider;
+import com.ethlo.http.model.BodyProvider;
+import com.ethlo.http.model.WebExchangeDataProvider;
 import com.ethlo.http.logger.delegate.SequentialDelegateLogger;
 import com.ethlo.http.model.AccessLogResult;
 import com.github.tomakehurst.wiremock.http.Fault;

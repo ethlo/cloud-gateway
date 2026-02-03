@@ -1,7 +1,5 @@
 package com.ethlo.http.model;
 
-import com.ethlo.http.blocking.model.WebExchangeDataProvider;
-
 import java.util.ArrayList;
 import java.util.List;
 

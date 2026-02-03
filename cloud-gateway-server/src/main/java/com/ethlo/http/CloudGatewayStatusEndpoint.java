@@ -19,7 +19,7 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 
-import com.ethlo.http.blocking.configuration.HttpLoggingConfiguration;
+import com.ethlo.http.configuration.HttpLoggingConfiguration;
 import com.ethlo.http.logger.clickhouse.ClickHouseStatsEndpoint;
 import com.ethlo.http.util.IoUtil;
 import io.micrometer.core.instrument.Meter;

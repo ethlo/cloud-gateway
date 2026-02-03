@@ -1,4 +1,4 @@
-package com.ethlo.http.blocking.predicates;
+package com.ethlo.http.predicates;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

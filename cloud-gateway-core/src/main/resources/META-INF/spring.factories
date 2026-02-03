@@ -1,2 +1,2 @@
 org.springframework.boot.env.EnvironmentPostProcessor=\
-com.ethlo.http.blocking.configuration.LegacyGatewayMigrationPostProcessor
+com.ethlo.http.configuration.LegacyGatewayMigrationPostProcessor

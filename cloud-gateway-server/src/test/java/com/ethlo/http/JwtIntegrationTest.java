@@ -28,7 +28,7 @@ import org.springframework.web.client.RestTemplate;
 
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
-import com.ethlo.http.blocking.model.WebExchangeDataProvider;
+import com.ethlo.http.model.WebExchangeDataProvider;
 import com.ethlo.http.logger.delegate.SequentialDelegateLogger;
 import com.ethlo.http.processors.auth.RealmUser;
 import com.github.tomakehurst.wiremock.junit5.WireMockExtension;

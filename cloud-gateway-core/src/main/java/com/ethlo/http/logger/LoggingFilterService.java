@@ -6,7 +6,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-import com.ethlo.http.blocking.configuration.HttpLoggingConfiguration;
+import com.ethlo.http.configuration.HttpLoggingConfiguration;
 import com.ethlo.http.match.HeaderPredicate;
 import com.ethlo.http.match.LogOptions;
 import com.ethlo.http.netty.PredicateConfig;

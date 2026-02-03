@@ -9,9 +9,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.web.servlet.function.ServerResponse;
 
-import com.ethlo.http.blocking.filters.AbstractFilterTest;
-import com.ethlo.http.blocking.filters.TemplateRedirectFilterSupplier;
-
 class TemplateRedirectFilterSupplierTest extends AbstractFilterTest<TemplateRedirectFilterSupplier.Config>
 {
     @Override

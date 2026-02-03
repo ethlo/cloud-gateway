@@ -6,8 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.cloud.gateway.server.mvc.filter.FilterSupplier;
 import org.springframework.http.HttpHeaders;
 
-import com.ethlo.http.blocking.filters.AbstractFilterTest;
-import com.ethlo.http.blocking.filters.basic.InjectBasicAuthFilterSupplier;
+import com.ethlo.http.filters.basic.InjectBasicAuthFilterSupplier;
 
 class InjectBasicAuthGatewayFilterFactoryTest extends AbstractFilterTest<InjectBasicAuthFilterSupplier.Config>
 {

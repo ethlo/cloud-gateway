@@ -3,7 +3,7 @@ package com.ethlo.http.match;
 import java.util.List;
 import java.util.Optional;
 
-import com.ethlo.http.blocking.MvcPredicateDefinition;
+import com.ethlo.http.MvcPredicateDefinition;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 

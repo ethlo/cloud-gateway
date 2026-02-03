@@ -12,7 +12,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.function.RequestPredicate;
 import org.springframework.web.servlet.function.ServerRequest;
 
-import com.ethlo.http.blocking.MvcPredicateDefinition;
 import jakarta.servlet.http.HttpServletRequest;
 
 @Component

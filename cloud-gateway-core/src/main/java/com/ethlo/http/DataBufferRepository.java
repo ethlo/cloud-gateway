@@ -18,7 +18,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.util.unit.DataSize;
 
 import com.ethlo.http.logger.CaptureConfiguration;
-import com.ethlo.http.blocking.model.BodyProvider;
+import com.ethlo.http.model.BodyProvider;
 import com.ethlo.http.netty.ServerDirection;
 
 public class DataBufferRepository

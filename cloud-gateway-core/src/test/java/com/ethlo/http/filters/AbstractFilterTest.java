@@ -1,18 +1,23 @@
-package com.ethlo.http.blocking.filters;
+package com.ethlo.http.filters;
 
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
-import java.util.List;
+import ch.qos.logback.core.testUtil.RandomUtil;
+import jakarta.servlet.http.HttpServletRequest;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.mockito.ArgumentCaptor;
 import org.springframework.cloud.gateway.server.mvc.filter.FilterSupplier;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.web.servlet.function.HandlerFilterFunction;
 import org.springframework.web.servlet.function.HandlerFunction;
 import org.springframework.web.servlet.function.ServerRequest;
 import org.springframework.web.servlet.function.ServerResponse;
+
+import java.util.List;
+
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 public abstract class AbstractFilterTest<T>
 {
@@ -26,8 +31,18 @@ public abstract class AbstractFilterTest<T>
     @BeforeEach
     void setUp() throws Exception
     {
-        // Mock the next handler to return a 200 OK and capture the (potentially mutated) request
-        when(next.handle(captor.capture())).thenReturn(ServerResponse.ok().build());
+        // Mock a ServerResponse
+        ServerResponse mockResponse = mock(ServerResponse.class);
+        HttpHeaders mutableHeaders = new HttpHeaders();
+
+        // Stub headers() to return our mutable map
+        when(mockResponse.headers()).thenReturn(mutableHeaders);
+
+        // Stub any other methods used by your filter
+        when(mockResponse.statusCode()).thenReturn(HttpStatus.OK);
+
+        // Then have next.handle() return it
+        when(next.handle(captor.capture())).thenReturn(mockResponse);
     }
 
     protected ServerRequest actualRequest()
@@ -37,17 +52,20 @@ public abstract class AbstractFilterTest<T>
 
     protected ServerResponse execute(T config) throws Exception
     {
-        return execute(config, new MockHttpServletRequest("GET", "/anything"));
+        final ServerRequest request = ServerRequest.from(ServerRequest.create(new MockHttpServletRequest("GET", "/anything"), List.of()))
+                .attribute("requestId", "request-id-" + RandomUtil.getPositiveInt())
+                .build();
+
+        return execute(config, request);
     }
 
-    protected ServerResponse execute(T config, MockHttpServletRequest mockRequest) throws Exception
+    protected ServerResponse execute(T config, HttpServletRequest request) throws Exception
     {
-        // 1. Create the ServerRequest from the mock servlet request
-        final ServerRequest request = ServerRequest.create(mockRequest, List.of());
+        return execute(config, ServerRequest.create(request, List.of()));
+    }
 
-        // 2. Get the filter function from your FilterSupplier (using the @Configurable method logic)
-        // Note: You may need to call your specific static factory method here
-        // depending on how you've structured your concrete tests.
+    protected ServerResponse execute(T config, ServerRequest request) throws Exception
+    {
         final HandlerFilterFunction<ServerResponse, ServerResponse> filter =
                 (HandlerFilterFunction<ServerResponse, ServerResponse>) filterSupplier()
                         .get()
