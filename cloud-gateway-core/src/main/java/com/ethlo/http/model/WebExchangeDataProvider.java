@@ -9,12 +9,14 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeMap;
 
+import com.ethlo.http.DataBufferRepository;
+
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 
-import com.ethlo.http.DataBufferRepository;
+import com.ethlo.http.DefaultDataBufferRepository;
 import com.ethlo.http.Route;
 import com.ethlo.http.netty.PredicateConfig;
 import com.ethlo.http.netty.ServerDirection;

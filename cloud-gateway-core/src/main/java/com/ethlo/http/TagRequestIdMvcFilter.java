@@ -15,6 +15,7 @@ import java.util.function.Predicate;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.server.mvc.common.MvcUtils;
 import org.springframework.core.NestedExceptionUtils;
@@ -25,9 +26,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import com.ethlo.http.configuration.HttpLoggingConfiguration;
-import com.ethlo.http.model.WebExchangeDataProvider;
 import com.ethlo.http.logger.LoggingFilterService;
 import com.ethlo.http.logger.delegate.SequentialDelegateLogger;
+import com.ethlo.http.model.WebExchangeDataProvider;
 import com.ethlo.http.netty.PredicateConfig;
 import com.ethlo.http.processors.LogPreProcessor;
 import jakarta.servlet.FilterChain;
@@ -50,7 +51,7 @@ public class TagRequestIdMvcFilter extends OncePerRequestFilter implements Order
 
     public TagRequestIdMvcFilter(LoggingFilterService loggingFilterService,
                                  SequentialDelegateLogger httpLogger,
-                                 DataBufferRepository repository,
+                                 @Autowired(required = false) DataBufferRepository repository,
                                  LogPreProcessor logPreProcessor,
                                  HttpLoggingConfiguration httpLoggingConfiguration,
                                  RoutePredicateLocator routePredicateLocator,
@@ -58,7 +59,7 @@ public class TagRequestIdMvcFilter extends OncePerRequestFilter implements Order
     {
         this.loggingFilterService = loggingFilterService;
         this.httpLogger = httpLogger;
-        this.repository = repository;
+        this.repository = repository != null ? repository : DataBufferRepository.NOP;
         this.logPreProcessor = logPreProcessor;
         this.autoCleanup = autoCleanup;
         this.predicateConfigs = httpLoggingConfiguration.getMatchers()

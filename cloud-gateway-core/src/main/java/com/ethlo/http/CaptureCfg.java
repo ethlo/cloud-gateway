@@ -15,8 +15,8 @@ import com.ethlo.http.configuration.HttpLoggingConfiguration;
 public class CaptureCfg
 {
     @Bean
-    public DataBufferRepository pooledFileDataBufferRepository(HttpLoggingConfiguration httpLoggingConfiguration) throws IOException
+    public DefaultDataBufferRepository pooledFileDataBufferRepository(HttpLoggingConfiguration httpLoggingConfiguration) throws IOException
     {
-        return new DataBufferRepository(httpLoggingConfiguration.getCapture(), httpLoggingConfiguration.maxMemoryBuffer());
+        return new DefaultDataBufferRepository(httpLoggingConfiguration.getCapture(), httpLoggingConfiguration.maxMemoryBuffer());
     }
 }

@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
+import org.springframework.cloud.gateway.server.mvc.common.Configurable;
 import org.springframework.cloud.gateway.server.mvc.predicate.PredicateSupplier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.function.RequestPredicate;
@@ -16,10 +17,9 @@ public class NotPathPredicateSupplier implements PredicateSupplier
     /**
      * Maps to "NotPath" in YAML
      */
-    public static RequestPredicate NotPath(Config config)
+    @Configurable
+    public static RequestPredicate notPath(Config config)
     {
-        // Use standard MVC RequestPredicates to build the path matchers and negate them
-        // We join multiple patterns using 'or' before negating the whole set
         RequestPredicate predicate = null;
         for (String pattern : config.getPatterns())
         {
@@ -35,7 +35,7 @@ public class NotPathPredicateSupplier implements PredicateSupplier
     {
         try
         {
-            return List.of(this.getClass().getMethod("NotPath", Config.class));
+            return List.of(this.getClass().getMethod("notPath", Config.class));
         }
         catch (NoSuchMethodException e)
         {

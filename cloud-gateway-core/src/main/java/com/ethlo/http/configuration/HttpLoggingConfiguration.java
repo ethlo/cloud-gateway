@@ -22,6 +22,7 @@ public class HttpLoggingConfiguration
 {
     public static final DataSize DEFAULT_MAX_MEMORY_BUFFER = DataSize.ofMegabytes(1);
 
+    @Valid
     private CaptureConfiguration capture;
     private LogFilter filter;
     private Map<String, Map<String, Object>> providers;
