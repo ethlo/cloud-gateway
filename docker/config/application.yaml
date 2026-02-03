@@ -63,9 +63,9 @@ spring:
       mvc:
         http-client:
           # Connection timeout in milliseconds
-          connect-timeout: 2000
+          connect-timeout: 3000
           # Response (read) timeout as a Duration
-          read-timeout: 5s
+          read-timeout: 30s
       filter:
         request-rate-limiter:
           enabled: true
@@ -118,15 +118,10 @@ spring:
           uri: http://192.0.0.255
           predicates:
             - Path=/504
-          #filters:
-          #  - name: CircuitBreaker
-          #    args:
-          #      name: upstream-down
-          #      fallbackUri: 'forward:/upstream-down'
   web:
     resources:
       static-locations:
         - file:/static
   webmvc:
-    problemdetails:
+    problem-details:
       enabled: true

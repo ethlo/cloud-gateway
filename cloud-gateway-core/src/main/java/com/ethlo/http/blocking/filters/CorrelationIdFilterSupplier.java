@@ -24,17 +24,15 @@ public class CorrelationIdFilterSupplier implements FilterSupplier
     {
         return (request, next) ->
         {
-            String requestId = (String) request.attribute("requestId").orElse("unknown");
+            final String requestId = (String) request.attribute("requestId").orElseThrow();
 
-            ServerRequest mutatedRequest = ServerRequest.from(request)
+            final ServerRequest mutatedRequest = ServerRequest.from(request)
                     .header(config.getHeaderName(), requestId)
                     .build();
 
-            ServerResponse response = next.handle(mutatedRequest);
-
-            return ServerResponse.from(response)
-                    .header(config.getHeaderName(), requestId)
-                    .build();
+            final ServerResponse response = next.handle(mutatedRequest);
+            response.headers().add(config.getHeaderName(), requestId);
+            return response;
         };
     }
 
