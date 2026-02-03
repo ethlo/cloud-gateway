@@ -32,6 +32,10 @@ http-logging:
     - id: All
       predicates:
         - Path=/**
+        - NotMethod=OPTION
+        #- Header:
+        #    name: X-Request-Id
+        #    regexp: \d+
       request:
         raw: STORE
         body: STORE
@@ -56,6 +60,12 @@ management:
 spring:
   cloud:
     gateway:
+      mvc:
+        http-client:
+          # Connection timeout in milliseconds
+          connect-timeout: 2000
+          # Response (read) timeout as a Duration
+          read-timeout: 5s
       filter:
         request-rate-limiter:
           enabled: true
@@ -74,11 +84,11 @@ spring:
           #filters:
           #  - PathHost=1
         - id: http-bin-delay
-          uri: https://httpbin.org/delay
+          uri: http://localhost:8080/delay
           predicates:
             - Path=/delay/**
         - id: http-bin-get
-          uri: https://httpbin.org/get
+          uri: http://localhost:8080/get
           predicates:
             - Path=/get
           filters:
@@ -93,7 +103,7 @@ spring:
             #    token-url: https://login.example.com/auth/realms/my-realm/protocol/openid-connect/token
             #    refresh-token: ey...
         - id: http-bin-anything
-          uri: https://httpbin.org/anything
+          uri: http://localhost:8080/anything
           predicates:
             - Path=/anything
           filters:
@@ -120,18 +130,3 @@ spring:
   webmvc:
     problemdetails:
       enabled: true
-
-#lamebda:
-#  enabled: true
-#  root-directory: ~/dev/lamebda
-
-# Link to other services' own routes configuration
-#upstream:
-#  interval: PT10S
-#  services:
-#    - name: my-service
-#      config-url: http://localhost:8000/config.yaml
-
-# These are workarounds for issues
-#workarounds:
-#  avoid-double-encoded-url: true

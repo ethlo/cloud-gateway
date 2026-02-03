@@ -1,17 +1,16 @@
 package com.ethlo.http.blocking;
 
-import com.ethlo.http.DataBufferRepository;
-import com.ethlo.http.RoutePredicateLocator;
-import com.ethlo.http.blocking.configuration.HttpLoggingConfiguration;
-import com.ethlo.http.blocking.model.WebExchangeDataProvider;
-import com.ethlo.http.logger.LoggingFilterService;
-import com.ethlo.http.logger.delegate.SequentialDelegateLogger;
-import com.ethlo.http.netty.PredicateConfig;
-import com.ethlo.http.processors.LogPreProcessor;
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.math.BigInteger;
+import java.net.SocketException;
+import java.net.URI;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Predicate;
 
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -25,17 +24,18 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import java.io.IOException;
-import java.math.BigInteger;
-import java.net.SocketException;
-import java.net.URI;
-import java.time.Duration;
-import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.function.Predicate;
+import com.ethlo.http.DataBufferRepository;
+import com.ethlo.http.RoutePredicateLocator;
+import com.ethlo.http.blocking.configuration.HttpLoggingConfiguration;
+import com.ethlo.http.blocking.model.WebExchangeDataProvider;
+import com.ethlo.http.logger.LoggingFilterService;
+import com.ethlo.http.logger.delegate.SequentialDelegateLogger;
+import com.ethlo.http.netty.PredicateConfig;
+import com.ethlo.http.processors.LogPreProcessor;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 //@RefreshScope
 @Component
@@ -130,7 +130,7 @@ public class TagRequestIdMvcFilter extends OncePerRequestFilter implements Order
         catch (Throwable e)
         {
             connectionException = e;
-            handleException(e, response);
+            handleException(requestId, e, response);
         } finally
         {
             saveLog(wrappedRequest, wrappedResponse, requestId, started, connectionException, loggingFilterService.merge(matchedConfig));
@@ -180,12 +180,16 @@ public class TagRequestIdMvcFilter extends OncePerRequestFilter implements Order
         }
     }
 
-    private void handleException(Throwable e, HttpServletResponse response)
+    private void handleException(final String requestId, Throwable e, HttpServletResponse response)
     {
-        logger.warn("Exception occurred during request processing", e);
         if (isReset(e))
         {
+            logger.warn("Connection reset during request processing for request {}", requestId);
             response.setStatus(HttpStatus.BAD_GATEWAY.value());
+        }
+        else
+        {
+            logger.warn("Exception occurred during request processing for request {}", requestId, e);
         }
     }
 

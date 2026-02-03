@@ -88,6 +88,12 @@ public class MvcResponseCapture extends HttpServletResponseWrapper
         }
 
         @Override
+        public void flush() throws IOException
+        {
+            delegate.flush();
+        }
+
+        @Override
         public void write(byte[] b, int off, int len) throws IOException
         {
             delegate.write(b, off, len);

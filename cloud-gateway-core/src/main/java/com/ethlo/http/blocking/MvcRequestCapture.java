@@ -45,6 +45,12 @@ public class MvcRequestCapture extends HttpServletRequestWrapper
         }
 
         @Override
+        public void close() throws IOException
+        {
+            delegate.close();
+        }
+
+        @Override
         public int read() throws IOException
         {
             int b = delegate.read();

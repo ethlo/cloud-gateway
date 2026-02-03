@@ -11,6 +11,7 @@ import org.apache.commons.io.monitor.FileAlterationMonitor;
 import org.apache.commons.io.monitor.FileAlterationObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.cloud.endpoint.event.RefreshEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.env.StandardEnvironment;
@@ -20,6 +21,7 @@ import org.springframework.util.StringUtils;
 
 import jakarta.annotation.PreDestroy;
 
+@ConditionalOnBean(FileConfigurationChangeDetectorConfiguration.class)
 @Component
 public class FileConfigurationChangeDetector
 {

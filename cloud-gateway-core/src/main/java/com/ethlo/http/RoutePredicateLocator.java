@@ -3,6 +3,8 @@ package com.ethlo.http;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.springframework.cloud.gateway.server.mvc.predicate.GatewayRequestPredicates;
 import org.springframework.http.HttpMethod;
@@ -24,75 +26,91 @@ public class RoutePredicateLocator
     {
         if (definitions == null || definitions.isEmpty())
         {
-            return request -> true;
+            return req -> true;
         }
 
         // Combine all definitions into one RequestPredicate
         RequestPredicate combined = definitions.stream()
                 .map(this::mapToPredicate)
                 .reduce(RequestPredicate::and)
-                .orElse(request -> true);
+                .orElse(req -> true);
 
-        // Convert the RequestPredicate test to work on the HttpServletRequest
+        // Wrap RequestPredicate to work on HttpServletRequest
         return servletRequest -> {
-            final ServerRequest serverRequest = ServerRequest.create(servletRequest, List.of());
-            return combined.test(serverRequest);
+            ServerRequest sr = ServerRequest.create(servletRequest, List.of());
+            return combined.test(sr);
         };
     }
 
     private RequestPredicate mapToPredicate(MvcPredicateDefinition def)
     {
-        final String name = def.name();
-        final Map<String, String> args = def.args();
+        String name = def.name().toLowerCase();
+        Map<String, String> args = def.args();
 
-        // MVC Gateway provides a helper that mimics the YAML naming convention
-        return switch (name.toLowerCase())
+        return switch (name)
         {
-            case "path" -> GatewayRequestPredicates.path(args.get("pattern"));
-            case "method" -> GatewayRequestPredicates.method(HttpMethod.valueOf(args.get("method").toUpperCase()));
-            case "header" -> GatewayRequestPredicates.header(args.get("header"), args.get("regexp"));
-            case "host" -> GatewayRequestPredicates.host(args.get("pattern"));
-            case "query" -> GatewayRequestPredicates.query(args.get("param"), args.get("regexp"));
+            case "method" -> GatewayRequestPredicates.method(HttpMethod.valueOf(getArg(args, "method").toUpperCase()));
+            case "notmethod" ->
+                    GatewayRequestPredicates.method(HttpMethod.valueOf(getArg(args, "method").toUpperCase())).negate();
+            case "path" -> GatewayRequestPredicates.path(getArg(args, "pattern"));
+            case "notpath" -> GatewayRequestPredicates.path(getArg(args, "pattern")).negate();
 
-            case "extension" ->
-            {
-                // In GATHER_LIST mode, arguments usually come in as _gen_0, _gen_1...
-                // or we can just parse the comma-separated string if that's how your YAML loads
-                List<String> extensions = extractList(args, "extensions");
-                yield extensionPredicate(extensions);
-            }
+            case "header" -> GatewayRequestPredicates.header(getArg(args, "header"), getArg(args, "regexp"));
+            case "host" -> GatewayRequestPredicates.host(getArg(args, "pattern"));
+            case "nothost" -> GatewayRequestPredicates.host(getArg(args, "pattern")).negate();
+            case "query" -> GatewayRequestPredicates.query(getArg(args, "param"), getArg(args, "regexp"));
 
-            default -> throw new IllegalArgumentException("Unsupported MVC predicate: " + name);
+            case "extension" -> extensionPredicate(extractList(args, "extensions"));
+            case "notextension" -> extensionPredicate(extractList(args, "extensions")).negate();
+
+            default -> throw new IllegalArgumentException("Unsupported MVC predicate: " + def.name());
         };
     }
 
-    // Helper to handle the "GATHER_LIST" style arguments from YAML
+    /**
+     * Returns argument value, fallback to _genkey_0 if missing
+     */
+    private String getArg(Map<String, String> args, String key)
+    {
+        String val = args.get(key);
+        if (val != null && !val.isBlank())
+        {
+            return val;
+        }
+        val = args.get("_genkey_0");
+        if (val != null && !val.isBlank())
+        {
+            return val;
+        }
+        throw new IllegalArgumentException("Missing required argument '" + key + "' for predicate");
+    }
+
+    /**
+     * Extract list of values from YAML / shortcut args
+     */
     private List<String> extractList(Map<String, String> args, String key)
     {
-        // If the YAML was "Extension: jpg, png", args might have key "extensions"
-        // If it was shortcut style, they might be indexed.
         String val = args.get(key);
-        if (val != null)
+        if (val != null && !val.isBlank())
         {
             return List.of(val.split("\\s*,\\s*"));
         }
-        return args.values().stream().toList();
+        // fallback: take all values (e.g., _gen_0, _gen_1...)
+        return args.values().stream()
+                .filter(v -> v != null && !v.isBlank())
+                .flatMap(v -> Stream.of(v.split("\\s*,\\s*")))
+                .collect(Collectors.toList());
     }
 
     private RequestPredicate extensionPredicate(List<String> extensions)
     {
         return request -> {
-            // request is org.springframework.web.servlet.function.ServerRequest
-            final String path = request.path();
-            final int lastDot = path.lastIndexOf('.');
-
+            String path = request.path();
+            int lastDot = path.lastIndexOf('.');
             if (lastDot != -1 && lastDot < path.length() - 1)
             {
-                if (extensions.isEmpty())
-                {
-                    return true; // Match any extension if list is empty
-                }
-                final String ext = path.substring(lastDot + 1);
+                if (extensions.isEmpty()) return true; // match any
+                String ext = path.substring(lastDot + 1);
                 return extensions.stream().anyMatch(e -> e.equalsIgnoreCase(ext));
             }
             return false;
