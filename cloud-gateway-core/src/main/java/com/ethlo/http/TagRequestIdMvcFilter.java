@@ -1,16 +1,15 @@
 package com.ethlo.http;
 
-import java.io.IOException;
-import java.math.BigInteger;
-import java.net.SocketException;
-import java.net.URI;
-import java.time.Duration;
-import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.function.Predicate;
+import com.ethlo.http.configuration.HttpLoggingConfiguration;
+import com.ethlo.http.logger.LoggingFilterService;
+import com.ethlo.http.logger.delegate.SequentialDelegateLogger;
+import com.ethlo.http.model.WebExchangeDataProvider;
+import com.ethlo.http.netty.PredicateConfig;
+import com.ethlo.http.processors.LogPreProcessor;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -25,16 +24,17 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import com.ethlo.http.configuration.HttpLoggingConfiguration;
-import com.ethlo.http.logger.LoggingFilterService;
-import com.ethlo.http.logger.delegate.SequentialDelegateLogger;
-import com.ethlo.http.model.WebExchangeDataProvider;
-import com.ethlo.http.netty.PredicateConfig;
-import com.ethlo.http.processors.LogPreProcessor;
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.math.BigInteger;
+import java.net.SocketException;
+import java.net.URI;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Predicate;
 
 //@RefreshScope
 @Component
@@ -97,7 +97,9 @@ public class TagRequestIdMvcFilter extends OncePerRequestFilter implements Order
     {
         final long started = System.nanoTime();
 
-        // deterministic matching
+        final String requestId = generateId();
+        request.setAttribute("requestId", requestId);
+
         final PredicateConfig matchedConfig = predicateConfigs.stream()
                 .filter(c -> c.predicate().test(request))
                 .findFirst()
@@ -109,10 +111,6 @@ public class TagRequestIdMvcFilter extends OncePerRequestFilter implements Order
             filterChain.doFilter(request, response);
             return;
         }
-
-        final String requestId = generateId();
-
-        request.setAttribute("requestId", requestId);
 
         // We use your repository to stream directly to disk instead of memory
         final MvcRequestCapture wrappedRequest = new MvcRequestCapture(request, requestId, repository);
