@@ -5,73 +5,88 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.net.URI;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
-import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
-import org.springframework.web.server.ServerWebExchange;
+import org.springframework.cloud.gateway.server.mvc.common.MvcUtils;
+import org.springframework.cloud.gateway.server.mvc.filter.FilterSupplier;
+import org.springframework.mock.web.MockHttpServletRequest;
 
-class PathHostGatewayFilterFactoryTest extends AbstractFilterTest<PathHostGatewayFilterFactory.Config>
+class PathHostFilterSupplierTest extends AbstractFilterTest<PathHostFilterSupplier.Config>
 {
     @Override
-    protected PathHostGatewayFilterFactory filterFactory()
+    protected FilterSupplier filterSupplier()
     {
-        return new PathHostGatewayFilterFactory();
+        return new PathHostFilterSupplier();
+    }
+
+    @Override
+    protected String getFilterName()
+    {
+        return "pathHost";
     }
 
     @Test
-    void firstPathPartIsHost()
+    void firstPathPartIsHost() throws Exception
     {
         // Given
-        final PathHostGatewayFilterFactory.Config config = new PathHostGatewayFilterFactory.Config()
+        final PathHostFilterSupplier.Config config = new PathHostFilterSupplier.Config()
                 .setServiceIndex(0);
 
         // When
-        final ServerWebExchange exchange = execute(config, MockServerHttpRequest.get("https://proxy.com/foo/bar/baz"));
+        final MockHttpServletRequest mockRequest = new MockHttpServletRequest("GET", "/foo/bar/baz");
+        execute(config, mockRequest);
 
-        // Then
-        assertThat((URI) exchange.getAttribute(ServerWebExchangeUtils.GATEWAY_REQUEST_URL_ATTR)).isEqualTo(URI.create("http://foo/bar/baz"));
+        // Then - Check the attribute on the captured request
+        final URI routedUri = (URI) actualRequest().attribute(MvcUtils.GATEWAY_REQUEST_URL_ATTR).orElse(null);
+        assertThat(routedUri).isEqualTo(URI.create("http://foo/bar/baz"));
     }
 
     @Test
-    void secondPathPartIsHost()
+    void secondPathPartIsHost() throws Exception
     {
         // Given
-        final PathHostGatewayFilterFactory.Config config = new PathHostGatewayFilterFactory.Config()
+        final PathHostFilterSupplier.Config config = new PathHostFilterSupplier.Config()
                 .setServiceIndex(1)
                 .setScheme("https");
 
         // When
-        final ServerWebExchange exchange = execute(config, MockServerHttpRequest.get("https://proxy.com/foo/bar/baz"));
+        final MockHttpServletRequest mockRequest = new MockHttpServletRequest("GET", "/foo/bar/baz");
+        execute(config, mockRequest);
 
         // Then
-        assertThat((URI) exchange.getAttribute(ServerWebExchangeUtils.GATEWAY_REQUEST_URL_ATTR)).isEqualTo(URI.create("https://bar/baz"));
+        final URI routedUri = (URI) actualRequest().attribute(MvcUtils.GATEWAY_REQUEST_URL_ATTR).orElse(null);
+        assertThat(routedUri).isEqualTo(URI.create("https://bar/baz"));
     }
 
     @Test
-    void regexpHost()
+    void regexpHost() throws Exception
     {
         // Given
-        final PathHostGatewayFilterFactory.Config config = new PathHostGatewayFilterFactory.Config()
+        final PathHostFilterSupplier.Config config = new PathHostFilterSupplier.Config()
                 .setServiceIndex(1)
                 .setScheme("https")
                 .setAllowedRegexp("[a-z]+");
 
         // When
-        final ServerWebExchange exchange = execute(config, MockServerHttpRequest.get("https://proxy.com/foo/bar/baz"));
+        final MockHttpServletRequest mockRequest = new MockHttpServletRequest("GET", "/foo/bar/baz");
+        execute(config, mockRequest);
 
         // Then
-        assertThat((URI) exchange.getAttribute(ServerWebExchangeUtils.GATEWAY_REQUEST_URL_ATTR)).isEqualTo(URI.create("https://bar/baz"));
+        final URI routedUri = (URI) actualRequest().attribute(MvcUtils.GATEWAY_REQUEST_URL_ATTR).orElse(null);
+        assertThat(routedUri).isEqualTo(URI.create("https://bar/baz"));
     }
 
     @Test
-    void pathOutOfBounds()
+    void pathOutOfBounds() throws Exception
     {
         // Given
-        final PathHostGatewayFilterFactory.Config config = new PathHostGatewayFilterFactory.Config()
+        final PathHostFilterSupplier.Config config = new PathHostFilterSupplier.Config()
                 .setServiceIndex(5);
+
         // When
-        final ServerWebExchange exchange = execute(config, MockServerHttpRequest.get("https://proxy.com/foo/bar/baz"));
+        final MockHttpServletRequest mockRequest = new MockHttpServletRequest("GET", "/foo/bar/baz");
+        execute(config, mockRequest);
 
         // Then
-        assertThat((URI) exchange.getAttribute(ServerWebExchangeUtils.GATEWAY_REQUEST_URL_ATTR)).isNull();
+        final URI routedUri = (URI) actualRequest().attribute(MvcUtils.GATEWAY_REQUEST_URL_ATTR).orElse(null);
+        assertThat(routedUri).isNull();
     }
 }

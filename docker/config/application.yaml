@@ -19,16 +19,26 @@ http-logging:
     enabled: true
     log-directory: /tmp/cloud-gateway/raw
   providers:
-    clickhouse:
-      enabled: true
-      url: jdbc:clickhouse://localhost:8123?database=default&custom_http_params=async_insert=1,wait_for_async_insert=1
-    file:
+    direct_async:
       enabled: true
       pattern: '{{gateway_request_id}} {{realm_claim}} {{user_claim}} {{method}} {{path}} {{host}} {{request_headers["Content-Length"][0]}} {{status}} {{user_agent}} {{duration | numberformat("#.###") }}'
+    clickhouse:
+      enabled: true
+      url: jdbc:clickhouse://localhost:8123?database=default
+      username: default
+      password: default
+      connection-init-sql: SET async_insert=1,wait_for_async_insert=1
+    #file:
+    #  enabled: true
+    #  pattern: '{{gateway_request_id}} {{realm_claim}} {{user_claim}} {{method}} {{path}} {{host}} {{request_headers["Content-Length"][0]}} {{status}} {{user_agent}} {{duration | numberformat("#.###") }}'
   matchers:
     - id: All
       predicates:
         - Path=/**
+        - NotMethod=OPTION
+        #- Header:
+        #    name: X-Request-Id
+        #    regexp: \d+
       request:
         raw: STORE
         body: STORE
@@ -37,8 +47,12 @@ http-logging:
         raw: STORE
 logging:
   level:
-    com.ethlo.http: INFO
-    org.springframework.cloud.gateway: INFO
+    com.ethlo.http: DEBUG
+    chronograph: DEBUG
+    #org.springframework.cloud.gateway: INFO
+    #org.springframework.cloud.gateway.server.mvc.config: TRACE
+    #org.springframework.cloud.gateway.server.mvc.predicate: TRACE
+    #org.springframework.cloud.gateway.server.mvc.filter: TRACE
 management:
   endpoints:
     web:
@@ -50,6 +64,12 @@ management:
 spring:
   cloud:
     gateway:
+      mvc:
+        http-client:
+          # Connection timeout in milliseconds
+          connect-timeout: 3000
+          # Response (read) timeout as a Duration
+          read-timeout: 30s
       filter:
         request-rate-limiter:
           enabled: true
@@ -65,14 +85,14 @@ spring:
           uri: http://default
           predicates:
             - Path=/hosts/**
-          filters:
-            - PathHost=1
+          #filters:
+          #  - PathHost=1
         - id: http-bin-delay
-          uri: https://httpbin.org/delay
+          uri: http://localhost:8080/delay
           predicates:
             - Path=/delay/**
         - id: http-bin-get
-          uri: https://httpbin.org/get
+          uri: http://localhost:8080/get
           predicates:
             - Path=/get
           filters:
@@ -81,49 +101,31 @@ spring:
                 username: foo
                 password: bar
             - SetRequestHeader=x-realm,baz
-            - name: InjectAccessTokenAuth
-              args:
-                client-id: my-client
-                token-url: https://login.acme.com/auth/realms/my-realm/protocol/openid-connect/token
-                refresh-token: ey...
+            #- name: InjectAccessTokenAuth
+            #  args:
+            #    client-id: my-client
+            #    token-url: https://login.example.com/auth/realms/my-realm/protocol/openid-connect/token
+            #    refresh-token: ey...
         - id: http-bin-anything
-          uri: https://httpbin.org/anything
+          uri: http://localhost:8080/anything
           predicates:
-            - Path=/anything
+            - Host=*
           filters:
+            - name: CorrelationIdHeader
+              args:
+                headerName: Correlation-Id
             - name: RequestRateLimiter
               args:
-                local-rate-limiter:
-                  replenish-rate: 2
-                  refresh-period: 10
+                replenishRate: 2
+                refreshPeriod: 10
         - id: http-upstream-missing
           uri: http://192.0.0.255
           predicates:
             - Path=/504
-          filters:
-            - name: CircuitBreaker
-              args:
-                name: upstream-down
-                fallbackUri: 'forward:/upstream-down'
   web:
     resources:
       static-locations:
         - file:/static
-  webflux:
-    problemdetails:
+  webmvc:
+    problem-details:
       enabled: true
-
-#lamebda:
-#  enabled: true
-#  root-directory: ~/dev/lamebda
-
-# Link to other services' own routes configuration
-#upstream:
-#  interval: PT10S
-#  services:
-#    - name: my-service
-#      config-url: http://localhost:8000/config.yaml
-
-# These are workarounds for issues
-#workarounds:
-#  avoid-double-encoded-url: true

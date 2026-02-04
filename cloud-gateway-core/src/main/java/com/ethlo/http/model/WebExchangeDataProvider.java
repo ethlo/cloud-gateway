@@ -9,14 +9,15 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeMap;
 
-import org.springframework.cloud.gateway.route.Route;
+import com.ethlo.http.DataBufferRepository;
+
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
-import org.springframework.http.server.RequestPath;
 
-import com.ethlo.http.netty.DataBufferRepository;
+import com.ethlo.http.DefaultDataBufferRepository;
+import com.ethlo.http.Route;
 import com.ethlo.http.netty.PredicateConfig;
 import com.ethlo.http.netty.ServerDirection;
 import com.ethlo.http.processors.auth.RealmUser;
@@ -28,7 +29,7 @@ public class WebExchangeDataProvider
     private String requestId;
     private Route route;
     private HttpMethod method;
-    private RequestPath path;
+    private String path;
     private URI uri;
     private HttpStatusCode statusCode;
     private HttpHeaders requestHeaders;
@@ -71,7 +72,7 @@ public class WebExchangeDataProvider
         return this;
     }
 
-    public WebExchangeDataProvider path(RequestPath path)
+    public WebExchangeDataProvider path(String path)
     {
         this.path = path;
         return this;
@@ -139,7 +140,7 @@ public class WebExchangeDataProvider
         return method;
     }
 
-    public RequestPath getPath()
+    public String getPath()
     {
         return path;
     }
@@ -182,8 +183,8 @@ public class WebExchangeDataProvider
     public Map<String, Object> asMetaMap()
     {
         final Map<String, Object> params = new TreeMap<>();
-        params.put("route_id", route.getId());
-        params.put("route_uri", route.getUri().toString());
+        params.put("route_id", route.id());
+        params.put("route_uri", route.uri().toString());
         params.put("realm_claim", getUser().map(RealmUser::realm).orElse(null));
         params.put("user_claim", getUser().map(RealmUser::username).orElse(null));
 
@@ -196,7 +197,7 @@ public class WebExchangeDataProvider
         params.put("timestamp", getTimestamp());
         params.put("gateway_request_id", getRequestId());
         params.put("method", getMethod().name());
-        params.put("path", getPath().value());
+        params.put("path", getPath());
         params.put("duration", getDuration().toMillis());
         params.put("status", getStatusCode().value());
         params.put("is_error", getStatusCode().isError());

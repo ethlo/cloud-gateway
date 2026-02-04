@@ -1,9 +1,10 @@
 package com.ethlo.http.logger;
 
-import com.ethlo.http.model.AccessLogResult;
 import com.ethlo.http.model.WebExchangeDataProvider;
 
-public interface HttpLogger
+public interface HttpLogger extends AutoCloseable
 {
-    AccessLogResult accessLog(WebExchangeDataProvider dataProvider);
+    void accessLog(WebExchangeDataProvider dataProvider);
+
+    String getName();
 }

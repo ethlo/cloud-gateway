@@ -3,34 +3,34 @@ package com.ethlo.http.filters;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.cloud.gateway.filter.factory.GatewayFilterFactory;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.server.reactive.ServerHttpRequest;
-import org.springframework.web.server.ServerWebExchange;
+import org.springframework.cloud.gateway.server.mvc.filter.FilterSupplier;
+import org.springframework.web.servlet.function.ServerResponse;
 
-class CorrelationIdHeaderGatewayFilterFactoryTest extends AbstractFilterTest<CorrelationIdHeaderGatewayFilterFactory.Config>
+class CorrelationIdHeaderFilterTest extends AbstractFilterTest<CorrelationIdFilterSupplier.Config>
 {
-    @Test
-    void shouldAddCorrelationIdHeaderToRequestAndResponse()
+    private static final String HEADER_NAME = "X-Custom-Correlation-Id";
+
+    @Override
+    protected FilterSupplier filterSupplier()
     {
-        // Given
-        final CorrelationIdHeaderGatewayFilterFactory.Config config = new CorrelationIdHeaderGatewayFilterFactory.Config();
-        config.setHeaderName("X-Custom-Correlation-Id");
-
-        final ServerWebExchange exchange = execute(config);
-        final ServerHttpRequest mockRequest = exchange.getRequest();
-
-        // Then
-        final ServerHttpRequest actualRequest = super.actualRequest();
-        final String requestId = mockRequest.getId();
-        final HttpHeaders responseHeaders = exchange.getResponse().getHeaders();
-        assertThat(actualRequest.getHeaders().getFirst(config.getHeaderName())).isEqualTo(requestId);
-        assertThat(responseHeaders.getFirst(config.getHeaderName())).isEqualTo(requestId);
+        return new CorrelationIdFilterSupplier();
     }
 
     @Override
-    protected GatewayFilterFactory<CorrelationIdHeaderGatewayFilterFactory.Config> filterFactory()
+    protected String getFilterName()
     {
-        return new CorrelationIdHeaderGatewayFilterFactory();
+        return "correlationIdHeader";
+    }
+
+    @Test
+    void shouldAddCorrelationIdHeaderToResponse() throws Exception
+    {
+        final CorrelationIdFilterSupplier.Config config = new CorrelationIdFilterSupplier.Config();
+        config.setHeaderName(HEADER_NAME);
+
+        final ServerResponse response = execute(config);
+
+        assertThat(response.statusCode().is2xxSuccessful()).isTrue();
+        assertThat(response.headers().containsHeader(HEADER_NAME)).isTrue();
     }
 }

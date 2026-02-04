@@ -5,29 +5,36 @@ import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
-import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.Mockito.timeout;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 
 import java.time.Instant;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.mockito.ArgumentCaptor;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
-import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.web.client.RestTemplate;
 
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
-import com.ethlo.http.logger.delegate.SequentialDelegateLogger;
+import com.ethlo.http.logger.delegate.DelegateHttpLogger;
+import com.ethlo.http.model.WebExchangeDataProvider;
+import com.ethlo.http.processors.auth.RealmUser;
 import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
-        // FORCE THESE ON EARLY (Critical for @ConditionalOnProperty)
         "http-logging.auth.jwt.enabled=true",
         "http-logging.auth.basic.enabled=true"})
 class JwtIntegrationTest extends BaseTest
@@ -36,122 +43,97 @@ class JwtIntegrationTest extends BaseTest
     static WireMockExtension wireMock = WireMockExtension.newInstance()
             .options(wireMockConfig().dynamicPort())
             .build();
-    @Autowired
-    private WebTestClient webClient;
+
+    @LocalServerPort
+    private int gatewayPort;
+
+    private RestTemplate restTemplate;
 
     @MockitoSpyBean
-    private SequentialDelegateLogger httpLogger;
+    private DelegateHttpLogger httpLogger;
 
     @DynamicPropertySource
     static void additionalConfigureProperties(DynamicPropertyRegistry registry)
     {
-        registry.add("spring.cloud.gateway.server.webflux.routes[0].uri",
-                () -> "http://localhost:" + wireMock.getPort()
-        );
-        registry.add("spring.cloud.gateway.server.webflux.routes[0].id",
-                () -> "test-route"
-        );
-        registry.add("spring.cloud.gateway.server.webflux.routes[0].predicates[0]",
-                () -> "Path=/test/**"
-        );
+        final String wiremockUrl = "http://localhost:" + wireMock.getPort();
+        registry.add("spring.cloud.gateway.server.webmvc.routes[0].uri", () -> wiremockUrl);
+        registry.add("spring.cloud.gateway.server.webmvc.routes[0].id", () -> "test-route");
+        registry.add("spring.cloud.gateway.server.webmvc.routes[0].predicates[0].name", () -> "Path");
+        registry.add("spring.cloud.gateway.server.webmvc.routes[0].predicates[0].args.pattern", () -> "/test/**");
 
-        // JWT auth extract
         registry.add("http-logging.auth.jwt.enabled", () -> "true");
-        // CHANGE THIS: 'user-claim' -> 'username-claim-name' (to match getUsernameClaimName())
         registry.add("http-logging.auth.jwt.username-claim-name", () -> "preferred_username");
-
-        // CHANGE THIS: Ensure this matches getRealmClaimName()
         registry.add("http-logging.auth.jwt.realm-claim-name", () -> "iss");
-
-        // CHANGE THIS: Ensure this matches getRealmExpression()
         registry.add("http-logging.auth.jwt.realm-expression", () -> "([^/]+)/?$");
-
-        // Basic Auth extract
         registry.add("http-logging.auth.basic.enabled", () -> "true");
         registry.add("http-logging.auth.basic.realm-header-name", () -> "x-realm");
 
-        // Capture everything matching Path=/**"
-        registry.add("http-logging.matchers[0].id", () -> "capture-all");
-        registry.add("http-logging.matchers[0].predicates[0]", () -> "Path=/**");
-
-        // Tell it WHAT to capture
-        registry.add("http-logging.matchers[0].request.raw", () -> "STORE");
-        registry.add("http-logging.matchers[0].request.body", () -> "STORE");
-        registry.add("http-logging.matchers[0].response.raw", () -> "STORE");
-        registry.add("http-logging.matchers[0].response.body", () -> "STORE");
-
-        registry.add("http-logging.providers.file.enabled", () -> "true");
-        registry.add("http-logging.providers.file.pattern", () -> "test-log-pattern");
-
         configureClickHouseProperties(registry);
+    }
+
+    @BeforeEach
+    void setUp()
+    {
+        this.restTemplate = new RestTemplate();
+        // Uses NoOpResponseErrorHandler so we don't need the internal class boilerplate
+        this.restTemplate.setErrorHandler(new org.springframework.web.client.NoOpResponseErrorHandler());
     }
 
     @Test
     void shouldExtractUserFromJwtAndLogIt()
     {
-        // Setup Upstream (WireMock) to return 200 OK
-        wireMock.stubFor(get(urlEqualTo("/test/resource"))
-                .willReturn(aResponse()
-                        .withStatus(200)
-                        .withBody("OK")));
+        wireMock.stubFor(get(urlEqualTo("/test/resource")).willReturn(aResponse().withStatus(200).withBody("OK")));
 
-        // Generate a valid testing JWT
-        String token = JWT.create()
-                .withSubject("test-user-123") // The 'sub' claim
-                .withIssuer("my-test-realm")  // The 'iss' claim
-                .withClaim("preferred_username", "test-user-123")
-                .withExpiresAt(Instant.now().plusSeconds(300))
-                .sign(Algorithm.HMAC256("secret"));
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(createToken("test-user-123", "my-test-realm"));
 
-        webClient.get()
-                .uri("/test/resource")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                .exchange()
-                .expectStatus().isOk();
+        ResponseEntity<String> response = restTemplate.exchange(
+                "http://localhost:" + gatewayPort + "/test/resource",
+                HttpMethod.GET,
+                new HttpEntity<>(headers),
+                String.class
+        );
 
-        // We use a timeout because logging happens asynchronously in your filter (ioScheduler)
-        verify(httpLogger, timeout(1000)).accessLog(argThat(data ->
-        {
-            // Check if the extractor actually ran and populated the user
-            if (data.getUser().isEmpty())
-            {
-                return false;
-            }
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 
-            return data.getUser().get().username().equals("test-user-123")
-                    && data.getUser().get().realm().equals("my-test-realm");
-        }));
+        // Capture the data to assert on it cleanly with AssertJ
+        ArgumentCaptor<WebExchangeDataProvider> captor = ArgumentCaptor.forClass(WebExchangeDataProvider.class);
+        verify(httpLogger).accessLog(any(), captor.capture());
+
+        RealmUser user = captor.getValue().getUser().orElseThrow();
+        assertThat(user.username()).isEqualTo("test-user-123");
+        assertThat(user.realm()).isEqualTo("my-test-realm");
     }
 
     @Test
     void shouldExtractUserEvenIfUpstreamReturns405()
     {
-        // A. Setup Upstream to return 405 Method Not Allowed
-        wireMock.stubFor(post(urlEqualTo("/test/resource"))
-                .willReturn(aResponse()
-                        .withStatus(405)));
+        wireMock.stubFor(post(urlEqualTo("/test/resource")).willReturn(aResponse().withStatus(405)));
 
-        String token = JWT.create()
-                .withSubject("test-user-405")
-                .withIssuer("my-test-realm")
-                .withClaim("preferred_username", "test-user-123")
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(createToken("test-user-123", "my-test-realm"));
+
+        ResponseEntity<String> response = restTemplate.exchange(
+                "http://localhost:" + gatewayPort + "/test/resource",
+                HttpMethod.POST,
+                new HttpEntity<>(headers),
+                String.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
+
+        ArgumentCaptor<WebExchangeDataProvider> captor = ArgumentCaptor.forClass(WebExchangeDataProvider.class);
+        verify(httpLogger).accessLog(any(), captor.capture());
+        assertThat(captor.getValue().getUser().get().username()).isEqualTo("test-user-123");
+    }
+
+    private String createToken(String user, String issuer)
+    {
+        return JWT.create()
+                .withSubject(user)
+                .withIssuer(issuer)
+                .withClaim("preferred_username", user)
+                .withExpiresAt(Instant.now().plusSeconds(300))
                 .sign(Algorithm.HMAC256("secret"));
-
-        // C. Fire a POST request (which triggers the 405)
-        webClient.post()
-                .uri("/test/resource")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                .exchange()
-                .expectStatus().isEqualTo(405);
-
-        // D. Verify extraction still happened
-        verify(httpLogger, timeout(1000)).accessLog(argThat(data ->
-        {
-            if (data.getUser().isEmpty())
-            {
-                return false;
-            }
-            return data.getUser().get().username().equals("test-user-123");
-        }));
     }
 }

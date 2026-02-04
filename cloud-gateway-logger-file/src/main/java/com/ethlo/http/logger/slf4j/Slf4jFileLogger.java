@@ -1,0 +1,47 @@
+package com.ethlo.http.logger.slf4j;
+
+import java.util.Map;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.ethlo.http.logger.HttpLogger;
+import com.ethlo.http.logger.rendering.AccessLogTemplateRenderer;
+import com.ethlo.http.model.WebExchangeDataProvider;
+
+public class Slf4jFileLogger implements HttpLogger
+{
+    private static final Logger accessLogLogger = LoggerFactory.getLogger("access-log");
+
+    private final AccessLogTemplateRenderer accessLogTemplateRenderer;
+
+
+    public Slf4jFileLogger(final AccessLogTemplateRenderer accessLogTemplateRenderer)
+    {
+        this.accessLogTemplateRenderer = accessLogTemplateRenderer;
+    }
+
+    public void accessLog(final WebExchangeDataProvider dataProvider)
+    {
+        final Map<String, Object> metaMap = dataProvider.asMetaMap();
+        accessLogLogger.info(accessLogTemplateRenderer.render(metaMap));
+    }
+
+    @Override
+    public String getName()
+    {
+        return "slf4j";
+    }
+
+    @Override
+    public String toString()
+    {
+        return getClass().getSimpleName() + " - pattern='" + accessLogTemplateRenderer.getPattern() + "'";
+    }
+
+    @Override
+    public void close()
+    {
+        // Nothing
+    }
+}

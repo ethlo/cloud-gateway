@@ -11,6 +11,7 @@ import org.apache.commons.io.monitor.FileAlterationMonitor;
 import org.apache.commons.io.monitor.FileAlterationObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.cloud.endpoint.event.RefreshEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.env.StandardEnvironment;
@@ -20,12 +21,12 @@ import org.springframework.util.StringUtils;
 
 import jakarta.annotation.PreDestroy;
 
+@ConditionalOnBean(FileConfigurationChangeDetectorConfiguration.class)
 @Component
 public class FileConfigurationChangeDetector
 {
     private static final Logger logger = LoggerFactory.getLogger(FileConfigurationChangeDetector.class);
 
-    private final FileAlterationListenerAdaptor listener;
     private final FileAlterationMonitor monitor;
 
     public FileConfigurationChangeDetector(final StandardEnvironment environment, final ApplicationEventPublisher applicationEventPublisher, final FileConfigurationChangeDetectorConfiguration config) throws Exception
@@ -36,7 +37,7 @@ public class FileConfigurationChangeDetector
         }
 
         logger.info("Starting configuration file watcher");
-        this.listener = new FileAlterationListenerAdaptor()
+        final FileAlterationListenerAdaptor listener = new FileAlterationListenerAdaptor()
         {
             @Override
             public void onFileChange(File file)
@@ -51,7 +52,10 @@ public class FileConfigurationChangeDetector
         paths.addAll(getPaths(environment.getProperty("spring.config.additional-location", "")));
         for (Path path : paths)
         {
-            final FileAlterationObserver observer = new FileAlterationObserver(path.toFile().isDirectory() ? path.toFile() : path.getParent().toFile(), FileFilterUtils.nameFileFilter(path.getFileName().toString()));
+            final FileAlterationObserver observer = FileAlterationObserver.builder()
+                    .setPath(path.toFile().isDirectory() ? path : path.getParent())
+                    .setFileFilter(FileFilterUtils.nameFileFilter(path.getFileName().toString()))
+                    .get();
             observer.addListener(listener);
             monitor.addObserver(observer);
             logger.info("Watching config location {} for change", path);

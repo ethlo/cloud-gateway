@@ -22,7 +22,6 @@ import com.ethlo.http.logger.HttpLogger;
 import com.ethlo.http.logger.RedactUtil;
 import com.ethlo.http.match.HeaderProcessing;
 import com.ethlo.http.match.LogOptions;
-import com.ethlo.http.model.AccessLogResult;
 import com.ethlo.http.model.BodyProvider;
 import com.ethlo.http.model.WebExchangeDataProvider;
 import com.ethlo.http.netty.PredicateConfig;
@@ -39,7 +38,7 @@ public class ClickHouseLogger implements HttpLogger
     }
 
     @Override
-    public AccessLogResult accessLog(final WebExchangeDataProvider dataProvider)
+    public void accessLog(final WebExchangeDataProvider dataProvider)
     {
         final PredicateConfig predicateConfig = dataProvider.getPredicateConfig();
         final Map<String, Object> params = dataProvider.asMetaMap();
@@ -59,13 +58,17 @@ public class ClickHouseLogger implements HttpLogger
         {
             logger.debug("Inserting data into ClickHouse for request {}", dataProvider.getRequestId());
             clickHouseLoggerRepository.insert(params);
-            return AccessLogResult.ok(dataProvider);
         }
         catch (Exception e)
         {
             logger.error("Failed to insert log into Clickhouse for request {}", dataProvider.getRequestId(), e);
-            return AccessLogResult.error(dataProvider, List.of(e));
         }
+    }
+
+    @Override
+    public String getName()
+    {
+        return "clickhouse";
     }
 
     private void processContentSync(LogOptions logConfig, BodyProvider bodyProvider, ServerDirection dir, Map<String, Object> params)
@@ -141,5 +144,11 @@ public class ClickHouseLogger implements HttpLogger
     {
         return headers.headerNames().stream()
                 .collect(Collectors.toMap(k -> k, k -> String.join(", ", Objects.requireNonNull(headers.get(k)))));
+    }
+
+    @Override
+    public void close()
+    {
+        // Nothing
     }
 }

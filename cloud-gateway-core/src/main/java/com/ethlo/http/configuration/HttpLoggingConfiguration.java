@@ -7,6 +7,7 @@ import java.util.Optional;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
+import org.springframework.util.unit.DataSize;
 import org.springframework.validation.annotation.Validated;
 
 import com.ethlo.http.logger.CaptureConfiguration;
@@ -19,16 +20,15 @@ import jakarta.validation.Valid;
 @ConfigurationProperties(prefix = "http-logging")
 public class HttpLoggingConfiguration
 {
-    public static final Integer DEFAULT_QUEUE_SIZE = 20;
-    public static final Integer DEFAULT_THREAD_COUNT = 5;
+    public static final DataSize DEFAULT_MAX_MEMORY_BUFFER = DataSize.ofBytes(0);
 
+    @Valid
     private CaptureConfiguration capture;
     private LogFilter filter;
     private Map<String, Map<String, Object>> providers;
     @Valid
     private List<RequestMatchingProcessor> matchers;
-    private Integer maxIoThreads;
-    private Integer maxQueueSize;
+    private DataSize maxMemoryBuffer = DEFAULT_MAX_MEMORY_BUFFER;
 
     public LogFilter getFilter()
     {
@@ -62,24 +62,15 @@ public class HttpLoggingConfiguration
         this.matchers = matchers;
     }
 
-    public Integer getMaxIoThreads()
+    public DataSize maxMemoryBuffer()
     {
-        return maxIoThreads;
+        return maxMemoryBuffer;
     }
 
-    public void setMaxIoThreads(final Integer maxIoThreads)
+    public HttpLoggingConfiguration setMaxMemoryBuffer(final DataSize maxMemoryBuffer)
     {
-        this.maxIoThreads = maxIoThreads;
-    }
-
-    public Integer getMaxQueueSize()
-    {
-        return maxQueueSize;
-    }
-
-    public void setMaxQueueSize(final Integer maxQueueSize)
-    {
-        this.maxQueueSize = maxQueueSize;
+        this.maxMemoryBuffer = maxMemoryBuffer;
+        return this;
     }
 
     public CaptureConfiguration getCapture()

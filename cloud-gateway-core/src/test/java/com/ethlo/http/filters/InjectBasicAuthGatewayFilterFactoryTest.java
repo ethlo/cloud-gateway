@@ -2,18 +2,19 @@ package com.ethlo.http.filters;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.Test;
-import org.springframework.cloud.gateway.filter.factory.GatewayFilterFactory;
+import org.springframework.cloud.gateway.server.mvc.filter.FilterSupplier;
 import org.springframework.http.HttpHeaders;
 
-class InjectBasicAuthGatewayFilterFactoryTest extends AbstractFilterTest<InjectBasicAuthGatewayFilterFactory.Config>
+import com.ethlo.http.filters.basic.InjectBasicAuthFilterSupplier;
+
+class InjectBasicAuthGatewayFilterFactoryTest extends AbstractFilterTest<InjectBasicAuthFilterSupplier.Config>
 {
     @Test
-    void shouldAddCorrelationIdHeaderToRequestAndResponse()
+    void shouldInjectBasicAuth() throws Exception
     {
         // Given
-        final InjectBasicAuthGatewayFilterFactory.Config config = new InjectBasicAuthGatewayFilterFactory.Config();
+        final InjectBasicAuthFilterSupplier.Config config = new InjectBasicAuthFilterSupplier.Config();
         config.setUsername("me");
         config.setPassword("mypass");
 
@@ -21,12 +22,18 @@ class InjectBasicAuthGatewayFilterFactoryTest extends AbstractFilterTest<InjectB
         execute(config);
 
         // Then
-        assertThat(actualRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION)).isEqualTo("Basic bWU6bXlwYXNz");
+        assertThat(actualRequest().headers().firstHeader(HttpHeaders.AUTHORIZATION))
+                .isEqualTo("Basic bWU6bXlwYXNz");    }
+
+    @Override
+    protected FilterSupplier filterSupplier()
+    {
+        return new InjectBasicAuthFilterSupplier();
     }
 
     @Override
-    protected GatewayFilterFactory<InjectBasicAuthGatewayFilterFactory.@NonNull Config> filterFactory()
+    protected String getFilterName()
     {
-        return new InjectBasicAuthGatewayFilterFactory();
+        return "injectBasicAuth";
     }
 }

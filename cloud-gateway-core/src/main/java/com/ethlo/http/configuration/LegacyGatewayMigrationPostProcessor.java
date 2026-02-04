@@ -22,7 +22,7 @@ public class LegacyGatewayMigrationPostProcessor implements EnvironmentPostProce
 {
     private static final DeferredLog logger = new DeferredLog();
     private static final String OLD_PREFIX = "spring.cloud.gateway.";
-    private static final String NEW_PREFIX = "spring.cloud.gateway.server.webflux.";
+    private static final String NEW_PREFIX = "spring.cloud.gateway.server.webmvc.";
 
     @Override
     public void postProcessEnvironment(ConfigurableEnvironment environment, @NotNull SpringApplication application)
@@ -60,7 +60,7 @@ public class LegacyGatewayMigrationPostProcessor implements EnvironmentPostProce
         if (!migratedProperties.isEmpty())
         {
             environment.getPropertySources().addFirst(new MapPropertySource("legacyGatewayMigration", migratedProperties));
-            logger.warn("Migrated " + migratedProperties.size() + " legacy gateway properties to new 'server.webflux' prefix.");
+            logger.warn("Migrated " + migratedProperties.size() + " legacy gateway properties to new '" + NEW_PREFIX + "' prefix.");
         }
 
         application.addListeners(this);
