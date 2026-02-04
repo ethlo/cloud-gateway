@@ -1,15 +1,16 @@
 package com.ethlo.http;
 
-import com.ethlo.http.configuration.HttpLoggingConfiguration;
-import com.ethlo.http.logger.LoggingFilterService;
-import com.ethlo.http.logger.delegate.SequentialDelegateLogger;
-import com.ethlo.http.model.WebExchangeDataProvider;
-import com.ethlo.http.netty.PredicateConfig;
-import com.ethlo.http.processors.LogPreProcessor;
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.math.BigInteger;
+import java.net.SocketException;
+import java.net.URI;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Predicate;
 
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -24,33 +25,34 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import java.io.IOException;
-import java.math.BigInteger;
-import java.net.SocketException;
-import java.net.URI;
-import java.time.Duration;
-import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.function.Predicate;
+import com.ethlo.chronograph.Chronograph;
+import com.ethlo.http.configuration.HttpLoggingConfiguration;
+import com.ethlo.http.logger.LoggingFilterService;
+import com.ethlo.http.logger.delegate.DelegateHttpLogger;
+import com.ethlo.http.model.WebExchangeDataProvider;
+import com.ethlo.http.netty.PredicateConfig;
+import com.ethlo.http.processors.LogPreProcessor;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 //@RefreshScope
 @Component
 public class TagRequestIdMvcFilter extends OncePerRequestFilter implements Ordered
 {
+    private static final Logger performanceLogger = LoggerFactory.getLogger("chronograph");
     private static final Logger logger = LoggerFactory.getLogger(TagRequestIdMvcFilter.class);
 
     private final LoggingFilterService loggingFilterService;
-    private final SequentialDelegateLogger httpLogger;
+    private final DelegateHttpLogger httpLogger;
     private final DataBufferRepository repository;
     private final LogPreProcessor logPreProcessor;
     private final List<PredicateConfig> predicateConfigs;
     private final boolean autoCleanup;
 
     public TagRequestIdMvcFilter(LoggingFilterService loggingFilterService,
-                                 SequentialDelegateLogger httpLogger,
+                                 DelegateHttpLogger httpLogger,
                                  @Autowired(required = false) DataBufferRepository repository,
                                  LogPreProcessor logPreProcessor,
                                  HttpLoggingConfiguration httpLoggingConfiguration,
@@ -95,43 +97,71 @@ public class TagRequestIdMvcFilter extends OncePerRequestFilter implements Order
     @Override
     protected void doFilterInternal(@NotNull HttpServletRequest request, @NotNull HttpServletResponse response, @NotNull FilterChain filterChain) throws ServletException, IOException
     {
-        final long started = System.nanoTime();
+        final Chronograph chronograph = Chronograph.create();
+        chronograph.time("request", () ->
+                {
+                    final String requestId = generateId();
+                    request.setAttribute("requestId", requestId);
+                    request.setAttribute("chronograph", chronograph);
 
-        final String requestId = generateId();
-        request.setAttribute("requestId", requestId);
+                    final PredicateConfig matchedConfig = chronograph.time("predicate_match", () ->
+                            predicateConfigs.stream()
+                                    .filter(c -> c.predicate().test(request))
+                                    .findFirst()
+                                    .orElse(null)
+                    );
 
-        final PredicateConfig matchedConfig = predicateConfigs.stream()
-                .filter(c -> c.predicate().test(request))
-                .findFirst()
-                .orElse(null);
+                    if (matchedConfig == null)
+                    {
+                        chronograph.time("upstream", () ->
+                                {
+                                    try
+                                    {
+                                        filterChain.doFilter(request, response);
+                                    }
+                                    catch (IOException | ServletException e)
+                                    {
+                                        throw new RuntimeException(e);
+                                    }
+                                }
+                        );
+                        return;
+                    }
 
-        if (matchedConfig == null)
-        {
-            // No match. Just pass through
-            filterChain.doFilter(request, response);
-            return;
-        }
+                    final MvcRequestCapture wrappedRequest = new MvcRequestCapture(chronograph, request, requestId, repository);
+                    final MvcResponseCapture wrappedResponse = new MvcResponseCapture(chronograph, response, requestId, repository);
 
-        // We use your repository to stream directly to disk instead of memory
-        final MvcRequestCapture wrappedRequest = new MvcRequestCapture(request, requestId, repository);
-        final MvcResponseCapture wrappedResponse = new MvcResponseCapture(response, requestId, repository);
+                    Throwable connectionException = null;
+                    try
+                    {
+                        chronograph.time("upstream", () -> {
+                                    try
+                                    {
+                                        filterChain.doFilter(wrappedRequest, wrappedResponse);
+                                    }
+                                    catch (IOException | ServletException e)
+                                    {
+                                        throw new RuntimeException(e);
+                                    }
+                                }
+                        );
 
-        Throwable connectionException = null;
-        try
-        {
-            filterChain.doFilter(wrappedRequest, wrappedResponse);
-
-            // Ensure response is fully flushed to capture the body
-            wrappedResponse.copyBodyToResponse();
-        }
-        catch (Throwable e)
-        {
-            connectionException = e;
-            handleException(requestId, e, response);
-        } finally
-        {
-            saveLog(wrappedRequest, wrappedResponse, requestId, started, connectionException, loggingFilterService.merge(matchedConfig));
-        }
+                        chronograph.time("buffer_flush", wrappedResponse::copyBodyToResponse);
+                    }
+                    catch (Throwable e)
+                    {
+                        connectionException = (e instanceof RuntimeException && e.getCause() != null) ? e.getCause() : e;
+                        handleException(requestId, connectionException, response);
+                    } finally
+                    {
+                        final Throwable finalExc = connectionException;
+                        chronograph.time("logging", () ->
+                                saveLog(wrappedRequest, wrappedResponse, requestId, chronograph, finalExc, loggingFilterService.merge(matchedConfig))
+                        );
+                    }
+                }
+        );
+        performanceLogger.debug("{}", chronograph);
     }
 
     private String generateId()
@@ -141,28 +171,31 @@ public class TagRequestIdMvcFilter extends OncePerRequestFilter implements Order
         return timestampPart + "-" + randomPart;
     }
 
-    private void saveLog(MvcRequestCapture req, MvcResponseCapture res, String requestId, long start, Throwable exc, final PredicateConfig mergedConfig)
+    private void saveLog(MvcRequestCapture req, MvcResponseCapture res, String requestId, Chronograph chronograph, Throwable exc, final PredicateConfig mergedConfig)
     {
         try
         {
-            final Duration duration = Duration.ofNanos(System.nanoTime() - start);
+            final WebExchangeDataProvider provider = chronograph.time("prepare_log_data", () ->
+                    {
+                        final Duration requestTime = chronograph.getTotalTime();
 
-            final Route route = getRoute(req);
+                        final Route route = getRoute(req);
 
-            final WebExchangeDataProvider provider = new WebExchangeDataProvider(repository, mergedConfig)
-                    .requestId(requestId)
-                    .method(HttpMethod.valueOf(req.getMethod()))
-                    .path(req.getRequestURI())
-                    .route(route)
-                    .uri(java.net.URI.create(req.getRequestURL().toString()))
-                    .statusCode(HttpStatus.valueOf(res.getStatus()))
-                    .requestHeaders(ServletUtil.extractHeaders(req))
-                    .responseHeaders(ServletUtil.extractHeaders(res))
-                    .duration(duration)
-                    .timestamp(OffsetDateTime.now())
-                    .exception(exc);
-
-            httpLogger.accessLog(logPreProcessor.process(provider));
+                        return new WebExchangeDataProvider(repository, mergedConfig)
+                                .requestId(requestId)
+                                .method(HttpMethod.valueOf(req.getMethod().toUpperCase()))
+                                .path(req.getRequestURI())
+                                .route(route)
+                                .uri(java.net.URI.create(req.getRequestURL().toString()))
+                                .statusCode(HttpStatus.valueOf(res.getStatus()))
+                                .requestHeaders(ServletUtil.extractHeaders(req))
+                                .responseHeaders(ServletUtil.extractHeaders(res))
+                                .duration(requestTime)
+                                .timestamp(OffsetDateTime.now())
+                                .exception(exc);
+                    }
+            );
+            chronograph.time("log_providers", () -> httpLogger.accessLog(chronograph, logPreProcessor.process(provider)));
         }
         catch (Exception e)
         {

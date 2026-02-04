@@ -1,5 +1,6 @@
 package com.ethlo.http.logger.clickhouse;
 
+import java.math.BigInteger;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -12,8 +13,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.ResponseBody;
-
-import com.clickhouse.data.value.UnsignedLong;
 
 @ConditionalOnBean(ClickHouseLogger.class)
 @Component
@@ -79,10 +78,10 @@ public class ClickHouseStatsEndpoint
                 ORDER BY event_time DESC WITH FILL FROM toStartOfInterval(now(), INTERVAL :interval SECOND) to (toStartOfInterval(now(), INTERVAL :interval SECOND) - toIntervalSecond(:interval * :intervalCount)) STEP toIntervalSecond(-:interval),
                 count""";
         final List<Map<String, Object>> result = tpl.queryForList(sql, Map.of("interval", interval.toSeconds(), "intervalCount", intervalCount));
-        final long max = result.stream().mapToLong(m -> ((UnsignedLong) m.getOrDefault("count", UnsignedLong.valueOf(0))).longValue()).max().orElse(1);
+        final long max = result.stream().mapToLong(m -> ((BigInteger) m.getOrDefault("count", BigInteger.valueOf(0))).longValue()).max().orElse(1);
         result.forEach(map ->
         {
-            final double percentage = (((UnsignedLong) map.getOrDefault("count", UnsignedLong.valueOf(0))).longValue() / (double) max) * 100;
+            final double percentage = (((BigInteger) map.getOrDefault("count", BigInteger.valueOf(0))).longValue() / (double) max) * 100;
             map.put("count_percentage", percentage);
         });
         return result;

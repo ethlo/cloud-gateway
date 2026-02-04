@@ -28,8 +28,9 @@ import org.springframework.web.client.RestTemplate;
 
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
+import com.ethlo.chronograph.Chronograph;
+import com.ethlo.http.logger.delegate.SyncDelegateLogger;
 import com.ethlo.http.model.WebExchangeDataProvider;
-import com.ethlo.http.logger.delegate.SequentialDelegateLogger;
 import com.ethlo.http.processors.auth.RealmUser;
 import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
 
@@ -49,7 +50,7 @@ class JwtIntegrationTest extends BaseTest
     private RestTemplate restTemplate;
 
     @MockitoSpyBean
-    private SequentialDelegateLogger httpLogger;
+    private SyncDelegateLogger httpLogger;
 
     @DynamicPropertySource
     static void additionalConfigureProperties(DynamicPropertyRegistry registry)
@@ -81,6 +82,7 @@ class JwtIntegrationTest extends BaseTest
     @Test
     void shouldExtractUserFromJwtAndLogIt()
     {
+        final Chronograph chronograph = Chronograph.create();
         wireMock.stubFor(get(urlEqualTo("/test/resource")).willReturn(aResponse().withStatus(200).withBody("OK")));
 
         HttpHeaders headers = new HttpHeaders();
@@ -97,7 +99,7 @@ class JwtIntegrationTest extends BaseTest
 
         // Capture the data to assert on it cleanly with AssertJ
         ArgumentCaptor<WebExchangeDataProvider> captor = ArgumentCaptor.forClass(WebExchangeDataProvider.class);
-        verify(httpLogger).accessLog(captor.capture());
+        verify(httpLogger).accessLog(chronograph, captor.capture());
 
         RealmUser user = captor.getValue().getUser().orElseThrow();
         assertThat(user.username()).isEqualTo("test-user-123");
@@ -107,6 +109,7 @@ class JwtIntegrationTest extends BaseTest
     @Test
     void shouldExtractUserEvenIfUpstreamReturns405()
     {
+        final Chronograph chronograph = Chronograph.create();
         wireMock.stubFor(post(urlEqualTo("/test/resource")).willReturn(aResponse().withStatus(405)));
 
         HttpHeaders headers = new HttpHeaders();
@@ -122,8 +125,9 @@ class JwtIntegrationTest extends BaseTest
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
 
         ArgumentCaptor<WebExchangeDataProvider> captor = ArgumentCaptor.forClass(WebExchangeDataProvider.class);
-        verify(httpLogger).accessLog(captor.capture());
+        verify(httpLogger).accessLog(chronograph, captor.capture());
         assertThat(captor.getValue().getUser().get().username()).isEqualTo("test-user-123");
+        logger.info("{}", chronograph);
     }
 
     private String createToken(String user, String issuer)

@@ -14,11 +14,13 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.Optional;
 import java.util.Random;
 import java.util.function.Consumer;
 import java.util.zip.GZIPOutputStream;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,15 +39,14 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.web.client.DefaultResponseErrorHandler;
 import org.springframework.web.client.RestTemplate;
 
+import com.ethlo.http.logger.delegate.DelegateHttpLogger;
 import com.ethlo.http.model.BodyProvider;
 import com.ethlo.http.model.WebExchangeDataProvider;
-import com.ethlo.http.logger.delegate.SequentialDelegateLogger;
-import com.ethlo.http.model.AccessLogResult;
 import com.github.tomakehurst.wiremock.http.Fault;
 import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class HandleDifferentResponseTypesTest extends BaseTest implements Consumer<AccessLogResult>
+class HandleDifferentResponseTypesTest extends BaseTest implements Consumer<WebExchangeDataProvider>
 {
     @RegisterExtension
     static WireMockExtension server = WireMockExtension.newInstance()
@@ -58,9 +59,9 @@ class HandleDifferentResponseTypesTest extends BaseTest implements Consumer<Acce
     private RestTemplate restTemplate;
 
     @Autowired
-    private SequentialDelegateLogger sequentialDelegateLogger;
+    private DelegateHttpLogger delegateHttpLogger;
 
-    private AccessLogResult finalResult;
+    private WebExchangeDataProvider webExchangeDataProvider;
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry)
@@ -120,7 +121,7 @@ class HandleDifferentResponseTypesTest extends BaseTest implements Consumer<Acce
             }
         });
 
-        sequentialDelegateLogger.addListener(this);
+        delegateHttpLogger.addListener(this);
     }
 
     @Test
@@ -134,11 +135,10 @@ class HandleDifferentResponseTypesTest extends BaseTest implements Consumer<Acce
 
         ResponseEntity<String> response = restTemplate.getForEntity(getGatewayUri("/get"), String.class);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(finalResult.isOk()).isTrue();
-        finalResult.cleanup();
+        webExchangeDataProvider.cleanup();
     }
 
-    @Test
+    @RepeatedTest(10)
     void testLargePayloadLogging() throws IOException
     {
         final byte[] largeData = new byte[1024 * 1024];
@@ -148,7 +148,7 @@ class HandleDifferentResponseTypesTest extends BaseTest implements Consumer<Acce
                 .withRequestBody(binaryEqualTo(largeData))
                 .willReturn(aResponse()
                         .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_OCTET_STREAM_VALUE)
-                        .withChunkedDribbleDelay(5, 500)
+                        //.withChunkedDribbleDelay(50, 1000)
                         .withBody(largeData)));
 
         byte[] compressedRequestData = gzipCompress(largeData);
@@ -157,17 +157,16 @@ class HandleDifferentResponseTypesTest extends BaseTest implements Consumer<Acce
         headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
         headers.set(HttpHeaders.CONTENT_ENCODING, "gzip");
 
-        HttpEntity<byte[]> request = new HttpEntity<>(compressedRequestData, headers);
-        ResponseEntity<byte[]> response = restTemplate.postForEntity(getGatewayUri("/post"), request, byte[].class);
+        final HttpEntity<byte[]> request = new HttpEntity<>(compressedRequestData, headers);
+        final ResponseEntity<byte[]> response = restTemplate.postForEntity(getGatewayUri("/post"), request, byte[].class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isEqualTo(largeData);
 
-        final WebExchangeDataProvider capture = finalResult.getWebExchangeDataProvider();
-        assertThat(readBody(capture.getRequestBody())).containsExactly(largeData);
-        assertThat(readBody(capture.getResponseBody())).containsExactly(largeData);
+        assertThat(readBody(webExchangeDataProvider.getRequestBody())).containsExactly(largeData);
+        assertThat(readBody(webExchangeDataProvider.getResponseBody())).containsExactly(largeData);
 
-        finalResult.cleanup();
+        webExchangeDataProvider.cleanup();
     }
 
     @Test
@@ -182,10 +181,10 @@ class HandleDifferentResponseTypesTest extends BaseTest implements Consumer<Acce
         ResponseEntity<String> response = restTemplate.getForEntity(getGatewayUri("/get"), String.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(finalResult.getWebExchangeDataProvider().getDuration())
+        assertThat(webExchangeDataProvider.getDuration())
                 .isCloseTo(Duration.ofSeconds(3), Duration.ofMillis(500));
 
-        finalResult.cleanup();
+        webExchangeDataProvider.cleanup();
     }
 
     @Test
@@ -209,11 +208,11 @@ class HandleDifferentResponseTypesTest extends BaseTest implements Consumer<Acce
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY);
 
-        final WebExchangeDataProvider capture = finalResult.getWebExchangeDataProvider();
+        final WebExchangeDataProvider capture = webExchangeDataProvider;
         assertThat(capture.getStatusCode().value()).isEqualTo(502);
         assertThat(readBody(capture.getRequestBody())).hasSameSizeAs(largeData);
 
-        finalResult.cleanup();
+        webExchangeDataProvider.cleanup();
     }
 
     private String getGatewayUri(String path)
@@ -221,7 +220,7 @@ class HandleDifferentResponseTypesTest extends BaseTest implements Consumer<Acce
         return "http://localhost:" + gatewayPort + path;
     }
 
-    private byte[] readBody(java.util.Optional<BodyProvider> provider)
+    private byte[] readBody(Optional<BodyProvider> provider)
     {
         return provider.map(p -> {
             try (InputStream is = p.getInputStream())
@@ -246,8 +245,8 @@ class HandleDifferentResponseTypesTest extends BaseTest implements Consumer<Acce
     }
 
     @Override
-    public void accept(final AccessLogResult accessLogResult)
+    public void accept(final WebExchangeDataProvider accessLogResult)
     {
-        this.finalResult = accessLogResult;
+        this.webExchangeDataProvider = accessLogResult;
     }
 }

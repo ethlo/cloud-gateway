@@ -20,7 +20,7 @@ import jakarta.validation.Valid;
 @ConfigurationProperties(prefix = "http-logging")
 public class HttpLoggingConfiguration
 {
-    public static final DataSize DEFAULT_MAX_MEMORY_BUFFER = DataSize.ofMegabytes(1);
+    public static final DataSize DEFAULT_MAX_MEMORY_BUFFER = DataSize.ofBytes(0);
 
     @Valid
     private CaptureConfiguration capture;

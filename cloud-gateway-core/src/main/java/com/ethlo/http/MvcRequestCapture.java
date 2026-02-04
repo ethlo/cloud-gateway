@@ -1,10 +1,12 @@
 package com.ethlo.http;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 
 import org.jetbrains.annotations.NotNull;
 
+import com.ethlo.chronograph.Chronograph;
 import com.ethlo.http.netty.ServerDirection;
 import jakarta.servlet.ReadListener;
 import jakarta.servlet.ServletInputStream;
@@ -13,13 +15,15 @@ import jakarta.servlet.http.HttpServletRequestWrapper;
 
 public class MvcRequestCapture extends HttpServletRequestWrapper
 {
+    private final Chronograph chronograph;
     private final String requestId;
     private final DataBufferRepository repository;
     private ServletInputStream inputStream;
 
-    public MvcRequestCapture(HttpServletRequest request, String requestId, DataBufferRepository repository)
+    public MvcRequestCapture(Chronograph chronograph, HttpServletRequest request, String requestId, DataBufferRepository repository)
     {
         super(request);
+        this.chronograph = chronograph;
         this.requestId = requestId;
         this.repository = repository;
     }
@@ -44,9 +48,20 @@ public class MvcRequestCapture extends HttpServletRequestWrapper
         }
 
         @Override
-        public void close() throws IOException
+        public void close()
         {
-            delegate.close();
+            chronograph.time("close", () ->
+                    {
+                        try
+                        {
+                            delegate.close();
+                        }
+                        catch (IOException e)
+                        {
+                            throw new UncheckedIOException(e);
+                        }
+                    }
+            );
         }
 
         @Override
@@ -55,7 +70,7 @@ public class MvcRequestCapture extends HttpServletRequestWrapper
             int b = delegate.read();
             if (b != -1)
             {
-                repository.writeSync(ServerDirection.REQUEST, requestId, ByteBuffer.wrap(new byte[]{(byte) b}));
+                chronograph.time("request_body_capture", () -> repository.writeSync(ServerDirection.REQUEST, requestId, ByteBuffer.wrap(new byte[]{(byte) b})));
             }
             return b;
         }
@@ -66,7 +81,7 @@ public class MvcRequestCapture extends HttpServletRequestWrapper
             int read = delegate.read(b, off, len);
             if (read > 0)
             {
-                repository.writeSync(ServerDirection.REQUEST, requestId, ByteBuffer.wrap(b, off, read));
+                chronograph.time("request_body_capture", () -> repository.writeSync(ServerDirection.REQUEST, requestId, ByteBuffer.wrap(b, off, read)));
             }
             return read;
         }

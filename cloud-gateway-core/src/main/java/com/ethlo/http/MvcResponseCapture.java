@@ -3,8 +3,12 @@ package com.ethlo.http;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
+import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 
+import org.jetbrains.annotations.NotNull;
+
+import com.ethlo.chronograph.Chronograph;
 import com.ethlo.http.netty.ServerDirection;
 import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.WriteListener;
@@ -13,14 +17,16 @@ import jakarta.servlet.http.HttpServletResponseWrapper;
 
 public class MvcResponseCapture extends HttpServletResponseWrapper
 {
+    private final Chronograph chronograph;
     private final String requestId;
     private final DataBufferRepository repository;
     private LoggingOutputStream loggingStream;
     private PrintWriter writer;
 
-    public MvcResponseCapture(HttpServletResponse response, String requestId, DataBufferRepository repository)
+    public MvcResponseCapture(final Chronograph chronograph, HttpServletResponse response, String requestId, DataBufferRepository repository)
     {
         super(response);
+        this.chronograph = chronograph;
         this.requestId = requestId;
         this.repository = repository;
     }
@@ -54,21 +60,29 @@ public class MvcResponseCapture extends HttpServletResponseWrapper
         return writer;
     }
 
-    /**
-     * This replaces the reactive .writeWith() logic.
-     * It ensures everything is flushed out before we finish.
-     */
-    public void copyBodyToResponse() throws IOException
+    public void copyBodyToResponse()
     {
-        if (writer != null)
-        {
-            writer.flush();
-        }
-        else if (loggingStream != null)
-        {
-            loggingStream.flush();
-        }
+        chronograph.time("response_body_flush", () ->
+                {
+                    if (writer != null)
+                    {
+                        writer.flush();
+                    }
+                    else if (loggingStream != null)
+                    {
+                        try
+                        {
+                            loggingStream.flush();
+                        }
+                        catch (IOException e)
+                        {
+                            throw new UncheckedIOException(e);
+                        }
+                    }
+                }
+        );
     }
+
 
     private class LoggingOutputStream extends ServletOutputStream
     {
@@ -80,25 +94,29 @@ public class MvcResponseCapture extends HttpServletResponseWrapper
         }
 
         @Override
-        public void write(int b) throws IOException
-        {
-            delegate.write(b);
-            repository.writeSync(ServerDirection.RESPONSE, requestId, ByteBuffer.wrap(new byte[]{(byte) b}));
-        }
-
-        @Override
         public void flush() throws IOException
         {
             delegate.flush();
         }
 
         @Override
-        public void write(byte[] b, int off, int len) throws IOException
+        public void write(int b) throws IOException
+        {
+            delegate.write(b);
+            chronograph.time("response_body_capture", () ->
+                    repository.writeSync(ServerDirection.RESPONSE, requestId, ByteBuffer.wrap(new byte[]{(byte) b}))
+            );
+        }
+
+        @Override
+        public void write(@NotNull byte[] b, int off, int len) throws IOException
         {
             delegate.write(b, off, len);
             if (len > 0)
             {
-                repository.writeSync(ServerDirection.RESPONSE, requestId, ByteBuffer.wrap(b, off, len));
+                chronograph.time("response_body_capture", () ->
+                        repository.writeSync(ServerDirection.RESPONSE, requestId, ByteBuffer.wrap(b, off, len))
+                );
             }
         }
 

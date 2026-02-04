@@ -48,7 +48,7 @@ public class DefaultDataBufferRepository implements DataBufferRepository
         statePool.compute(key, (k, state) -> {
                     try
                     {
-                        // Scenario 1: First write, initialize in memory
+                        // First write, initialize in memory
                         if (state == null)
                         {
                             if (bytesToWrite > thresholdBytes)
@@ -58,14 +58,14 @@ public class DefaultDataBufferRepository implements DataBufferRepository
                             return createInMemoryState(data);
                         }
 
-                        // Scenario 2: Already on disk, write to channel
+                        // Already on disk, write to channel
                         if (state.channel != null)
                         {
                             writeToChannel(state.channel, state.position, data);
                             return state;
                         }
 
-                        // Scenario 3: Currently in memory, check if this write triggers spill
+                        // Currently in memory, check if this write triggers spill
                         if (state.memoryBuffer.size() + bytesToWrite > thresholdBytes)
                         {
                             return spillExistingToDisk(direction, requestId, state.memoryBuffer, data);
@@ -87,11 +87,11 @@ public class DefaultDataBufferRepository implements DataBufferRepository
 
     private DataState createInMemoryState(ByteBuffer data) throws IOException
     {
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        final ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         byte[] bytes = new byte[data.remaining()];
         data.get(bytes);
-        baos.write(bytes);
-        return new DataState(baos, null, new AtomicLong(bytes.length));
+        outputStream.write(bytes);
+        return new DataState(outputStream, null, new AtomicLong(bytes.length));
     }
 
     private DataState spillNewToDisk(ServerDirection dir, String id, ByteBuffer data) throws IOException
@@ -102,19 +102,58 @@ public class DefaultDataBufferRepository implements DataBufferRepository
         return new DataState(null, fc, new AtomicLong(written));
     }
 
+    private void writeFully(FileChannel fc, ByteBuffer src, long offset) throws IOException
+    {
+        int attempts = 0;
+        while (src.hasRemaining())
+        {
+            final int written = (offset < 0) ? fc.write(src) : fc.write(src, offset);
+
+            if (written == 0)
+            {
+                attempts++;
+                if (attempts > 10)
+                {
+                    throw new IOException("Critical: Zero bytes written to disk after 10 attempts. Disk full or IO stall?");
+                }
+                Thread.yield(); // Give the OS a moment to flush buffers
+            }
+            else
+            {
+                if (offset >= 0)
+                {
+                    offset += written;
+                }
+                attempts = 0; // Reset on progress
+            }
+        }
+    }
+
     private DataState spillExistingToDisk(ServerDirection dir, String id, ByteArrayOutputStream existing, ByteBuffer data) throws IOException
     {
-        Path path = getPath(dir, id);
-        FileChannel fc = FileChannel.open(path, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
-        fc.write(ByteBuffer.wrap(existing.toByteArray()));
-        int written = fc.write(data);
-        return new DataState(null, fc, new AtomicLong(existing.size() + written));
+        final Path path = getPath(dir, id);
+        final FileChannel fc = FileChannel.open(path, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+
+        // Write the accumulated memory buffer fully
+        writeFully(fc, ByteBuffer.wrap(existing.toByteArray()), -1);
+
+        // Write the new incoming chunk fully
+        int dataSize = data.remaining();
+        writeFully(fc, data, -1);
+
+        return new DataState(null, fc, new AtomicLong(existing.size() + dataSize));
     }
 
     private void writeToChannel(FileChannel fc, AtomicLong pos, ByteBuffer data) throws IOException
     {
-        long startOffset = pos.getAndAdd(data.remaining());
-        fc.write(data, startOffset);
+        final int bytesToWrite = data.remaining();
+        // We calculate the start offset, but we must ensure we write exactly bytesToWrite
+        long currentOffset = pos.getAndAdd(bytesToWrite);
+        while (data.hasRemaining())
+        {
+            int written = fc.write(data, currentOffset);
+            currentOffset += written;
+        }
     }
 
     public void cleanup(String requestId)

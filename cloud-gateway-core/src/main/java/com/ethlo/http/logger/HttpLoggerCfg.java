@@ -3,12 +3,15 @@ package com.ethlo.http.logger;
 import java.util.List;
 import java.util.Optional;
 
+import com.ethlo.http.logger.delegate.SyncDelegateLogger;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.support.GenericApplicationContext;
 
 import com.ethlo.http.configuration.HttpLoggingConfiguration;
-import com.ethlo.http.logger.delegate.SequentialDelegateLogger;
+import com.ethlo.http.logger.delegate.AsyncDelegateLogger;
+import com.ethlo.http.logger.delegate.DelegateHttpLogger;
 
 @Configuration
 public class HttpLoggerCfg
@@ -20,7 +23,7 @@ public class HttpLoggerCfg
     }
 
     @Bean
-    SequentialDelegateLogger sequentialDelegateLogger(final GenericApplicationContext applicationContext, final HttpLoggingConfiguration httpLoggingConfiguration, List<HttpLoggerFactory> factories)
+    DelegateHttpLogger sequentialDelegateLogger(final GenericApplicationContext applicationContext, final HttpLoggingConfiguration httpLoggingConfiguration, List<HttpLoggerFactory> factories)
     {
         final List<HttpLogger> loggers = Optional.ofNullable(httpLoggingConfiguration.getProviders())
                 .map(providers -> providers.entrySet().stream().map(entry ->
@@ -36,6 +39,6 @@ public class HttpLoggerCfg
                                     );
                         })
                         .toList()).orElse(List.of());
-        return new SequentialDelegateLogger(loggers);
+        return new SyncDelegateLogger(loggers);
     }
 }
