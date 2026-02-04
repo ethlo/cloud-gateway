@@ -27,7 +27,6 @@ public class FileConfigurationChangeDetector
 {
     private static final Logger logger = LoggerFactory.getLogger(FileConfigurationChangeDetector.class);
 
-    private final FileAlterationListenerAdaptor listener;
     private final FileAlterationMonitor monitor;
 
     public FileConfigurationChangeDetector(final StandardEnvironment environment, final ApplicationEventPublisher applicationEventPublisher, final FileConfigurationChangeDetectorConfiguration config) throws Exception
@@ -38,7 +37,7 @@ public class FileConfigurationChangeDetector
         }
 
         logger.info("Starting configuration file watcher");
-        this.listener = new FileAlterationListenerAdaptor()
+        final FileAlterationListenerAdaptor listener = new FileAlterationListenerAdaptor()
         {
             @Override
             public void onFileChange(File file)
@@ -53,7 +52,10 @@ public class FileConfigurationChangeDetector
         paths.addAll(getPaths(environment.getProperty("spring.config.additional-location", "")));
         for (Path path : paths)
         {
-            final FileAlterationObserver observer = new FileAlterationObserver(path.toFile().isDirectory() ? path.toFile() : path.getParent().toFile(), FileFilterUtils.nameFileFilter(path.getFileName().toString()));
+            final FileAlterationObserver observer = FileAlterationObserver.builder()
+                    .setPath(path.toFile().isDirectory() ? path : path.getParent())
+                    .setFileFilter(FileFilterUtils.nameFileFilter(path.getFileName().toString()))
+                    .get();
             observer.addListener(listener);
             monitor.addObserver(observer);
             logger.info("Watching config location {} for change", path);
