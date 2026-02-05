@@ -248,24 +248,33 @@ public class DefaultDataBufferRepository implements DataBufferRepository
             try
             {
                 state.channel.close();
-                if (!Files.deleteIfExists(getPath(dir, requestId, "headers")))
-                {
-                    logger.warn("Unable to clean up headers file for {} for {}", dir.name().toLowerCase(), requestId);
-                }
-
-                if (!Files.deleteIfExists(getPath(dir, requestId, "body")))
-                {
-                    logger.warn("Unable to clean up body file for {} for {}", dir.name().toLowerCase(), requestId);
-                }
-
+                deleteAndReport(dir, requestId, "body", "Unable to clean up body file for {} for {}");
                 if (logger.isDebugEnabled())
                 {
                     logger.debug("Deleted {} disk buffer for {}. File size {}B", dir, requestId, state.position.get());
                 }
             }
-            catch (IOException ignored)
+            catch (IOException exc)
             {
+                logger.warn(exc.getMessage(), exc);
             }
+        }
+
+        deleteAndReport(dir, requestId, "headers", "Unable to clean up headers file for {} for {}");
+    }
+
+    private void deleteAndReport(ServerDirection dir, String requestId, String headers, String format)
+    {
+        try
+        {
+            if (!Files.deleteIfExists(getPath(dir, requestId, headers)))
+            {
+                logger.warn(format, dir.name().toLowerCase(), requestId);
+            }
+        }
+        catch (IOException exc)
+        {
+            logger.warn("Error deleting transient file {}", requestId, exc);
         }
     }
 
