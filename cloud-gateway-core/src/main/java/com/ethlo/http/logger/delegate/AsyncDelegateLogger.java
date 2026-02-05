@@ -47,9 +47,12 @@ public class AsyncDelegateLogger extends BaseDelegateHttpLogger implements Runna
                 if (data != null)
                 {
                     final Chronograph asyncChronograph = Chronograph.create();
-                    logWebExchangeData(asyncChronograph, data);
-                    data.cleanup();
-                    logger.debug("Request {}:\n{}", data.getRequestId(), asyncChronograph);
+                    if (logWebExchangeData(asyncChronograph, data))
+                    {
+                        data.cleanup();
+                    }
+
+                    logger.debug("Logger performance for request {}:\n{}", data.getRequestId(), asyncChronograph);
                 }
             }
             catch (InterruptedException e)

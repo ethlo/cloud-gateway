@@ -51,8 +51,9 @@ public abstract class BaseDelegateHttpLogger implements DelegateHttpLogger
         this.listeners.remove(listener);
     }
 
-    protected void logWebExchangeData(Chronograph chronograph, WebExchangeDataProvider dataProvider)
+    protected boolean logWebExchangeData(Chronograph chronograph, WebExchangeDataProvider dataProvider)
     {
+        boolean success = true;
         try
         {
             for (HttpLogger httpLogger : httpLoggers)
@@ -64,6 +65,7 @@ public abstract class BaseDelegateHttpLogger implements DelegateHttpLogger
                 }
                 catch (Exception e)
                 {
+                    success = false;
                     logger.error("Logger {} failed for request {}",
                             httpLogger.getClass().getSimpleName(), dataProvider.getRequestId(), e
                     );
@@ -73,6 +75,7 @@ public abstract class BaseDelegateHttpLogger implements DelegateHttpLogger
         {
             notifyListeners(dataProvider);
         }
+        return success;
     }
 
     @Override

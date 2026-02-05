@@ -16,6 +16,9 @@ public class SyncDelegateLogger extends BaseDelegateHttpLogger
     @Override
     public void accessLog(final Chronograph chronograph, final WebExchangeDataProvider dataProvider)
     {
-        logWebExchangeData(chronograph, dataProvider);
+        if (logWebExchangeData(chronograph, dataProvider))
+        {
+            dataProvider.cleanup();
+        }
     }
 }
