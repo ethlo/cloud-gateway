@@ -3,8 +3,6 @@ package com.ethlo.http.logger;
 import java.util.List;
 import java.util.Optional;
 
-import com.ethlo.http.configuration.BeanProvider;
-
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -12,6 +10,7 @@ import org.springframework.context.annotation.DependsOn;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.context.support.GenericApplicationContext;
 
+import com.ethlo.http.configuration.BeanProvider;
 import com.ethlo.http.configuration.HttpLoggingConfiguration;
 import com.ethlo.http.logger.delegate.AsyncDelegateLogger;
 import com.ethlo.http.logger.delegate.DelegateHttpLogger;
@@ -20,18 +19,18 @@ import com.ethlo.http.logger.delegate.SyncDelegateLogger;
 @Configuration
 public class HttpLoggerCfg
 {
-    @Bean
-    LoggingFilterService loggingFilterService(final HttpLoggingConfiguration httpLoggingConfiguration)
-    {
-        return new LoggingFilterService(httpLoggingConfiguration);
-    }
-
     @Lazy(false)
     @Bean
     public static BeanProvider beanProvider(ApplicationContext applicationContext)
     {
         BeanProvider.setApplicationContext(applicationContext);
-        return new BeanProvider();
+        return null;
+    }
+
+    @Bean
+    LoggingFilterService loggingFilterService(final HttpLoggingConfiguration httpLoggingConfiguration)
+    {
+        return new LoggingFilterService(httpLoggingConfiguration);
     }
 
     @DependsOn("beanProvider")

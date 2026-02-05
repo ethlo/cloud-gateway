@@ -30,7 +30,7 @@ http-logging:
       enabled: true
       pattern: '{{ timestamp | date("yyyy-MM-dd''T''HH:mm:ss.SSSXXX") }} {{gateway_request_id}} {{realm_claim}} {{user_claim}} {{method}} {{path}} {{host}} {{duration}} {{status}} {{user_agent}}'
       storage-directory: /tmp/cloud-gateway/archive
-      max-rollover-size: 1M
+      max-rollover-size: 1MB
     file:
       enabled: true
       pattern: '{{gateway_request_id}} {{realm_claim}} {{user_claim}} {{method}} {{path}} {{host}} {{request_headers["Content-Length"][0]}} {{status}} {{user_agent}} {{duration | numberformat("#.###") }}'
