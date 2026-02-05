@@ -79,9 +79,10 @@ public record BodyProvider(@Nullable Path file, byte @Nullable [] bytes, @Nullab
     /**
      * Moves the underlying file to a new location if it exists on disk.
      * If the data is in memory, it writes the bytes to the target path.
-     * * @param target The destination path
      *
+     * @param target The destination path
      * @return A new BodyProvider instance pointing to the new location
+     * @throws UncheckedIOException if an I/O error occurs while creating directories, moving, or writing the file
      */
     public BodyProvider moveTo(Path target)
     {
