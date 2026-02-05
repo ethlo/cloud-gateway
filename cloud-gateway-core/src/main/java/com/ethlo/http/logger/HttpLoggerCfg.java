@@ -5,7 +5,6 @@ import java.util.Optional;
 
 import com.ethlo.http.configuration.BeanProvider;
 
-import org.intellij.lang.annotations.JdkConstants;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
