@@ -126,7 +126,7 @@ public class DirectFileLogger implements HttpLogger
                 StandardOpenOption.APPEND
         ));
 
-        this.currentSize = Files.size(activeLog);
+        this.currentSize = Files.exists(activeLog) ? Files.size(activeLog) : 0L;
         this.currentDate = newDate;
     }
 
