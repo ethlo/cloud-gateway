@@ -166,7 +166,7 @@ class HandleDifferentResponseTypesTest extends BaseTest implements Consumer<WebE
         assertThat(readBody(webExchangeDataProvider.getRequestBody())).containsExactly(largeData);
         assertThat(readBody(webExchangeDataProvider.getResponseBody())).containsExactly(largeData);
 
-        webExchangeDataProvider.cleanup();
+        //webExchangeDataProvider.cleanup();
     }
 
     @Test

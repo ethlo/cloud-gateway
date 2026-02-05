@@ -15,8 +15,6 @@ import java.util.function.Predicate;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.server.mvc.common.MvcUtils;
 import org.springframework.core.NestedExceptionUtils;
 import org.springframework.core.Ordered;
@@ -31,6 +29,7 @@ import com.ethlo.http.logger.LoggingFilterService;
 import com.ethlo.http.logger.delegate.DelegateHttpLogger;
 import com.ethlo.http.model.WebExchangeDataProvider;
 import com.ethlo.http.netty.PredicateConfig;
+import com.ethlo.http.netty.ServerDirection;
 import com.ethlo.http.processors.LogPreProcessor;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -49,21 +48,18 @@ public class TagRequestIdMvcFilter extends OncePerRequestFilter implements Order
     private final DataBufferRepository repository;
     private final LogPreProcessor logPreProcessor;
     private final List<PredicateConfig> predicateConfigs;
-    private final boolean autoCleanup;
 
     public TagRequestIdMvcFilter(LoggingFilterService loggingFilterService,
                                  DelegateHttpLogger httpLogger,
-                                 @Autowired(required = false) DataBufferRepository repository,
+                                 DataBufferRepository repository,
                                  LogPreProcessor logPreProcessor,
                                  HttpLoggingConfiguration httpLoggingConfiguration,
-                                 RoutePredicateLocator routePredicateLocator,
-                                 @Value("${content-logging.buffer-files.cleanup:true}") final boolean autoCleanup)
+                                 RoutePredicateLocator routePredicateLocator)
     {
         this.loggingFilterService = loggingFilterService;
         this.httpLogger = httpLogger;
-        this.repository = repository != null ? repository : DataBufferRepository.NOP;
+        this.repository = repository != null ? repository : NopDataBufferRepository.INSTANCE;
         this.logPreProcessor = logPreProcessor;
-        this.autoCleanup = autoCleanup;
         this.predicateConfigs = httpLoggingConfiguration.getMatchers()
                 .stream()
                 .map(c ->
@@ -101,6 +97,8 @@ public class TagRequestIdMvcFilter extends OncePerRequestFilter implements Order
         chronograph.time("request", () ->
                 {
                     final String requestId = generateId();
+                    logger.debug("Starting request id {}", requestId);
+
                     request.setAttribute("requestId", requestId);
                     request.setAttribute("chronograph", chronograph);
 
@@ -118,6 +116,7 @@ public class TagRequestIdMvcFilter extends OncePerRequestFilter implements Order
                                     try
                                     {
                                         filterChain.doFilter(request, response);
+                                        logger.debug("Finished request id {} without capture", requestId);
                                     }
                                     catch (IOException | ServletException e)
                                     {
@@ -127,6 +126,11 @@ public class TagRequestIdMvcFilter extends OncePerRequestFilter implements Order
                         );
                         return;
                     }
+
+                    // Write Request headers immediately
+                    chronograph.time("persist_request_headers", () ->
+                            repository.writeHeaders(ServerDirection.REQUEST, requestId, ServletUtil.extractHeaders(request))
+                    );
 
                     final MvcRequestCapture wrappedRequest = new MvcRequestCapture(chronograph, request, requestId, repository);
                     final MvcResponseCapture wrappedResponse = new MvcResponseCapture(chronograph, response, requestId, repository);
@@ -138,12 +142,17 @@ public class TagRequestIdMvcFilter extends OncePerRequestFilter implements Order
                                     try
                                     {
                                         filterChain.doFilter(wrappedRequest, wrappedResponse);
+                                        logger.debug("Finished request id {} with capture", requestId);
                                     }
                                     catch (IOException | ServletException e)
                                     {
                                         throw new RuntimeException(e);
                                     }
                                 }
+                        );
+
+                        chronograph.time("persist_response_headers", () ->
+                                repository.writeHeaders(ServerDirection.RESPONSE, requestId, ServletUtil.extractHeaders(response))
                         );
 
                         chronograph.time("buffer_flush", wrappedResponse::copyBodyToResponse);
@@ -183,13 +192,12 @@ public class TagRequestIdMvcFilter extends OncePerRequestFilter implements Order
 
                         return new WebExchangeDataProvider(repository, mergedConfig)
                                 .requestId(requestId)
+                                .cleanupTask(() -> repository.cleanup(requestId))
                                 .method(HttpMethod.valueOf(req.getMethod().toUpperCase()))
                                 .path(req.getRequestURI())
                                 .route(route)
                                 .uri(java.net.URI.create(req.getRequestURL().toString()))
                                 .statusCode(HttpStatus.valueOf(res.getStatus()))
-                                .requestHeaders(ServletUtil.extractHeaders(req))
-                                .responseHeaders(ServletUtil.extractHeaders(res))
                                 .duration(requestTime)
                                 .timestamp(OffsetDateTime.now())
                                 .exception(exc);
@@ -201,12 +209,6 @@ public class TagRequestIdMvcFilter extends OncePerRequestFilter implements Order
         {
             logger.error("Failed to save log for {}", requestId, e);
             repository.persistForError(requestId);
-        } finally
-        {
-            if (autoCleanup)
-            {
-                repository.cleanup(requestId);
-            }
         }
     }
 

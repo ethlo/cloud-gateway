@@ -2,6 +2,7 @@ server:
   port: 8888
 
 http-logging:
+  async: true
   filter:
     request-headers:
       excludes:
@@ -19,15 +20,17 @@ http-logging:
     enabled: true
     log-directory: /tmp/cloud-gateway/raw
   providers:
-    direct_async:
-      enabled: true
-      pattern: '{{gateway_request_id}} {{realm_claim}} {{user_claim}} {{method}} {{path}} {{host}} {{request_headers["Content-Length"][0]}} {{status}} {{user_agent}} {{duration | numberformat("#.###") }}'
     clickhouse:
       enabled: true
       url: jdbc:clickhouse://localhost:8123?database=default
       username: default
       password: default
       connection-init-sql: SET async_insert=1,wait_for_async_insert=1
+    direct_file:
+      enabled: true
+      pattern: '{{ timestamp | date("yyyy-MM-dd''T''HH:mm:ss.SSSXXX") }} {{gateway_request_id}} {{realm_claim}} {{user_claim}} {{method}} {{path}} {{host}} {{duration}} {{status}} {{user_agent}}'
+      storage-directory: /tmp/cloud-gateway/archive
+
     #file:
     #  enabled: true
     #  pattern: '{{gateway_request_id}} {{realm_claim}} {{user_claim}} {{method}} {{path}} {{host}} {{request_headers["Content-Length"][0]}} {{status}} {{user_agent}} {{duration | numberformat("#.###") }}'

@@ -30,6 +30,8 @@ public class HttpLoggingConfiguration
     private List<RequestMatchingProcessor> matchers;
     private DataSize maxMemoryBuffer = DEFAULT_MAX_MEMORY_BUFFER;
 
+    private boolean async;
+
     public LogFilter getFilter()
     {
         return filter;
@@ -81,6 +83,17 @@ public class HttpLoggingConfiguration
     public HttpLoggingConfiguration setCapture(final CaptureConfiguration capture)
     {
         this.capture = capture;
+        return this;
+    }
+
+    public boolean async()
+    {
+        return async;
+    }
+
+    public HttpLoggingConfiguration setAsync(final boolean async)
+    {
+        this.async = async;
         return this;
     }
 }

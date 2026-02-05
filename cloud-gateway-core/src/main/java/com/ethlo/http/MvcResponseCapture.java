@@ -104,7 +104,7 @@ public class MvcResponseCapture extends HttpServletResponseWrapper
         {
             delegate.write(b);
             chronograph.time("response_body_capture", () ->
-                    repository.writeSync(ServerDirection.RESPONSE, requestId, ByteBuffer.wrap(new byte[]{(byte) b}))
+                    repository.writeBody(ServerDirection.RESPONSE, requestId, ByteBuffer.wrap(new byte[]{(byte) b}))
             );
         }
 
@@ -115,7 +115,7 @@ public class MvcResponseCapture extends HttpServletResponseWrapper
             if (len > 0)
             {
                 chronograph.time("response_body_capture", () ->
-                        repository.writeSync(ServerDirection.RESPONSE, requestId, ByteBuffer.wrap(b, off, len))
+                        repository.writeBody(ServerDirection.RESPONSE, requestId, ByteBuffer.wrap(b, off, len))
                 );
             }
         }

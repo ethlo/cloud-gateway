@@ -5,7 +5,7 @@ import java.util.function.Consumer;
 import com.ethlo.chronograph.Chronograph;
 import com.ethlo.http.model.WebExchangeDataProvider;
 
-public interface DelegateHttpLogger
+public interface DelegateHttpLogger extends AutoCloseable
 {
     void accessLog(Chronograph chronograph, WebExchangeDataProvider dataProvider);
 

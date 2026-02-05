@@ -26,7 +26,7 @@ public class AsyncDelegateLogger extends BaseDelegateHttpLogger implements Runna
     @Override
     public void accessLog(final Chronograph chronograph, final WebExchangeDataProvider dataProvider)
     {
-        chronograph.time("log_queue_offer", () ->
+        chronograph.time("async_log", () ->
                 {
                     if (!queue.offer(dataProvider))
                     {
@@ -48,7 +48,8 @@ public class AsyncDelegateLogger extends BaseDelegateHttpLogger implements Runna
                 {
                     final Chronograph asyncChronograph = Chronograph.create();
                     logWebExchangeData(asyncChronograph, data);
-                    logger.info("Request {}:\n{}", data.getRequestId(), asyncChronograph);
+                    data.cleanup();
+                    logger.debug("Request {}:\n{}", data.getRequestId(), asyncChronograph);
                 }
             }
             catch (InterruptedException e)
@@ -63,7 +64,8 @@ public class AsyncDelegateLogger extends BaseDelegateHttpLogger implements Runna
         }
     }
 
-    public void stop()
+    @Override
+    public void close() throws Exception
     {
         this.running = false;
         try
@@ -73,5 +75,6 @@ public class AsyncDelegateLogger extends BaseDelegateHttpLogger implements Runna
         catch (InterruptedException ignored)
         {
         }
+        super.close();
     }
 }
