@@ -2,11 +2,8 @@ package com.ethlo.http.configuration;
 
 import org.jetbrains.annotations.NotNull;
 import org.springframework.context.ApplicationContext;
-import org.springframework.context.ApplicationContextAware;
-import org.springframework.stereotype.Component;
 
-@Component
-public class BeanProvider implements ApplicationContextAware
+public class BeanProvider
 {
     private static ApplicationContext ctx;
 
@@ -15,8 +12,7 @@ public class BeanProvider implements ApplicationContextAware
         return ctx.getBean(type);
     }
 
-    @Override
-    public void setApplicationContext(@NotNull ApplicationContext applicationContext)
+    public static void setApplicationContext(@NotNull ApplicationContext applicationContext)
     {
         ctx = applicationContext;
     }

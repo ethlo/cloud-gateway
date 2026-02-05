@@ -12,6 +12,7 @@ import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -41,7 +42,7 @@ public class ClickHouseLogger implements HttpLogger
     public void accessLog(final WebExchangeDataProvider dataProvider)
     {
         final PredicateConfig predicateConfig = dataProvider.getPredicateConfig();
-        final Map<String, Object> params = dataProvider.asMetaMap();
+        final Map<String, Object> params = new TreeMap<>(dataProvider.asMetaMap());
 
         initializeParams(params);
 
@@ -56,7 +57,6 @@ public class ClickHouseLogger implements HttpLogger
 
         try
         {
-            logger.debug("Inserting data into ClickHouse for request {}", dataProvider.getRequestId());
             clickHouseLoggerRepository.insert(params);
         }
         catch (Exception e)

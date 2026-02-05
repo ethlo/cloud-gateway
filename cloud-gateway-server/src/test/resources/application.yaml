@@ -14,7 +14,7 @@ http-logging:
     file:
       enabled: true
       pattern: '{{gateway_request_id}} {{realm_claim}} {{user_claim}} {{method}} {{path}} {{host}} {{request_headers["Content-Length"][0]}} {{status}} {{user_agent}} {{duration | numberformat("#.###") }}'
-    direct_async:
+    direct_file:
       enabled: true
       pattern: '{{gateway_request_id}} {{realm_claim}} {{user_claim}} {{method}} {{path}} {{host}} {{request_headers["Content-Length"][0]}} {{status}} {{user_agent}} {{duration | numberformat("#.###") }}'
     clickhouse:

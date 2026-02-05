@@ -21,12 +21,7 @@ public abstract class BaseDelegateHttpLogger implements DelegateHttpLogger
     public BaseDelegateHttpLogger(final List<HttpLogger> httpLoggers)
     {
         this.httpLoggers = httpLoggers;
-    }
-
-    @Override
-    public void accessLog(final Chronograph chronograph, final WebExchangeDataProvider dataProvider)
-    {
-
+        logger.info("Active loggers: {}", httpLoggers.stream().map(HttpLogger::getName).toList());
     }
 
     private void notifyListeners(WebExchangeDataProvider result)
@@ -62,6 +57,7 @@ public abstract class BaseDelegateHttpLogger implements DelegateHttpLogger
         {
             for (HttpLogger httpLogger : httpLoggers)
             {
+                logger.debug("Delegating to log {}", httpLogger.getName());
                 try
                 {
                     chronograph.time("logger_" + httpLogger.getName(), () -> httpLogger.accessLog(dataProvider));
@@ -76,6 +72,22 @@ public abstract class BaseDelegateHttpLogger implements DelegateHttpLogger
         } finally
         {
             notifyListeners(dataProvider);
+        }
+    }
+
+    @Override
+    public void close() throws Exception
+    {
+        for (HttpLogger httpLogger : httpLoggers)
+        {
+            try
+            {
+                httpLogger.close();
+            }
+            catch (Exception e)
+            {
+                logger.warn("Logger {} failed to close", httpLogger.getName(), e);
+            }
         }
     }
 }

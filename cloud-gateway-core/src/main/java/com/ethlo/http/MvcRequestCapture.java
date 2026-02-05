@@ -70,7 +70,7 @@ public class MvcRequestCapture extends HttpServletRequestWrapper
             int b = delegate.read();
             if (b != -1)
             {
-                chronograph.time("request_body_capture", () -> repository.writeSync(ServerDirection.REQUEST, requestId, ByteBuffer.wrap(new byte[]{(byte) b})));
+                chronograph.time("request_body_capture", () -> repository.writeBody(ServerDirection.REQUEST, requestId, ByteBuffer.wrap(new byte[]{(byte) b})));
             }
             return b;
         }
@@ -81,7 +81,7 @@ public class MvcRequestCapture extends HttpServletRequestWrapper
             int read = delegate.read(b, off, len);
             if (read > 0)
             {
-                chronograph.time("request_body_capture", () -> repository.writeSync(ServerDirection.REQUEST, requestId, ByteBuffer.wrap(b, off, read)));
+                chronograph.time("request_body_capture", () -> repository.writeBody(ServerDirection.REQUEST, requestId, ByteBuffer.wrap(b, off, read)));
             }
             return read;
         }

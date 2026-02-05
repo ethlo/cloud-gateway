@@ -11,12 +11,19 @@ import com.ethlo.http.configuration.HttpLoggingConfiguration;
 
 @Configuration
 @RefreshScope
-@ConditionalOnProperty("http-logging.capture.enabled")
 public class CaptureCfg
 {
     @Bean
-    public DefaultDataBufferRepository pooledFileDataBufferRepository(HttpLoggingConfiguration httpLoggingConfiguration) throws IOException
+    @ConditionalOnProperty("http-logging.capture.enabled")
+    public DataBufferRepository dataBufferRepository(HttpLoggingConfiguration httpLoggingConfiguration) throws IOException
     {
         return new DefaultDataBufferRepository(httpLoggingConfiguration.getCapture(), httpLoggingConfiguration.maxMemoryBuffer());
+    }
+
+    @Bean
+    @ConditionalOnProperty(value = "http-logging.capture.enabled", havingValue = "false", matchIfMissing = true)
+    public DataBufferRepository nopDataBufferRepository()
+    {
+        return NopDataBufferRepository.INSTANCE;
     }
 }
