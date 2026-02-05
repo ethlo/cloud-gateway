@@ -14,8 +14,6 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Objects;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.util.unit.DataSize;
 
 import com.ethlo.http.DataBufferRepository;
@@ -26,8 +24,6 @@ import com.ethlo.http.model.WebExchangeDataProvider;
 
 public class DirectFileLogger implements HttpLogger
 {
-    private static final Logger logger = LoggerFactory.getLogger(DirectFileLogger.class);
-
     private final AccessLogTemplateRenderer accessLogTemplateRenderer;
     private final ArchiveManager archiveManager;
     private final Path logDirectory;
@@ -40,8 +36,8 @@ public class DirectFileLogger implements HttpLogger
     {
         this.accessLogTemplateRenderer = accessLogTemplateRenderer;
         this.archiveManager = new ArchiveManager(logDirectory, repository);
-        this.logDirectory = Objects.requireNonNull(logDirectory);
-        this.maxRolloverSize = maxRolloverSize;
+        this.logDirectory = Objects.requireNonNull(logDirectory, "logDirectory cannot be null");
+        this.maxRolloverSize = Objects.requireNonNull(maxRolloverSize, "maxRolloverSize cannot be null");
 
         try
         {
