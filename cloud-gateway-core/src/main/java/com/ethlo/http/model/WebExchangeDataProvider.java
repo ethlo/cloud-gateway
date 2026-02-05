@@ -10,6 +10,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeMap;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatusCode;
@@ -23,6 +25,7 @@ import com.ethlo.http.processors.auth.RealmUser;
 
 public class WebExchangeDataProvider
 {
+    private static final Logger logger = LoggerFactory.getLogger(WebExchangeDataProvider.class);
     private final DataBufferRepository dataBufferRepository;
     private final PredicateConfig predicateConfig;
     private String requestId;
@@ -55,7 +58,14 @@ public class WebExchangeDataProvider
 
     public void cleanup()
     {
-        cleanupTask.run();
+        if (cleanupTask != null)
+        {
+            cleanupTask.run();
+        }
+        else
+        {
+            logger.warn("No cleanup task for request {}", requestId);
+        }
     }
 
     public WebExchangeDataProvider requestId(String requestId)

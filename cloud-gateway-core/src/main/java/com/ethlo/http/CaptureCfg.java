@@ -21,7 +21,7 @@ public class CaptureCfg
     }
 
     @Bean
-    @ConditionalOnProperty(value = "http-logging.capture.enabled", havingValue = "false")
+    @ConditionalOnProperty(value = "http-logging.capture.enabled", havingValue = "false", matchIfMissing = true)
     public DataBufferRepository nopDataBufferRepository()
     {
         return NopDataBufferRepository.INSTANCE;
