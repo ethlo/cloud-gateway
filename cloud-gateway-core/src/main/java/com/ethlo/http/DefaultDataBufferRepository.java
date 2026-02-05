@@ -75,7 +75,7 @@ public class DefaultDataBufferRepository implements DataBufferRepository
                 StandardOpenOption.TRUNCATE_EXISTING
         ))
         {
-            writeFully(fc, ByteBuffer.wrap(serialize(headers)), 0);
+            writeFully(fc, ByteBuffer.wrap(serialize(headers)));
         }
         catch (IOException e)
         {
@@ -185,29 +185,27 @@ public class DefaultDataBufferRepository implements DataBufferRepository
         return new DataState(null, fc, new AtomicLong(written));
     }
 
-    private void writeFully(FileChannel fc, ByteBuffer src, long offset) throws IOException
+    private void writeFully(FileChannel fc, ByteBuffer src) throws IOException
     {
-        int attempts = 0;
+        writeFully(fc, src, null);
+    }
+
+    private void writeFully(FileChannel fc, ByteBuffer src, Long offset) throws IOException
+    {
         while (src.hasRemaining())
         {
-            final int written = (offset < 0) ? fc.write(src) : fc.write(src, offset);
+            // If offset is null, use the channel's current position (and update it)
+            // If offset is provided, use absolute position (does NOT update channel position)
+            int written = (offset == null) ? fc.write(src) : fc.write(src, offset);
 
             if (written == 0)
             {
-                attempts++;
-                if (attempts > 10)
-                {
-                    throw new IOException("Critical: Zero bytes written to disk after 10 attempts. Disk full or IO stall?");
-                }
-                Thread.yield(); // Give the OS a moment to flush buffers
+                // Standard retry logic for edge cases/interrupts
+                Thread.yield();
             }
-            else
+            else if (offset != null)
             {
-                if (offset >= 0)
-                {
-                    offset += written;
-                }
-                attempts = 0; // Reset on progress
+                offset += written;
             }
         }
     }
@@ -218,11 +216,11 @@ public class DefaultDataBufferRepository implements DataBufferRepository
         final FileChannel fc = FileChannel.open(path, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
 
         // Write the accumulated memory buffer fully
-        writeFully(fc, ByteBuffer.wrap(existing.toByteArray()), -1);
+        writeFully(fc, ByteBuffer.wrap(existing.toByteArray()));
 
         // Write the new incoming chunk fully
         int dataSize = data.remaining();
-        writeFully(fc, data, -1);
+        writeFully(fc, data);
 
         return new DataState(null, fc, new AtomicLong(existing.size() + dataSize));
     }
@@ -230,13 +228,8 @@ public class DefaultDataBufferRepository implements DataBufferRepository
     private void writeToChannel(FileChannel fc, AtomicLong pos, ByteBuffer data) throws IOException
     {
         final int bytesToWrite = data.remaining();
-        // We calculate the start offset, but we must ensure we write exactly bytesToWrite
-        long currentOffset = pos.getAndAdd(bytesToWrite);
-        while (data.hasRemaining())
-        {
-            int written = fc.write(data, currentOffset);
-            currentOffset += written;
-        }
+        final long startOffset = pos.getAndAdd(bytesToWrite);
+        writeFully(fc, data, startOffset);
     }
 
     public void cleanup(String requestId)
@@ -345,10 +338,10 @@ public class DefaultDataBufferRepository implements DataBufferRepository
         {
             // 1. Write the Durable Headers (Advances pointer)
             byte[] headerBytes = serialize(headers);
-            writeFully(out, ByteBuffer.wrap(headerBytes), -1);
+            writeFully(out, ByteBuffer.wrap(headerBytes));
 
             // 2. Add the double CRLF "Separator" (Advances pointer again)
-            writeFully(out, ByteBuffer.wrap("\r\n".getBytes(StandardCharsets.US_ASCII)), -1);
+            writeFully(out, ByteBuffer.wrap("\r\n".getBytes(StandardCharsets.US_ASCII)));
 
             // 3. Zero-Copy the body (Starts at current pointer position)
             if (bodyProvider.file() != null && Files.exists(bodyProvider.file()))
@@ -367,7 +360,7 @@ public class DefaultDataBufferRepository implements DataBufferRepository
             // Handle memory-based bodies if they exist
             else if (bodyProvider.bytes() != null)
             {
-                writeFully(out, ByteBuffer.wrap(bodyProvider.bytes()), -1);
+                writeFully(out, ByteBuffer.wrap(bodyProvider.bytes()));
             }
 
             logger.debug("Archived combined {} for {}", fileName, requestId);
