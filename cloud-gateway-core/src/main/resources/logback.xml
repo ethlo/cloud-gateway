@@ -10,22 +10,6 @@
         </encoder>
     </appender>
 
-    <appender name="access-file" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>${java.io.tmpdir}/cloud-gateway/access.log</file>
-        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <fileNamePattern>${java.io.tmpdir}/cloud-gateway/access.%d{yyyy-MM-dd}.log</fileNamePattern>
-            <maxHistory>100</maxHistory>
-        </rollingPolicy>
-        <encoder>
-            <pattern>%d - %m%n%ex
-            </pattern>
-        </encoder>
-    </appender>
-
-    <logger name="access-log" additivity="false">
-        <appender-ref ref="access-file"/>
-    </logger>
-
     <root level="INFO">
         <appender-ref ref="console"/>
     </root>

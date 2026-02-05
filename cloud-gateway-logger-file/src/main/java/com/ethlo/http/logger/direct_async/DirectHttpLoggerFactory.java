@@ -26,6 +26,6 @@ public class DirectHttpLoggerFactory implements HttpLoggerFactory
     public HttpLogger getInstance(final Map<String, Object> configuration, BiFunction<String, Object, Object> beanRegistration)
     {
         final DirectFileProviderConfig config = load(configuration, DirectFileProviderConfig.class);
-        return new DirectFileLogger(new PebbleAccessLogTemplateRenderer(config.pattern(), false), config.storageDirectory(), BeanProvider.get(DataBufferRepository.class));
+        return new DirectFileLogger(new PebbleAccessLogTemplateRenderer(config.pattern(), false), config.storageDirectory(), config.maxRolloverSize(), BeanProvider.get(DataBufferRepository.class));
     }
 }

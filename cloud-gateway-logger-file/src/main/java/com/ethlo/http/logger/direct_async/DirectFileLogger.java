@@ -31,18 +31,18 @@ public class DirectFileLogger implements HttpLogger
     private final AccessLogTemplateRenderer accessLogTemplateRenderer;
     private final ArchiveManager archiveManager;
     private final Path logDirectory;
+    private final DataSize maxRolloverSize;
     private long currentSize;
     private LocalDate currentDate;
     private OutputStream destination;
 
-    // Config
-    private long maxFileSize = DataSize.ofMegabytes(10).toBytes();
-
-    public DirectFileLogger(AccessLogTemplateRenderer accessLogTemplateRenderer, Path logDirectory, DataBufferRepository repository)
+    public DirectFileLogger(AccessLogTemplateRenderer accessLogTemplateRenderer, Path logDirectory, DataSize maxRolloverSize, DataBufferRepository repository)
     {
         this.accessLogTemplateRenderer = accessLogTemplateRenderer;
         this.archiveManager = new ArchiveManager(logDirectory, repository);
         this.logDirectory = Objects.requireNonNull(logDirectory);
+        this.maxRolloverSize = maxRolloverSize;
+
         try
         {
             init();
@@ -66,7 +66,7 @@ public class DirectFileLogger implements HttpLogger
 
         // Check if the existing file is already over the limit from a previous run
         this.currentSize = Files.size(activePath);
-        if (currentSize > maxFileSize)
+        if (currentSize > maxRolloverSize.toBytes())
         {
             roll(currentDate);
         }
@@ -77,16 +77,8 @@ public class DirectFileLogger implements HttpLogger
     {
         try
         {
-            init();
-
-            // 1. Render the text-based access log line
             final String logLine = accessLogTemplateRenderer.render(data.asMetaMap()) + "\n";
-
-            // 2. Write to the rolling access log file (Text only)
             writeToRollingFile(logLine.getBytes(StandardCharsets.UTF_8));
-
-            // 3. Archive the raw data (Headers + Body combined into .raw files)
-            // This uses the ArchiveManager's m/l/8/h/ sharding logic
             archiveManager.archive(data);
         }
         catch (IOException e)
@@ -100,7 +92,7 @@ public class DirectFileLogger implements HttpLogger
         final LocalDate now = LocalDate.now();
 
         // Trigger roll if the date changed OR the file grew too large
-        if (!now.equals(currentDate) || (currentSize + bytes.length > maxFileSize))
+        if (!now.equals(currentDate) || (currentSize + bytes.length > maxRolloverSize.toBytes()))
         {
             roll(now);
         }

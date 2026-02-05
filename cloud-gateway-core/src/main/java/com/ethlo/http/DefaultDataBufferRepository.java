@@ -328,7 +328,7 @@ public class DefaultDataBufferRepository implements DataBufferRepository
     private void archive(String requestId, ServerDirection direction, Path archiveDir)
     {
         final Optional<HttpHeaders> headers = readHeaders(direction, requestId);
-        headers.ifPresent(header -> archiveCombined(requestId, direction, header, getBody(direction, requestId, header.getFirst(HttpHeaders.TRANSFER_ENCODING)).orElse(BodyProvider.NONE), archiveDir));
+        headers.ifPresent(header -> archiveCombined(requestId, direction, header, getBody(direction, requestId, header.getFirst(HttpHeaders.CONTENT_ENCODING)).orElse(BodyProvider.NONE), archiveDir));
 
     }
 
