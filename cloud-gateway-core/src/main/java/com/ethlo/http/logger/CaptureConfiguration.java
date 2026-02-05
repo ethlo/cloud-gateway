@@ -3,13 +3,15 @@ package com.ethlo.http.logger;
 import java.nio.file.Path;
 import java.util.Optional;
 
+import jakarta.validation.Valid;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.validation.annotation.Validated;
 
 import jakarta.validation.constraints.NotNull;
 
-@Validated
+@Valid
 public class CaptureConfiguration
 {
     private static final Logger logger = LoggerFactory.getLogger(CaptureConfiguration.class);

@@ -248,8 +248,16 @@ public class DefaultDataBufferRepository implements DataBufferRepository
             try
             {
                 state.channel.close();
-                Files.deleteIfExists(getPath(dir, requestId, "headers"));
-                Files.deleteIfExists(getPath(dir, requestId, "body"));
+                if (!Files.deleteIfExists(getPath(dir, requestId, "headers")))
+                {
+                    logger.warn("Unable to clean up headers file for {} for {}", dir.name().toLowerCase(), requestId);
+                }
+
+                if (!Files.deleteIfExists(getPath(dir, requestId, "body")))
+                {
+                    logger.warn("Unable to clean up body file for {} for {}", dir.name().toLowerCase(), requestId);
+                }
+
                 if (logger.isDebugEnabled())
                 {
                     logger.debug("Deleted {} disk buffer for {}. File size {}B", dir, requestId, state.position.get());

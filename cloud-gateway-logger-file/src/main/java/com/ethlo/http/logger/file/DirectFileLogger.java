@@ -1,4 +1,4 @@
-package com.ethlo.http.logger.direct_async;
+package com.ethlo.http.logger.file;
 
 import java.io.BufferedOutputStream;
 import java.io.IOException;
@@ -26,17 +26,17 @@ public class DirectFileLogger implements HttpLogger
 {
     private final AccessLogTemplateRenderer accessLogTemplateRenderer;
     private final ArchiveManager archiveManager;
-    private final Path logDirectory;
+    private final Path storageDirectory;
     private final DataSize maxRolloverSize;
     private long currentSize;
     private LocalDate currentDate;
     private OutputStream destination;
 
-    public DirectFileLogger(AccessLogTemplateRenderer accessLogTemplateRenderer, Path logDirectory, DataSize maxRolloverSize, DataBufferRepository repository)
+    public DirectFileLogger(AccessLogTemplateRenderer accessLogTemplateRenderer, Path storageDirectory, DataSize maxRolloverSize, DataBufferRepository repository)
     {
         this.accessLogTemplateRenderer = accessLogTemplateRenderer;
-        this.archiveManager = new ArchiveManager(logDirectory, repository);
-        this.logDirectory = Objects.requireNonNull(logDirectory, "logDirectory cannot be null");
+        this.archiveManager = new ArchiveManager(storageDirectory, repository);
+        this.storageDirectory = Objects.requireNonNull(storageDirectory, "storageDirectory cannot be null");
         this.maxRolloverSize = Objects.requireNonNull(maxRolloverSize, "maxRolloverSize cannot be null");
 
         try
@@ -51,8 +51,8 @@ public class DirectFileLogger implements HttpLogger
 
     private void init() throws IOException
     {
-        Files.createDirectories(logDirectory);
-        final Path activePath = logDirectory.resolve("access.log");
+        Files.createDirectories(storageDirectory);
+        final Path activePath = storageDirectory.resolve("access.log");
 
         this.currentDate = LocalDate.now();
         this.destination = new BufferedOutputStream(Files.newOutputStream(activePath,
@@ -106,13 +106,13 @@ public class DirectFileLogger implements HttpLogger
             destination.close();
         }
 
-        final Path activeLog = logDirectory.resolve("access.log");
+        final Path activeLog = storageDirectory.resolve("access.log");
 
         if (Files.exists(activeLog))
         {
             // Add a timestamp to the rolled file: access.log.2026-02-05.143005.log
             final String timestamp = DateTimeFormatter.ofPattern("yyyy-MM-dd.HHmmss").format(LocalDateTime.now());
-            final Path rolledLog = logDirectory.resolve("access.log." + timestamp + ".log");
+            final Path rolledLog = storageDirectory.resolve("access.log." + timestamp + ".log");
             Files.move(activeLog, rolledLog, StandardCopyOption.REPLACE_EXISTING);
         }
 

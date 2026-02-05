@@ -1,7 +1,5 @@
 package com.ethlo.http.logger.clickhouse;
 
-import static com.ethlo.http.match.HeaderProcessing.DELETE;
-import static com.ethlo.http.match.HeaderProcessing.REDACT;
 import static com.ethlo.http.match.LogOptions.ContentProcessing.STORE;
 import static com.ethlo.http.netty.ServerDirection.REQUEST;
 import static com.ethlo.http.netty.ServerDirection.RESPONSE;
@@ -20,8 +18,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 
 import com.ethlo.http.logger.HttpLogger;
-import com.ethlo.http.logger.RedactUtil;
-import com.ethlo.http.match.HeaderProcessing;
 import com.ethlo.http.match.LogOptions;
 import com.ethlo.http.model.BodyProvider;
 import com.ethlo.http.model.WebExchangeDataProvider;
@@ -109,35 +105,8 @@ public class ClickHouseLogger implements HttpLogger
 
     private void prepareHeaders(WebExchangeDataProvider dataProvider, PredicateConfig predicateConfig, Map<String, Object> params)
     {
-        final HttpHeaders requestHeaders = HttpHeaders.copyOf(dataProvider.getRequestHeaders());
-        final HttpHeaders responseHeaders = HttpHeaders.copyOf(dataProvider.getResponseHeaders());
-
-        // Request Header Scrubbing
-        processHeader(DELETE, requestHeaders, HttpHeaders.HOST);
-        processHeader(REDACT, requestHeaders, HttpHeaders.AUTHORIZATION);
-        requestHeaders.headerNames().forEach(name -> processHeader(predicateConfig.request().headers().apply(name), requestHeaders, name));
-
-        // Response Header Scrubbing
-        responseHeaders.headerNames().forEach(name -> processHeader(predicateConfig.response().headers().apply(name), responseHeaders, name));
-
-        params.put("request_headers", flattenMap(requestHeaders));
-        params.put("response_headers", flattenMap(responseHeaders));
-    }
-
-    private void processHeader(HeaderProcessing processing, HttpHeaders headers, String name)
-    {
-        if (processing == DELETE)
-        {
-            headers.remove(name);
-        }
-        else if (processing == REDACT)
-        {
-            final List<String> values = headers.get(name);
-            if (values != null)
-            {
-                headers.put(name, RedactUtil.redactAll(values));
-            }
-        }
+        params.put("request_headers", flattenMap(dataProvider.getRequestHeaders()));
+        params.put("response_headers", flattenMap(dataProvider.getResponseHeaders()));
     }
 
     private Map<String, String> flattenMap(HttpHeaders headers)

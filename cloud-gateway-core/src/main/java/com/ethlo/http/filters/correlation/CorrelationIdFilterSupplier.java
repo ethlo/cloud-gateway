@@ -1,4 +1,4 @@
-package com.ethlo.http.filters;
+package com.ethlo.http.filters.correlation;
 
 import java.lang.reflect.Method;
 import java.util.Collection;
@@ -8,12 +8,13 @@ import org.springframework.cloud.gateway.server.mvc.common.Configurable;
 import org.springframework.cloud.gateway.server.mvc.filter.FilterSupplier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.function.HandlerFilterFunction;
-import org.springframework.web.servlet.function.ServerRequest;
 import org.springframework.web.servlet.function.ServerResponse;
 
 @Component
 public class CorrelationIdFilterSupplier implements FilterSupplier
 {
+    public static final String ATTR_HEADER_NAME = "correlation.header.name";
+
     public static HandlerFilterFunction<ServerResponse, ServerResponse> correlationIdHeader()
     {
         return correlationIdHeader(new Config());
@@ -22,17 +23,14 @@ public class CorrelationIdFilterSupplier implements FilterSupplier
     @Configurable
     public static HandlerFilterFunction<ServerResponse, ServerResponse> correlationIdHeader(Config config)
     {
-        return (request, next) ->
-        {
-            final String requestId = (String) request.attribute("requestId").orElseThrow();
+        return (request, next) -> {
+            String requestId = (String) request.attribute("requestId").orElseThrow();
 
-            final ServerRequest mutatedRequest = ServerRequest.from(request)
-                    .header(config.getHeaderName(), requestId)
-                    .build();
+            // Pass data to servlet layer
+            request.attributes().put(ATTR_HEADER_NAME, config.getHeaderName());
+            request.attributes().put("correlationId", requestId);
 
-            final ServerResponse response = next.handle(mutatedRequest);
-            response.headers().add(config.getHeaderName(), requestId);
-            return response;
+            return next.handle(request);
         };
     }
 
@@ -42,13 +40,13 @@ public class CorrelationIdFilterSupplier implements FilterSupplier
         try
         {
             return List.of(
-                    this.getClass().getMethod("correlationIdHeader"),
-                    this.getClass().getMethod("correlationIdHeader", Config.class)
+                    getClass().getMethod("correlationIdHeader"),
+                    getClass().getMethod("correlationIdHeader", Config.class)
             );
         }
         catch (NoSuchMethodException e)
         {
-            throw new RuntimeException(e);
+            throw new IllegalStateException(e);
         }
     }
 

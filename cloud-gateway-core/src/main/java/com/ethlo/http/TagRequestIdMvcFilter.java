@@ -1,5 +1,9 @@
 package com.ethlo.http;
 
+import static com.ethlo.http.ServletUtil.sanitizeHeaders;
+import static com.ethlo.http.match.HeaderProcessing.DELETE;
+import static com.ethlo.http.match.HeaderProcessing.REDACT;
+
 import java.io.IOException;
 import java.math.BigInteger;
 import java.net.SocketException;
@@ -18,6 +22,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.cloud.gateway.server.mvc.common.MvcUtils;
 import org.springframework.core.NestedExceptionUtils;
 import org.springframework.core.Ordered;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -26,7 +31,10 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import com.ethlo.chronograph.Chronograph;
 import com.ethlo.http.configuration.HttpLoggingConfiguration;
 import com.ethlo.http.logger.LoggingFilterService;
+import com.ethlo.http.logger.RedactUtil;
 import com.ethlo.http.logger.delegate.DelegateHttpLogger;
+import com.ethlo.http.match.HeaderPredicate;
+import com.ethlo.http.match.HeaderProcessing;
 import com.ethlo.http.model.WebExchangeDataProvider;
 import com.ethlo.http.netty.PredicateConfig;
 import com.ethlo.http.netty.ServerDirection;
@@ -129,7 +137,7 @@ public class TagRequestIdMvcFilter extends OncePerRequestFilter implements Order
 
                     // Write Request headers immediately
                     chronograph.time("persist_request_headers", () ->
-                            repository.writeHeaders(ServerDirection.REQUEST, requestId, ServletUtil.extractHeaders(request))
+                            repository.writeHeaders(ServerDirection.REQUEST, requestId, sanitizeHeaders(matchedConfig.request().headers(), ServletUtil.extractHeaders(request)))
                     );
 
                     final MvcRequestCapture wrappedRequest = new MvcRequestCapture(chronograph, request, requestId, repository);
@@ -152,7 +160,7 @@ public class TagRequestIdMvcFilter extends OncePerRequestFilter implements Order
                         );
 
                         chronograph.time("persist_response_headers", () ->
-                                repository.writeHeaders(ServerDirection.RESPONSE, requestId, ServletUtil.extractHeaders(response))
+                                repository.writeHeaders(ServerDirection.RESPONSE, requestId, sanitizeHeaders(matchedConfig.response().headers(), ServletUtil.extractHeaders(response)))
                         );
 
                         chronograph.time("buffer_flush", wrappedResponse::copyBodyToResponse);

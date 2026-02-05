@@ -19,6 +19,8 @@ import java.util.Random;
 import java.util.function.Consumer;
 import java.util.zip.GZIPOutputStream;
 
+import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
@@ -115,7 +117,7 @@ class HandleDifferentResponseTypesTest extends BaseTest implements Consumer<WebE
         this.restTemplate.setErrorHandler(new DefaultResponseErrorHandler()
         {
             @Override
-            public boolean hasError(final ClientHttpResponse response) throws IOException
+            public boolean hasError(final @NotNull ClientHttpResponse response) throws IOException
             {
                 return false;
             }
@@ -133,7 +135,7 @@ class HandleDifferentResponseTypesTest extends BaseTest implements Consumer<WebE
                         .withChunkedDribbleDelay(5, 500)
                         .withBody("Mozilla Developer Network")));
 
-        ResponseEntity<String> response = restTemplate.getForEntity(getGatewayUri("/get"), String.class);
+        ResponseEntity<@NonNull String> response = restTemplate.getForEntity(getGatewayUri("/get"), String.class);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         webExchangeDataProvider.cleanup();
     }
@@ -166,7 +168,7 @@ class HandleDifferentResponseTypesTest extends BaseTest implements Consumer<WebE
         assertThat(readBody(webExchangeDataProvider.getRequestBody())).containsExactly(largeData);
         assertThat(readBody(webExchangeDataProvider.getResponseBody())).containsExactly(largeData);
 
-        //webExchangeDataProvider.cleanup();
+        webExchangeDataProvider.cleanup();
     }
 
     @Test

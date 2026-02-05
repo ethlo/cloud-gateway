@@ -1,4 +1,4 @@
-package com.ethlo.http.logger.direct_async;
+package com.ethlo.http.logger.file;
 
 import java.nio.file.Path;
 import java.util.Optional;

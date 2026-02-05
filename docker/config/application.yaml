@@ -48,10 +48,10 @@ http-logging:
       response:
         body: STORE
         raw: STORE
-logging:
-  level:
-    com.ethlo.http: DEBUG
-    chronograph: DEBUG
+    #logging:
+    #  level:
+    #com.ethlo.http: DEBUG
+    #chronograph: DEBUG
     #org.springframework.cloud.gateway: INFO
     #org.springframework.cloud.gateway.server.mvc.config: TRACE
     #org.springframework.cloud.gateway.server.mvc.predicate: TRACE

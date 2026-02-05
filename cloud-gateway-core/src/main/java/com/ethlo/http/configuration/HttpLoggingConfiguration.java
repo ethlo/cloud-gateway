@@ -6,17 +6,14 @@ import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.util.unit.DataSize;
-import org.springframework.validation.annotation.Validated;
 
 import com.ethlo.http.logger.CaptureConfiguration;
 import com.ethlo.http.logger.LogFilter;
 import com.ethlo.http.match.RequestMatchingProcessor;
 import jakarta.validation.Valid;
 
-@Validated
-@RefreshScope
+@Valid
 @ConfigurationProperties(prefix = "http-logging")
 public class HttpLoggingConfiguration
 {

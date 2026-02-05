@@ -2,6 +2,8 @@ package com.ethlo.http.filters;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.ethlo.http.filters.correlation.CorrelationIdFilterSupplier;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.cloud.gateway.server.mvc.filter.FilterSupplier;
 import org.springframework.web.servlet.function.ServerResponse;
