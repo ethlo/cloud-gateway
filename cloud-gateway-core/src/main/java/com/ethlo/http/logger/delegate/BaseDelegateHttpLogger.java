@@ -86,7 +86,7 @@ public abstract class BaseDelegateHttpLogger implements DelegateHttpLogger
             }
             catch (Exception e)
             {
-                logger.warn("Logger {} failed to close", logger.getName(), e);
+                logger.warn("Logger {} failed to close", httpLogger.getName(), e);
             }
         }
     }
