@@ -8,6 +8,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpHeaders;
 
 import com.ethlo.http.model.BodyProvider;
+import com.ethlo.http.model.WebExchangeDataProvider;
 import com.ethlo.http.netty.ServerDirection;
 
 public class NopDataBufferRepository implements DataBufferRepository
@@ -56,7 +57,7 @@ public class NopDataBufferRepository implements DataBufferRepository
     }
 
     @Override
-    public void archive(final String requestId, final Path archiveDir)
+    public void archive(final WebExchangeDataProvider data, final Path archiveDir)
     {
 
     }

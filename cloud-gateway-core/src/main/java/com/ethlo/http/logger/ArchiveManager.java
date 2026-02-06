@@ -36,7 +36,7 @@ public class ArchiveManager
 
             // 3. Trigger the stitching/moving logic in the repository
             // This combines headers + body into [requestId]_request.raw and [requestId]_response.raw
-            repository.archive(requestId, targetDir);
+            repository.archive(data, targetDir);
         }
         catch (IOException e)
         {

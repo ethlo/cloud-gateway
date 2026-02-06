@@ -18,10 +18,12 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.util.unit.DataSize;
 
 import com.ethlo.http.logger.CaptureConfiguration;
 import com.ethlo.http.model.BodyProvider;
+import com.ethlo.http.model.WebExchangeDataProvider;
 import com.ethlo.http.netty.ServerDirection;
 
 public class DefaultDataBufferRepository implements DataBufferRepository
@@ -90,6 +92,8 @@ public class DefaultDataBufferRepository implements DataBufferRepository
         {
             for (String value : values)
             {
+                // We repeat the header name for multi-values (Standard Wire Format)
+                // This is safer than comma-separation for things like Set-Cookie
                 sb.append(name).append(": ").append(value).append("\r\n");
             }
         });
@@ -300,11 +304,11 @@ public class DefaultDataBufferRepository implements DataBufferRepository
         return Optional.of(new BodyProvider(getPath(dir, id, "body"), contentEncoding));
     }
 
-    @Override
-    public void archive(final String requestId, final Path archiveDir)
+    public void archive(WebExchangeDataProvider data, final Path archiveDir)
     {
-        archive(requestId, ServerDirection.REQUEST, archiveDir);
-        archive(requestId, ServerDirection.RESPONSE, archiveDir);
+        final String requestId = data.getRequestId();
+        archive(data, ServerDirection.REQUEST, archiveDir);
+        archive(data, ServerDirection.RESPONSE, archiveDir);
     }
 
     public void persistForError(String requestId)
@@ -335,15 +339,17 @@ public class DefaultDataBufferRepository implements DataBufferRepository
     }
 
 
-    private void archive(String requestId, ServerDirection direction, Path archiveDir)
+    private void archive(WebExchangeDataProvider data, ServerDirection direction, Path archiveDir)
     {
+        final String requestId = data.getRequestId();
         final Optional<HttpHeaders> headers = readHeaders(direction, requestId);
-        headers.ifPresent(header -> archiveCombined(requestId, direction, header, getBody(direction, requestId, header.getFirst(HttpHeaders.CONTENT_ENCODING)).orElse(BodyProvider.NONE), archiveDir));
+        headers.ifPresent(header -> archiveCombined(data, direction, header, getBody(direction, requestId, header.getFirst(HttpHeaders.CONTENT_ENCODING)).orElse(BodyProvider.NONE), archiveDir));
 
     }
 
-    private void archiveCombined(String requestId, ServerDirection dir, HttpHeaders headers, BodyProvider bodyProvider, Path archiveDir)
+    private void archiveCombined(WebExchangeDataProvider data, ServerDirection dir, HttpHeaders headers, BodyProvider bodyProvider, Path archiveDir)
     {
+        final String requestId = data.getRequestId();
         final String fileName = requestId + "_" + dir.name().toLowerCase() + ".raw";
         final Path target = archiveDir.resolve(fileName);
 
@@ -353,14 +359,15 @@ public class DefaultDataBufferRepository implements DataBufferRepository
                 StandardOpenOption.TRUNCATE_EXISTING
         ))
         {
-            // 1. Write the Durable Headers (Advances pointer)
+            // HTTP line
+            writeFully(out, ByteBuffer.wrap(buildStartLine(data, dir).getBytes(StandardCharsets.UTF_8)));
+
+            // Headers
             byte[] headerBytes = serialize(headers);
             writeFully(out, ByteBuffer.wrap(headerBytes));
-
-            // 2. Add the double CRLF "Separator" (Advances pointer again)
             writeFully(out, ByteBuffer.wrap("\r\n".getBytes(StandardCharsets.US_ASCII)));
 
-            // 3. Zero-Copy the body (Starts at current pointer position)
+            // Body (zero copy)
             if (bodyProvider.file() != null && Files.exists(bodyProvider.file()))
             {
                 try (FileChannel in = FileChannel.open(bodyProvider.file(), StandardOpenOption.READ))
@@ -386,6 +393,42 @@ public class DefaultDataBufferRepository implements DataBufferRepository
         {
             throw new UncheckedIOException("Failed to archive " + requestId, e);
         }
+    }
+
+    private String buildStartLine(WebExchangeDataProvider data, ServerDirection dir)
+    {
+        if (dir == ServerDirection.REQUEST)
+        {
+            return String.format("%s %s %s\r\n",
+                    data.getMethod(),
+                    data.getUri(),
+                    data.getProtocol()
+            );
+        }
+        else
+        {
+            return String.format("%s %d %s\r\n",
+                    "HTTP/1.1",
+                    data.getStatusCode().value(),
+                    getReasonPhrase(data.getStatusCode().value())
+            );
+        }
+    }
+
+    private String getReasonPhrase(int code)
+    {
+        final HttpStatus status = HttpStatus.resolve(code);
+        if (status != null)
+        {
+            return status.getReasonPhrase();
+        }
+
+        // Fallback for custom codes like 499
+        return switch (code)
+        {
+            case 499 -> "Client Closed Request";
+            default -> "Status " + code;
+        };
     }
 
     // Helper record to manage the toggle between RAM and Disk

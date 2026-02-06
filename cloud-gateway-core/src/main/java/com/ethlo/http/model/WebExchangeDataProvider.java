@@ -34,6 +34,7 @@ public class WebExchangeDataProvider
     private String path;
     private URI uri;
     private HttpStatusCode statusCode;
+    private String protocol;
     private HeaderProvider requestHeaders;
     private HeaderProvider responseHeaders;
     private OffsetDateTime timestamp;
@@ -217,6 +218,17 @@ public class WebExchangeDataProvider
     public Route getRoute()
     {
         return route;
+    }
+
+    public WebExchangeDataProvider protocol(final String protocol)
+    {
+        this.protocol = protocol;
+        return this;
+    }
+
+    public String getProtocol()
+    {
+        return protocol;
     }
 
     public WebExchangeDataProvider route(final Route route)

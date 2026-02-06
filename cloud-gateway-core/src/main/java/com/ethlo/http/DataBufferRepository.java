@@ -8,6 +8,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpHeaders;
 
 import com.ethlo.http.model.BodyProvider;
+import com.ethlo.http.model.WebExchangeDataProvider;
 import com.ethlo.http.netty.ServerDirection;
 
 public interface DataBufferRepository
@@ -24,5 +25,5 @@ public interface DataBufferRepository
 
     Optional<BodyProvider> getBody(ServerDirection serverDirection, String requestId, @Nullable String contentEncoding);
 
-    void archive(String requestId, Path archiveDir);
+    void archive(WebExchangeDataProvider data, Path archiveDir);
 }

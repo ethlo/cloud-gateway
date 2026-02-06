@@ -1,8 +1,6 @@
 package com.ethlo.http;
 
 import static com.ethlo.http.ServletUtil.sanitizeHeaders;
-import static com.ethlo.http.match.HeaderProcessing.DELETE;
-import static com.ethlo.http.match.HeaderProcessing.REDACT;
 
 import java.io.IOException;
 import java.math.BigInteger;
@@ -16,13 +14,13 @@ import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Predicate;
 
+import org.apache.catalina.connector.ClientAbortException;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cloud.gateway.server.mvc.common.MvcUtils;
 import org.springframework.core.NestedExceptionUtils;
 import org.springframework.core.Ordered;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -31,10 +29,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import com.ethlo.chronograph.Chronograph;
 import com.ethlo.http.configuration.HttpLoggingConfiguration;
 import com.ethlo.http.logger.LoggingFilterService;
-import com.ethlo.http.logger.RedactUtil;
 import com.ethlo.http.logger.delegate.DelegateHttpLogger;
-import com.ethlo.http.match.HeaderPredicate;
-import com.ethlo.http.match.HeaderProcessing;
 import com.ethlo.http.model.WebExchangeDataProvider;
 import com.ethlo.http.netty.PredicateConfig;
 import com.ethlo.http.netty.ServerDirection;
@@ -168,7 +163,7 @@ public class TagRequestIdMvcFilter extends OncePerRequestFilter implements Order
                     catch (Throwable e)
                     {
                         connectionException = (e instanceof RuntimeException && e.getCause() != null) ? e.getCause() : e;
-                        handleException(requestId, connectionException, response);
+                        handleException(connectionException, requestId, request, response);
                     } finally
                     {
                         final Throwable finalExc = connectionException;
@@ -197,12 +192,13 @@ public class TagRequestIdMvcFilter extends OncePerRequestFilter implements Order
                         final Duration requestTime = chronograph.getTotalTime();
 
                         final Route route = getRoute(req);
-
                         return new WebExchangeDataProvider(repository, mergedConfig)
                                 .requestId(requestId)
                                 .cleanupTask(() -> repository.cleanup(requestId))
                                 .method(HttpMethod.valueOf(req.getMethod().toUpperCase()))
                                 .path(req.getRequestURI())
+                                .protocol(req.getProtocol())
+
                                 .route(route)
                                 .uri(java.net.URI.create(req.getRequestURL().toString()))
                                 .statusCode(HttpStatus.valueOf(res.getStatus()))
@@ -220,25 +216,28 @@ public class TagRequestIdMvcFilter extends OncePerRequestFilter implements Order
         }
     }
 
-    private void handleException(final String requestId, Throwable e, HttpServletResponse response)
+    private void handleException(Throwable exception, final String requestId, final HttpServletRequest request, HttpServletResponse response)
     {
-        if (isReset(e))
+        final Throwable rootCause = NestedExceptionUtils.getMostSpecificCause(exception);
+        if (rootCause instanceof SocketException)
         {
-            logger.warn("Connection reset during request processing for request {}", requestId);
-            response.setStatus(HttpStatus.BAD_GATEWAY.value());
+            handle(rootCause, requestId, request, HttpStatus.BAD_GATEWAY, response);
+        }
+        else if (rootCause instanceof ClientAbortException)
+        {
+            handle(rootCause, requestId, request, HttpStatus.valueOf(499), response);
         }
         else
         {
-            logger.warn("Exception occurred during request processing for request {}", requestId, e);
+            logger.warn("Unexpected exception {} occurred during request processing for request {}: {} {}", rootCause.getClass().getName(), requestId, request.getMethod(), request.getRequestURI(), exception);
         }
     }
 
-    private boolean isReset(Throwable ex)
+    private void handle(final Throwable rootCause, String requestId, HttpServletRequest request, HttpStatus httpStatus, HttpServletResponse response)
     {
-        final Throwable rootCause = NestedExceptionUtils.getMostSpecificCause(ex);
-        return rootCause instanceof SocketException;
+        logger.info("Error {} during request processing for request {}: {} {}", rootCause.getClass().getName(), requestId, request.getMethod(), request.getRequestURI());
+        response.setStatus(httpStatus.value());
     }
-
 
     @Override
     public int getOrder()
