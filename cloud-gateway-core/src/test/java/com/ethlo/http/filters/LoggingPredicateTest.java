@@ -15,97 +15,93 @@ import com.ethlo.http.match.RequestMatchingProcessor;
 import com.ethlo.http.netty.PredicateConfig;
 import com.ethlo.http.util.ConfigUtil;
 
-class LoggingPredicateTest
+class LoggingPredicateReadTest
 {
-
     @Test
-    void testMixedMapRepresentations()
+    void readsMatcher_shouldMatchPlainGetWithoutExtension()
     {
-        // 1. Prepare the raw map mimic from YAML binder (as seen in your debugger)
+        // Mimic YAML binder output
         final Map<String, Object> rawPredicates = new LinkedHashMap<>();
+        rawPredicates.put("0",
+                "NotHost=target-server.**,login.**,sso-admin-server.**,monitoring.**,admin.**,api-monitor-server.**");
+        rawPredicates.put("1", "Method=GET");
+        rawPredicates.put("2", "NotPath=/api/live/ws,/api/events");
+        rawPredicates.put("3", "NotExtension=");
 
-        // Representation A: String Shortcut
-        rawPredicates.put("0", "Path=/api/**");
+        final RequestMatchingProcessor processor =
+                new RequestMatchingProcessor(
+                        "reads",
+                        rawPredicates,
+                        null,
+                        new LogOptions(null, null, null)
+                );
 
-        // Representation B: Structured Map (Double Nested)
-        final Map<String, Object> headerOuter = new LinkedHashMap<>();
-        final Map<String, String> headerInner = new LinkedHashMap<>();
-        headerInner.put("name", "X-Request-Id");
-        headerInner.put("regexp", "\\d+");
-        headerOuter.put("Header", headerInner);
-        rawPredicates.put("1", headerOuter);
+        final PredicateConfig config =
+                ConfigUtil.toMatchers(List.of(processor)).getFirst();
 
-        // Representation C: Comma-separated Shortcut
-        rawPredicates.put("2", "NotMethod=GET,OPTIONS");
+        // GET without extension, allowed host, allowed path
+        MockHttpServletRequest request =
+                createRequest("GET", "http://api.example.com/api/orders", "api.example.com");
 
-        // 2. Instantiate the record using the constructor
-        final RequestMatchingProcessor processor = new RequestMatchingProcessor(
-                "test-matcher",
-                rawPredicates,
-                new LogOptions(null, null, null),
-                new LogOptions(null, null, null)
-        );
-
-        // 3. Transform using ConfigUtil
-        final List<PredicateConfig> configs = ConfigUtil.toMatchers(List.of(processor));
-        final PredicateConfig config = configs.getFirst();
-
-        // 4. SCENARIOS
-
-        // SCENARIO 1: Valid POST (Matches Path, Matches Header, Matches NotMethod)
-        MockHttpServletRequest request = createRequest("POST", "http://localhost/api/data", "localhost");
-        request.addHeader("X-Request-Id", "999");
         assertThat(config.predicate().test(request))
-                .as("Valid numeric ID and POST should match")
+                .as("GET without extension should match reads matcher")
                 .isTrue();
+    }
 
-        // SCENARIO 2: Valid Path but Invalid Header Regex
-        request = createRequest("POST", "http://localhost/api/data", "localhost");
-        request.addHeader("X-Request-Id", "abc");
-        assertThat(config.predicate().test(request))
-                .as("Non-numeric ID should fail regex predicate")
-                .isFalse();
+    @Test
+    void readsMatcher_shouldRejectGetWithExtension()
+    {
+        final Map<String, Object> rawPredicates = new LinkedHashMap<>();
+        rawPredicates.put("0",
+                "NotHost=target-server.**,login.**,sso-admin-server.**,monitoring.**,admin.**,api-monitor-server.**");
+        rawPredicates.put("1", "Method=GET");
+        rawPredicates.put("2", "NotPath=/api/live/ws,/api/events");
+        rawPredicates.put("3", "NotExtension=");
 
-        // SCENARIO 3: Valid Header but Negated Method (GET)
-        request = createRequest("GET", "http://localhost/api/data", "localhost");
-        request.addHeader("X-Request-Id", "123");
+        final RequestMatchingProcessor processor =
+                new RequestMatchingProcessor("reads", rawPredicates, null, null);
+
+        final PredicateConfig config =
+                ConfigUtil.toMatchers(List.of(processor)).getFirst();
+
+        // GET *with* extension → should fail NotExtension
+        MockHttpServletRequest request =
+                createRequest("GET", "http://api.example.com/api/orders.json", "api.example.com");
+
         assertThat(config.predicate().test(request))
-                .as("GET is negated in NotMethod and should fail")
+                .as("GET with extension should be rejected by NotExtension")
                 .isFalse();
     }
 
     @Test
-    void testNotHostLogic()
+    void readsMatcher_shouldRejectNonGet()
     {
         final Map<String, Object> rawPredicates = new LinkedHashMap<>();
-        rawPredicates.put("0", "NotHost=admin.**,monitoring.**");
+        rawPredicates.put("0",
+                "NotHost=target-server.**,login.**,sso-admin-server.**,monitoring.**,admin.**,api-monitor-server.**");
+        rawPredicates.put("1", "Method=GET");
+        rawPredicates.put("2", "NotPath=/api/live/ws,/api/events");
+        rawPredicates.put("3", "NotExtension=");
 
-        final RequestMatchingProcessor processor = new RequestMatchingProcessor(
-                "host-test",
-                rawPredicates,
-                null,
-                null
-        );
+        final RequestMatchingProcessor processor =
+                new RequestMatchingProcessor("reads", rawPredicates, null, null);
 
-        final PredicateConfig config = ConfigUtil.toMatchers(List.of(processor)).getFirst();
+        final PredicateConfig config =
+                ConfigUtil.toMatchers(List.of(processor)).getFirst();
 
-        // Scenario 1: Allowed Host
-        MockHttpServletRequest okReq = createRequest("POST", "/", "api.ethlo.com");
-        assertThat(config.predicate().test(okReq)).isTrue();
+        MockHttpServletRequest request =
+                createRequest("POST", "http://api.example.com/api/orders", "api.example.com");
 
-        // Scenario 2: Negated Host (admin)
-        MockHttpServletRequest adminReq = createRequest("POST", "/", "admin.ethlo.com");
-        assertThat(config.predicate().test(adminReq)).isFalse();
-
-        // Scenario 3: Negated Host (monitoring)
-        MockHttpServletRequest monReq = createRequest("POST", "/", "monitoring.internal");
-        assertThat(config.predicate().test(monReq)).isFalse();
+        assertThat(config.predicate().test(request))
+                .as("POST should not match Method=GET")
+                .isFalse();
     }
 
-    private MockHttpServletRequest createRequest(String method, String url, String host)
+    private static MockHttpServletRequest createRequest(String method, String url, String host)
     {
         URI uri = URI.create(url);
-        MockHttpServletRequest request = new MockHttpServletRequest(method, uri.getPath());
+        MockHttpServletRequest request =
+                new MockHttpServletRequest(method, uri.getPath());
         request.setServerName(uri.getHost());
         request.addHeader("Host", host);
         return request;

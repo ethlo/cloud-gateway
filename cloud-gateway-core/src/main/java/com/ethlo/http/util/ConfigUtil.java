@@ -17,6 +17,8 @@ import org.springframework.web.servlet.function.ServerRequest;
 import com.ethlo.http.MvcPredicateDefinition;
 import com.ethlo.http.match.RequestMatchingProcessor;
 import com.ethlo.http.netty.PredicateConfig;
+import com.ethlo.http.predicates.ExtensionPredicateSupplier;
+import com.ethlo.http.predicates.NotExtensionPredicateSupplier;
 import jakarta.servlet.http.HttpServletRequest;
 
 public class ConfigUtil
@@ -139,8 +141,10 @@ public class ConfigUtil
             case "method" -> methods(pattern);
             case "notmethod" -> methods(pattern).negate();
 
-            case "extension" -> extension(pattern);
-            case "notextension" -> extension(pattern).negate();
+            case "extension" ->
+                    ExtensionPredicateSupplier.extension(new ExtensionPredicateSupplier.Config().setExtensions(split(pattern)));
+            case "notextension" ->
+                    NotExtensionPredicateSupplier.notExtension(new ExtensionPredicateSupplier.Config().setExtensions(split(pattern)));
 
             case "header" -> GatewayRequestPredicates.header(
                     args.get("name"),
@@ -172,20 +176,6 @@ public class ConfigUtil
                         HttpMethod.valueOf(m.toUpperCase())
                 )
         );
-    }
-
-    private static RequestPredicate extension(String raw)
-    {
-        List<String> exts = split(raw);
-
-        return req ->
-        {
-            String path = req.path();
-            int idx = path.lastIndexOf('.');
-            String ext = idx >= 0 ? path.substring(idx + 1) : "";
-
-            return exts.isEmpty() || exts.contains(ext);
-        };
     }
 
     private static RequestPredicate orList(String raw, Function<String, RequestPredicate> mapper)
