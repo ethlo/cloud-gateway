@@ -27,7 +27,7 @@ public class HeaderProvider
     {
         if (cache == null)
         {
-            cache = repository.readHeaders(serverDirection, requestId).orElseGet(HttpHeaders::new);
+            cache = repository.getHeaders(serverDirection, requestId).orElseGet(HttpHeaders::new);
         }
         return cache;
     }

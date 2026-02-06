@@ -68,7 +68,7 @@ public class DefaultDataBufferRepository implements DataBufferRepository
     }
 
     @Override
-    public void writeHeaders(ServerDirection direction, String requestId, HttpHeaders headers)
+    public void putHeaders(ServerDirection direction, String requestId, HttpHeaders headers)
     {
         final Path path = getPath(direction, requestId, "headers");
         try (FileChannel fc = FileChannel.open(path,
@@ -101,7 +101,7 @@ public class DefaultDataBufferRepository implements DataBufferRepository
     }
 
     @Override
-    public Optional<HttpHeaders> readHeaders(final ServerDirection direction, final String requestId)
+    public Optional<HttpHeaders> getHeaders(final ServerDirection direction, final String requestId)
     {
         final Path path = getPath(direction, requestId, "headers");
 
@@ -292,9 +292,13 @@ public class DefaultDataBufferRepository implements DataBufferRepository
         return basePath.resolve(id + "_" + dir.name().toLowerCase() + "." + suffix);
     }
 
-    public Optional<BodyProvider> getBody(ServerDirection dir, String id, String contentEncoding)
+    @Override
+    public Optional<BodyProvider> getBody(ServerDirection dir, String id)
     {
-        DataState state = statePool.get(getPoolKey(dir, id));
+        final String contentEncoding = getHeaders(dir, id)
+                .orElseThrow(() -> new IllegalArgumentException("Missing headers for " + id))
+                .getFirst(HttpHeaders.CONTENT_ENCODING);
+        final DataState state = statePool.get(getPoolKey(dir, id));
         if (state == null) return Optional.empty();
 
         if (state.memoryBuffer != null)
@@ -342,8 +346,8 @@ public class DefaultDataBufferRepository implements DataBufferRepository
     private void archive(WebExchangeDataProvider data, ServerDirection direction, Path archiveDir)
     {
         final String requestId = data.getRequestId();
-        final Optional<HttpHeaders> headers = readHeaders(direction, requestId);
-        headers.ifPresent(header -> archiveCombined(data, direction, header, getBody(direction, requestId, header.getFirst(HttpHeaders.CONTENT_ENCODING)).orElse(BodyProvider.NONE), archiveDir));
+        final Optional<HttpHeaders> headers = getHeaders(direction, requestId);
+        headers.ifPresent(header -> archiveCombined(data, direction, header, getBody(direction, requestId).orElse(BodyProvider.NONE), archiveDir));
 
     }
 

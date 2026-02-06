@@ -12,7 +12,6 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.function.Predicate;
 
 import org.apache.catalina.connector.ClientAbortException;
 import org.jetbrains.annotations.NotNull;
@@ -34,12 +33,12 @@ import com.ethlo.http.model.WebExchangeDataProvider;
 import com.ethlo.http.netty.PredicateConfig;
 import com.ethlo.http.netty.ServerDirection;
 import com.ethlo.http.processors.LogPreProcessor;
+import com.ethlo.http.util.ConfigUtil;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-//@RefreshScope
 @Component
 public class TagRequestIdMvcFilter extends OncePerRequestFilter implements Ordered
 {
@@ -56,26 +55,13 @@ public class TagRequestIdMvcFilter extends OncePerRequestFilter implements Order
                                  DelegateHttpLogger httpLogger,
                                  DataBufferRepository repository,
                                  LogPreProcessor logPreProcessor,
-                                 HttpLoggingConfiguration httpLoggingConfiguration,
-                                 RoutePredicateLocator routePredicateLocator)
+                                 HttpLoggingConfiguration httpLoggingConfiguration)
     {
         this.loggingFilterService = loggingFilterService;
         this.httpLogger = httpLogger;
         this.repository = repository != null ? repository : NopDataBufferRepository.INSTANCE;
         this.logPreProcessor = logPreProcessor;
-        this.predicateConfigs = httpLoggingConfiguration.getMatchers()
-                .stream()
-                .map(c ->
-                {
-                    List<MvcPredicateDefinition> mvcDefs = c.predicates().stream()
-                            .map(p -> new MvcPredicateDefinition(p.name(), p.args()))
-                            .toList();
-
-                    final Predicate<HttpServletRequest> combinedPredicate = routePredicateLocator.getPredicates(mvcDefs);
-
-                    return new PredicateConfig(c.id(), combinedPredicate, c.request(), c.response());
-                })
-                .toList();
+        this.predicateConfigs = ConfigUtil.toMatchers(httpLoggingConfiguration.getMatchers());
     }
 
     @NotNull
@@ -93,6 +79,24 @@ public class TagRequestIdMvcFilter extends OncePerRequestFilter implements Order
         return new Route(routeId, routeUri);
     }
 
+    private static void handleNoMatch(@NotNull HttpServletRequest request, @NotNull HttpServletResponse response, @NotNull FilterChain filterChain, Chronograph chronograph, String requestId)
+    {
+        chronograph.time("upstream", () ->
+                {
+                    try
+                    {
+                        filterChain.doFilter(request, response);
+                        logger.debug("Finished request id {} without capture", requestId);
+                    }
+                    catch (IOException | ServletException e)
+                    {
+                        throw new RuntimeException(e);
+                    }
+                }
+        );
+        return;
+    }
+
     @Override
     protected void doFilterInternal(@NotNull HttpServletRequest request, @NotNull HttpServletResponse response, @NotNull FilterChain filterChain) throws ServletException, IOException
     {
@@ -101,7 +105,6 @@ public class TagRequestIdMvcFilter extends OncePerRequestFilter implements Order
                 {
                     final String requestId = generateId();
                     logger.debug("Starting request id {}", requestId);
-
                     request.setAttribute("requestId", requestId);
                     request.setAttribute("chronograph", chronograph);
 
@@ -114,66 +117,59 @@ public class TagRequestIdMvcFilter extends OncePerRequestFilter implements Order
 
                     if (matchedConfig == null)
                     {
-                        chronograph.time("upstream", () ->
-                                {
-                                    try
-                                    {
-                                        filterChain.doFilter(request, response);
-                                        logger.debug("Finished request id {} without capture", requestId);
-                                    }
-                                    catch (IOException | ServletException e)
-                                    {
-                                        throw new RuntimeException(e);
-                                    }
-                                }
-                        );
+                        handleNoMatch(request, response, filterChain, chronograph, requestId);
                         return;
                     }
 
-                    // Write Request headers immediately
-                    chronograph.time("persist_request_headers", () ->
-                            repository.writeHeaders(ServerDirection.REQUEST, requestId, sanitizeHeaders(matchedConfig.request().headers(), ServletUtil.extractHeaders(request)))
-                    );
-
-                    final MvcRequestCapture wrappedRequest = new MvcRequestCapture(chronograph, request, requestId, repository);
-                    final MvcResponseCapture wrappedResponse = new MvcResponseCapture(chronograph, response, requestId, repository);
-
-                    Throwable connectionException = null;
-                    try
-                    {
-                        chronograph.time("upstream", () -> {
-                                    try
-                                    {
-                                        filterChain.doFilter(wrappedRequest, wrappedResponse);
-                                        logger.debug("Finished request id {} with capture", requestId);
-                                    }
-                                    catch (IOException | ServletException e)
-                                    {
-                                        throw new RuntimeException(e);
-                                    }
-                                }
-                        );
-
-                        chronograph.time("persist_response_headers", () ->
-                                repository.writeHeaders(ServerDirection.RESPONSE, requestId, sanitizeHeaders(matchedConfig.response().headers(), ServletUtil.extractHeaders(response)))
-                        );
-
-                        chronograph.time("buffer_flush", wrappedResponse::copyBodyToResponse);
-                    }
-                    catch (Throwable e)
-                    {
-                        connectionException = (e instanceof RuntimeException && e.getCause() != null) ? e.getCause() : e;
-                        handleException(connectionException, requestId, request, response);
-                    } finally
-                    {
-                        final Throwable finalExc = connectionException;
-                        chronograph.time("logging", () ->
-                                saveLog(wrappedRequest, wrappedResponse, requestId, chronograph, finalExc, loggingFilterService.merge(matchedConfig))
-                        );
-                    }
+                    handleMatch(request, response, filterChain, chronograph, requestId, matchedConfig);
                 }
         );
         performanceLogger.debug("{}", chronograph);
+    }
+
+    private void handleMatch(@NotNull HttpServletRequest request, @NotNull HttpServletResponse response, @NotNull FilterChain filterChain, Chronograph chronograph, String requestId, PredicateConfig matchedConfig)
+    {
+        // Write Request headers immediately
+        chronograph.time("persist_request_headers", () ->
+                repository.putHeaders(ServerDirection.REQUEST, requestId, sanitizeHeaders(matchedConfig.request().headers(), ServletUtil.extractHeaders(request)))
+        );
+
+        final MvcRequestCapture wrappedRequest = new MvcRequestCapture(chronograph, request, requestId, repository);
+        final MvcResponseCapture wrappedResponse = new MvcResponseCapture(chronograph, response, requestId, repository);
+
+        Throwable connectionException = null;
+        try
+        {
+            chronograph.time("upstream", () -> {
+                        try
+                        {
+                            filterChain.doFilter(wrappedRequest, wrappedResponse);
+                            logger.debug("Finished request id {} with capture", requestId);
+                        }
+                        catch (IOException | ServletException e)
+                        {
+                            throw new RuntimeException(e);
+                        }
+                    }
+            );
+
+            chronograph.time("persist_response_headers", () ->
+                    repository.putHeaders(ServerDirection.RESPONSE, requestId, sanitizeHeaders(matchedConfig.response().headers(), ServletUtil.extractHeaders(response)))
+            );
+
+            chronograph.time("buffer_flush", wrappedResponse::copyBodyToResponse);
+        }
+        catch (Throwable e)
+        {
+            connectionException = (e instanceof RuntimeException && e.getCause() != null) ? e.getCause() : e;
+            handleException(connectionException, requestId, request, response);
+        } finally
+        {
+            final Throwable finalExc = connectionException;
+            chronograph.time("logging", () ->
+                    saveLog(wrappedRequest, wrappedResponse, requestId, chronograph, finalExc, loggingFilterService.merge(matchedConfig))
+            );
+        }
     }
 
     private String generateId()

@@ -119,12 +119,12 @@ public class WebExchangeDataProvider
 
     public Optional<BodyProvider> getRequestBody()
     {
-        return dataBufferRepository.getBody(ServerDirection.REQUEST, requestId, getRequestHeaders().getFirst(HttpHeaders.CONTENT_ENCODING));
+        return dataBufferRepository.getBody(ServerDirection.REQUEST, requestId);
     }
 
     public Optional<BodyProvider> getResponseBody()
     {
-        return dataBufferRepository.getBody(ServerDirection.RESPONSE, requestId, getResponseHeaders().getFirst(HttpHeaders.CONTENT_ENCODING));
+        return dataBufferRepository.getBody(ServerDirection.RESPONSE, requestId);
     }
 
     public String getRequestId()

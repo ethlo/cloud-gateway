@@ -1,26 +1,24 @@
 package com.ethlo.http.match;
 
-import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
-import com.ethlo.http.MvcPredicateDefinition;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 
 /**
- * Configuration record for matching requests in the MVC Gateway.
- * Predicates are now matched against HttpServletRequest.
+ * Configuration record for matching requests for logging
  */
 @Valid
 public record RequestMatchingProcessor(
         @NotEmpty String id,
-        @NotEmpty @Valid List<MvcPredicateDefinition> predicates,
+        @NotEmpty @Valid Map<String, Object> predicates,
         LogOptions request,
         LogOptions response)
 {
     public RequestMatchingProcessor(
             @NotEmpty final String id,
-            @NotEmpty @Valid final List<MvcPredicateDefinition> predicates,
+            final @NotEmpty @Valid Map<String, Object> predicates,
             final LogOptions request,
             final LogOptions response)
     {

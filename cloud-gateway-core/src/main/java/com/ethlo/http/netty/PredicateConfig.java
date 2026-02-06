@@ -1,9 +1,12 @@
 package com.ethlo.http.netty;
 
+import java.util.function.Predicate;
+
 import com.ethlo.http.match.LogOptions;
+import jakarta.servlet.http.HttpServletRequest;
 
 public record PredicateConfig(String id,
-                              java.util.function.Predicate<jakarta.servlet.http.HttpServletRequest> predicate,
+                              Predicate<HttpServletRequest> predicate,
                               LogOptions request,
                               LogOptions response)
 {

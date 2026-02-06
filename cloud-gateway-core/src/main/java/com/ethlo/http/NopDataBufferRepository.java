@@ -4,7 +4,6 @@ import java.nio.ByteBuffer;
 import java.nio.file.Path;
 import java.util.Optional;
 
-import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpHeaders;
 
 import com.ethlo.http.model.BodyProvider;
@@ -21,13 +20,13 @@ public class NopDataBufferRepository implements DataBufferRepository
     }
 
     @Override
-    public void writeHeaders(final ServerDirection direction, final String requestId, final HttpHeaders headers)
+    public void putHeaders(final ServerDirection direction, final String requestId, final HttpHeaders headers)
     {
 
     }
 
     @Override
-    public Optional<HttpHeaders> readHeaders(final ServerDirection direction, final String requestId)
+    public Optional<HttpHeaders> getHeaders(final ServerDirection direction, final String requestId)
     {
         return Optional.empty();
     }
@@ -51,7 +50,7 @@ public class NopDataBufferRepository implements DataBufferRepository
     }
 
     @Override
-    public Optional<BodyProvider> getBody(final ServerDirection serverDirection, final String requestId, @Nullable final String contentEncoding)
+    public Optional<BodyProvider> getBody(final ServerDirection serverDirection, final String requestId)
     {
         return Optional.empty();
     }

@@ -38,10 +38,12 @@ http-logging:
     - id: All
       predicates:
         - Path=/**
-        - NotMethod=OPTION
-        #- Header:
-        #    name: X-Request-Id
-        #    regexp: \d+
+        #- NotPath=/sso-admin/**,/foo,/bar/baz
+        #- NotHost=login.**,admin.**,monitoring.**,sso-admin-server.**
+        #- NotMethod=GET,OPTION,PATCH
+        - Header:
+           name: X-Request-Id
+           regexp: \d+
       request:
         raw: STORE
         body: STORE
