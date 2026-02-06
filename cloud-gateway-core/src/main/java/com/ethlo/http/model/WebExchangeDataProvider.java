@@ -1,7 +1,6 @@
 package com.ethlo.http.model;
 
 import java.net.InetSocketAddress;
-import java.net.URI;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.Collections;
@@ -32,7 +31,7 @@ public class WebExchangeDataProvider
     private Route route;
     private HttpMethod method;
     private String path;
-    private URI uri;
+    private String uri;
     private HttpStatusCode statusCode;
     private String protocol;
     private HeaderProvider requestHeaders;
@@ -87,7 +86,7 @@ public class WebExchangeDataProvider
         return this;
     }
 
-    public WebExchangeDataProvider uri(URI uri)
+    public WebExchangeDataProvider uri(String uri)
     {
         this.uri = uri;
         return this;
@@ -142,7 +141,7 @@ public class WebExchangeDataProvider
         return path;
     }
 
-    public URI getUri()
+    public String getUri()
     {
         return uri;
     }
@@ -262,5 +261,11 @@ public class WebExchangeDataProvider
     public Optional<Throwable> getException()
     {
         return Optional.ofNullable(exception);
+    }
+
+    public void loggerError()
+    {
+        logger.warn("Unable to ingest into all loggers for request {}, leaving request/response files behind", requestId);
+        dataBufferRepository.persistForError(requestId);
     }
 }

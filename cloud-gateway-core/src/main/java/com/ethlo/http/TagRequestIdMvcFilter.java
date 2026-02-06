@@ -46,19 +46,19 @@ public class TagRequestIdMvcFilter extends OncePerRequestFilter implements Order
     private static final Logger logger = LoggerFactory.getLogger(TagRequestIdMvcFilter.class);
 
     private final LoggingFilterService loggingFilterService;
-    private final DelegateHttpLogger httpLogger;
+    private final DelegateHttpLogger delegateHttpLogger;
     private final DataBufferRepository repository;
     private final LogPreProcessor logPreProcessor;
     private final List<PredicateConfig> predicateConfigs;
 
     public TagRequestIdMvcFilter(LoggingFilterService loggingFilterService,
-                                 DelegateHttpLogger httpLogger,
+                                 DelegateHttpLogger delegateHttpLogger,
                                  DataBufferRepository repository,
                                  LogPreProcessor logPreProcessor,
                                  HttpLoggingConfiguration httpLoggingConfiguration)
     {
         this.loggingFilterService = loggingFilterService;
-        this.httpLogger = httpLogger;
+        this.delegateHttpLogger = delegateHttpLogger;
         this.repository = repository != null ? repository : NopDataBufferRepository.INSTANCE;
         this.logPreProcessor = logPreProcessor;
         this.predicateConfigs = ConfigUtil.toMatchers(httpLoggingConfiguration.getMatchers());
@@ -181,35 +181,39 @@ public class TagRequestIdMvcFilter extends OncePerRequestFilter implements Order
 
     private void saveLog(MvcRequestCapture req, MvcResponseCapture res, String requestId, Chronograph chronograph, Throwable exc, final PredicateConfig mergedConfig)
     {
-        try
-        {
-            final WebExchangeDataProvider provider = chronograph.time("prepare_log_data", () ->
-                    {
-                        final Duration requestTime = chronograph.getTotalTime();
+        final WebExchangeDataProvider provider = chronograph.time("prepare_log_data", () ->
+                {
+                    final Duration requestTime = chronograph.getTotalTime();
 
-                        final Route route = getRoute(req);
-                        return new WebExchangeDataProvider(repository, mergedConfig)
-                                .requestId(requestId)
-                                .cleanupTask(() -> repository.cleanup(requestId))
-                                .method(HttpMethod.valueOf(req.getMethod().toUpperCase()))
-                                .path(req.getRequestURI())
-                                .protocol(req.getProtocol())
+                    final Route route = getRoute(req);
+                    return new WebExchangeDataProvider(repository, mergedConfig)
+                            .requestId(requestId)
+                            .cleanupTask(() -> repository.cleanup(requestId))
+                            .method(HttpMethod.valueOf(req.getMethod().toUpperCase()))
+                            .path(req.getRequestURI())
+                            .protocol(req.getProtocol())
+                            .route(route)
+                            .uri(safeFullUri(req))
+                            .statusCode(HttpStatus.valueOf(res.getStatus()))
+                            .duration(requestTime)
+                            .timestamp(OffsetDateTime.now())
+                            .exception(exc);
+                }
+        );
 
-                                .route(route)
-                                .uri(java.net.URI.create(req.getRequestURL().toString()))
-                                .statusCode(HttpStatus.valueOf(res.getStatus()))
-                                .duration(requestTime)
-                                .timestamp(OffsetDateTime.now())
-                                .exception(exc);
-                    }
-            );
-            chronograph.time("log_providers", () -> httpLogger.accessLog(chronograph, logPreProcessor.process(provider)));
-        }
-        catch (Exception e)
+        chronograph.time("log_providers", () -> delegateHttpLogger.accessLog(chronograph, logPreProcessor.process(provider)));
+    }
+
+    private String safeFullUri(HttpServletRequest req)
+    {
+        final StringBuffer url = req.getRequestURL();
+        final String query = req.getQueryString();
+
+        if (query != null)
         {
-            logger.error("Failed to save log for {}", requestId, e);
-            repository.persistForError(requestId);
+            url.append('?').append(query);
         }
+        return url.toString();
     }
 
     private void handleException(Throwable exception, final String requestId, final HttpServletRequest request, HttpServletResponse response)
