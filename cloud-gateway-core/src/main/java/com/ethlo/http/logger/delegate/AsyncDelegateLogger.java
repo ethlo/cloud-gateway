@@ -51,6 +51,10 @@ public class AsyncDelegateLogger extends BaseDelegateHttpLogger implements Runna
                     {
                         data.cleanup();
                     }
+                    else
+                    {
+                        data.loggerError();
+                    }
 
                     logger.debug("Logger performance for request {}:\n{}", data.getRequestId(), asyncChronograph);
                 }

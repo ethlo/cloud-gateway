@@ -20,5 +20,9 @@ public class SyncDelegateLogger extends BaseDelegateHttpLogger
         {
             dataProvider.cleanup();
         }
+        else
+        {
+            dataProvider.loggerError();
+        }
     }
 }
