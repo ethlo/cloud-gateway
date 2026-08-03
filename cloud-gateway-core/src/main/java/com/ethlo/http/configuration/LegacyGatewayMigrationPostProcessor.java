@@ -42,7 +42,7 @@ public class LegacyGatewayMigrationPostProcessor implements EnvironmentPostProce
                         // We strictly only migrate "routes", "default-filters", and "discovery"
                         // as these are the main ones that moved to .server.webflux
                         String suffix = key.substring(OLD_PREFIX.length());
-                        if (suffix.startsWith("routes") || suffix.startsWith("default-filters") || suffix.startsWith("discovery"))
+                        if (suffix.startsWith("routes") || suffix.startsWith("default-filters") || suffix.startsWith("defaultfilters") || suffix.startsWith("discovery"))
                         {
                             String newKey = NEW_PREFIX + suffix;
                             // Only add if not already present (newer config takes precedence)
