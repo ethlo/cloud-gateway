@@ -1,6 +1,7 @@
 package com.ethlo.http.configuration;
 
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 import org.jetbrains.annotations.NotNull;
@@ -24,31 +25,32 @@ public class LegacyGatewayMigrationPostProcessor implements EnvironmentPostProce
     private static final String NEW_PREFIX = "spring.cloud.gateway.server.webflux.";
 
     @Override
-    public void postProcessEnvironment(ConfigurableEnvironment environment, @NotNull SpringApplication application)
+    public void postProcessEnvironment(final ConfigurableEnvironment environment, @NotNull final SpringApplication application)
     {
         final Map<String, Object> migratedProperties = new HashMap<>();
 
-        // Iterate over all property sources (System props, Env vars, YAMLs, etc.)
-        for (PropertySource<?> source : environment.getPropertySources())
+        for (final PropertySource<?> source : environment.getPropertySources())
         {
-            if (source instanceof MapPropertySource mapSource)
+            if (source instanceof final MapPropertySource mapSource)
             {
-                for (String key : mapSource.getPropertyNames())
+                for (final String key : mapSource.getPropertyNames())
                 {
-                    // Check if property starts with old prefix but NOT the new one (to avoid double mapping)
-                    // We exclude 'httpclient' or other submodules that might not have moved
-                    if (key.startsWith(OLD_PREFIX) && !key.startsWith(NEW_PREFIX))
+                    final String normalizedKey = key.toLowerCase(Locale.ROOT)
+                            .replace('_', '.')
+                            .replaceAll("\\.(\\d+)", "[$1]");
+
+                    if (normalizedKey.startsWith(OLD_PREFIX) && !normalizedKey.startsWith(NEW_PREFIX))
                     {
-                        // We strictly only migrate "routes", "default-filters", and "discovery"
-                        // as these are the main ones that moved to .server.webflux
-                        String suffix = key.substring(OLD_PREFIX.length());
+                        final String suffix = normalizedKey.substring(OLD_PREFIX.length());
+
                         if (suffix.startsWith("routes") || suffix.startsWith("default-filters") || suffix.startsWith("defaultfilters") || suffix.startsWith("discovery"))
                         {
-                            String normalizedSuffix = suffix.startsWith("defaultfilters")
+                            final String normalizedSuffix = suffix.startsWith("defaultfilters")
                                     ? "default-filters" + suffix.substring("defaultfilters".length())
                                     : suffix;
-                            String newKey = NEW_PREFIX + normalizedSuffix;
-                            // Only add if not already present (newer config takes precedence)
+
+                            final String newKey = NEW_PREFIX + normalizedSuffix;
+
                             if (!environment.containsProperty(newKey))
                             {
                                 migratedProperties.put(newKey, mapSource.getProperty(key));
