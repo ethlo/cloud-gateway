@@ -18,9 +18,9 @@ public class LegacyGatewayMigrationPostProcessorTest
         final SpringApplication application = new SpringApplication();
         final LegacyGatewayMigrationPostProcessor processor = new LegacyGatewayMigrationPostProcessor();
 
-        // Simulate environment variables exactly as the OS presents them
+        // Simulate environment variables exactly as the OS presents them (POSIX compliant)
         final Map<String, Object> rawEnvVars = Map.of(
-                "SPRING_CLOUD_GATEWAY_DEFAULTFILTERS[0].NAME", "CorrelationIdHeader",
+                "SPRING_CLOUD_GATEWAY_DEFAULTFILTERS_0_NAME", "CorrelationIdHeader",
                 "SPRING_CLOUD_GATEWAY_ROUTES_0_ID", "route-from-env"
         );
 
@@ -28,9 +28,9 @@ public class LegacyGatewayMigrationPostProcessorTest
 
         processor.postProcessEnvironment(environment, application);
 
-        // Assert that the raw ENV keys correctly resolved to the new hyphenated and dotted webflux namespace
+        // Assert that the raw ENV keys correctly resolved to the new hyphenated and bracketed webflux namespace
         assertThat(environment.getProperty("spring.cloud.gateway.server.webflux.default-filters[0].name")).isEqualTo("CorrelationIdHeader");
-        assertThat(environment.getProperty("spring.cloud.gateway.server.webflux.routes.0.id")).isEqualTo("route-from-env");
+        assertThat(environment.getProperty("spring.cloud.gateway.server.webflux.routes[0].id")).isEqualTo("route-from-env");
     }
 
     @Test

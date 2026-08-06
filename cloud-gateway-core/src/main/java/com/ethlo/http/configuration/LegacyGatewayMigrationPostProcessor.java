@@ -1,6 +1,7 @@
 package com.ethlo.http.configuration;
 
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 import org.jetbrains.annotations.NotNull;
@@ -34,7 +35,9 @@ public class LegacyGatewayMigrationPostProcessor implements EnvironmentPostProce
             {
                 for (final String key : mapSource.getPropertyNames())
                 {
-                    final String normalizedKey = key.toLowerCase().replace('_', '.');
+                    final String normalizedKey = key.toLowerCase(Locale.ROOT)
+                            .replace('_', '.')
+                            .replaceAll("\\.(\\d+)", "[$1]");
 
                     if (normalizedKey.startsWith(OLD_PREFIX) && !normalizedKey.startsWith(NEW_PREFIX))
                     {
@@ -50,7 +53,6 @@ public class LegacyGatewayMigrationPostProcessor implements EnvironmentPostProce
 
                             if (!environment.containsProperty(newKey))
                             {
-                                // We pull the value using the original raw key, but store it under the new canonical dotted key
                                 migratedProperties.put(newKey, mapSource.getProperty(key));
                             }
                         }
