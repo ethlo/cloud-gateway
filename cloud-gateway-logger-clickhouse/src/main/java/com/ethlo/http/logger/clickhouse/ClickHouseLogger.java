@@ -2,6 +2,7 @@ package com.ethlo.http.logger.clickhouse;
 
 import static com.ethlo.http.match.HeaderProcessing.DELETE;
 import static com.ethlo.http.match.HeaderProcessing.REDACT;
+import static com.ethlo.http.match.LogOptions.ContentProcessing.NONE;
 import static com.ethlo.http.match.LogOptions.ContentProcessing.STORE;
 import static com.ethlo.http.netty.ServerDirection.REQUEST;
 import static com.ethlo.http.netty.ServerDirection.RESPONSE;
@@ -71,7 +72,9 @@ public class ClickHouseLogger implements HttpLogger
 
     private static Optional<BodyDecodeException> processBody(final Map<String, Object> params, final LogOptions logConfig, final String keyPrefix, final byte[] responseData, final ServerDirection serverDirection)
     {
-        if (logConfig.body() != null)
+        // Never null: LogOptions defaults it to NONE. Decoding the body is a full HTTP parse that can fail on a
+        // truncated capture, so it must not run for a route that only asked for the raw bytes or for nothing at all.
+        if (logConfig.body() != NONE)
         {
             final BodyProvider bodyProvider;
             try
