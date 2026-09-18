@@ -95,6 +95,24 @@ http-logging:
 
 **Warning**: Storing raw data may include sensitive information such as usernames, passwords, and API keys.
 
+#### Buffer File Retention
+
+Captured request and response bytes are buffered to `http-logging.capture.log-directory` and deleted as soon as the
+request has been logged. When a request cannot be fully logged, for example because an upstream closed the connection
+mid-response and left an undecodable body, its buffer files are kept so they can be inspected. A sweeper removes such
+leftovers once they have been untouched for the retention period, so they do not accumulate indefinitely:
+
+```
+http-logging:
+  capture:
+    enabled: true
+    log-directory: /tmp/cloud-gateway/raw
+    # How long an unprocessable buffer file is kept before it is deleted (default: 1 hour)
+    orphan-file-retention: PT1H
+    # How often to look for such files (default: 10 minutes)
+    orphan-file-sweep-interval: PT10M
+```
+
 For more details on logging in Spring Boot, see
 the [official Spring documentation](https://docs.spring.io/spring-boot/how-to/logging.html#howto.logging.logback).
 
