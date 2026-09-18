@@ -131,7 +131,7 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
         final ServerHttpRequest req = exchange.getRequest();
         final ServerHttpResponse res = exchange.getResponse();
         final Route route = exchange.getAttribute(ServerWebExchangeUtils.GATEWAY_ROUTE_ATTR);
-        final HttpStatusCode httpStatusCode = determineStatusCode(exception, exchange.getResponse().getStatusCode());
+        final HttpStatusCode httpStatusCode = determineStatusCode(exception, res);
 
         logger.debug("Completed request {} in {}: {}", requestId, duration, predicateConfig);
 
@@ -155,9 +155,16 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
         return httpLogger.accessLog(processed);
     }
 
-    private HttpStatusCode determineStatusCode(final Throwable exc, final HttpStatusCode responseStatusCode)
+    /**
+     * An error raised after the response was committed cannot change what the client received, as the status line is
+     * already on the wire. Reporting a synthetic 500 in that case would contradict the response the client actually
+     * got, so the committed status wins. The error itself is still recorded via the exception fields.
+     */
+    static HttpStatusCode determineStatusCode(final Throwable exc, final ServerHttpResponse response)
     {
-        if (exc != null)
+        final HttpStatusCode responseStatusCode = response.getStatusCode();
+
+        if (exc != null && !(response.isCommitted() && responseStatusCode != null))
         {
             return Optional.of(exc)
                     .filter(e -> ResponseStatusException.class.isAssignableFrom(e.getClass()))
