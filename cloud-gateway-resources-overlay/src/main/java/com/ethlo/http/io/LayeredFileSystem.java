@@ -138,7 +138,7 @@ public class LayeredFileSystem extends FileSystem
         {
             registerRecursively(created);
         }
-        catch (IOException e)
+        catch (IOException | UncheckedIOException e)
         {
             logger.warn("Unable to watch newly created directory {}: {}", created, e.getMessage());
         }
