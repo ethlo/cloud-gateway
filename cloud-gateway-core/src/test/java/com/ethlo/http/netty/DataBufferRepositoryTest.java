@@ -58,6 +58,47 @@ class DataBufferRepositoryTest
         assertThat(contents(ServerDirection.RESPONSE)).isEqualTo(payload);
     }
 
+    @Test
+    void shortWritesAreFollowedUpUntilTheBufferIsExhausted()
+    {
+        final String payload = "abcdefghij";
+        final ShortWriteChannel channel = new ShortWriteChannel(payload.length(), 3, true);
+        final CompletableFuture<Integer> result = new CompletableFuture<>();
+        final ByteBuffer data = buffer(payload);
+
+        dataBufferRepository.writeFully(channel, data, 0, data.position(), data.remaining(), 0, result);
+
+        assertThat(result.join()).isEqualTo(payload.length());
+        assertThat(channel.written()).isEqualTo(payload.getBytes(StandardCharsets.UTF_8));
+        assertThat(channel.writeCount()).isEqualTo(4);
+    }
+
+    @Test
+    void shortWritesAreFollowedUpWhenTheChannelDoesNotAdvanceTheBuffer()
+    {
+        final String payload = "abcdefghij";
+        final ShortWriteChannel channel = new ShortWriteChannel(payload.length(), 4, false);
+        final CompletableFuture<Integer> result = new CompletableFuture<>();
+        final ByteBuffer data = buffer(payload);
+
+        dataBufferRepository.writeFully(channel, data, 0, data.position(), data.remaining(), 0, result);
+
+        assertThat(result.join()).isEqualTo(payload.length());
+        assertThat(channel.written()).isEqualTo(payload.getBytes(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void aChannelThatStopsMakingProgressFailsTheWrite()
+    {
+        final ShortWriteChannel channel = new ShortWriteChannel(10, 0, true);
+        final CompletableFuture<Integer> result = new CompletableFuture<>();
+        final ByteBuffer data = buffer("abcdefghij");
+
+        dataBufferRepository.writeFully(channel, data, 0, data.position(), data.remaining(), 0, result);
+
+        assertThat(result).isCompletedExceptionally();
+    }
+
     private ByteBuffer buffer(final String content)
     {
         return ByteBuffer.wrap(content.getBytes(StandardCharsets.UTF_8));

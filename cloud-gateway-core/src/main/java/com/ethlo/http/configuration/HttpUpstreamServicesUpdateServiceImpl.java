@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -176,6 +177,17 @@ public class HttpUpstreamServicesUpdateServiceImpl implements HttpUpstreamServic
                 }
             });
         });
+
+        // Drop state for services that are no longer configured, as the collapsed view below is built from the
+        // whole map and would otherwise keep serving their routes indefinitely
+        final Set<String> configured = upstreamServiceConfiguration.getServices().stream()
+                .map(service -> service.configUrl().toString())
+                .collect(Collectors.toSet());
+        if (lastModified.keySet().retainAll(configured))
+        {
+            logger.info("Discarded upstream configuration for services that are no longer configured");
+            refreshRequired.set(true);
+        }
 
         final Map<String, RouteDefinition> collapsed = lastModified.entrySet().stream()
                 .filter(Objects::nonNull)

@@ -87,23 +87,46 @@ public class DataBufferRepository
     {
         final BufferHolder holder = getAsyncFileChannel(operation, requestId);
         final CompletableFuture<Integer> completableFuture = new CompletableFuture<>();
-        final long offset = holder.size.getAndAdd(data.remaining());
+        final int length = data.remaining();
+        final long offset = holder.size.getAndAdd(length);
+        writeFully(holder.fileChannel, data, offset, data.position(), length, 0, completableFuture);
+        return completableFuture;
+    }
 
-        holder.fileChannel.write(data, offset, null, new CompletionHandler<Integer, Void>()
+    /**
+     * A single write is not guaranteed to consume the whole buffer. As the offset was claimed for the full length,
+     * a short write must be followed up rather than leaving the tail unwritten and a gap in the file.
+     */
+    void writeFully(final AsynchronousFileChannel fileChannel, final ByteBuffer data, final long offset, final int startPosition, final int length, final int writtenSoFar, final CompletableFuture<Integer> result)
+    {
+        if (writtenSoFar >= length)
+        {
+            result.complete(writtenSoFar);
+            return;
+        }
+
+        // Set explicitly rather than relying on the channel to have advanced the buffer for us
+        data.position(startPosition + writtenSoFar);
+
+        fileChannel.write(data, offset + writtenSoFar, null, new CompletionHandler<Integer, Void>()
         {
             @Override
-            public void completed(Integer result, Void attachment)
+            public void completed(Integer written, Void attachment)
             {
-                completableFuture.complete(result);
+                if (written <= 0 && writtenSoFar + written < length)
+                {
+                    result.completeExceptionally(new IOException("Wrote " + written + " bytes with " + (length - writtenSoFar) + " bytes remaining, giving up"));
+                    return;
+                }
+                writeFully(fileChannel, data, offset, startPosition, length, writtenSoFar + written, result);
             }
 
             @Override
             public void failed(Throwable exc, Void attachment)
             {
-                completableFuture.completeExceptionally(exc);
+                result.completeExceptionally(exc);
             }
         });
-        return completableFuture;
     }
 
     private BufferHolder getAsyncFileChannel(final ServerDirection serverDirection, final String requestId)
