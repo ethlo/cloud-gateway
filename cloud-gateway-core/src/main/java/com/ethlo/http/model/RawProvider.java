@@ -4,7 +4,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousFileChannel;
-import java.nio.channels.CompletionHandler;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
 import java.util.Optional;
@@ -61,11 +61,12 @@ public class RawProvider
             return Optional.empty();
         }
 
+        // Read the whole file in one go rather than issuing a single asynchronous read, which is not
+        // guaranteed to fill the buffer and would silently yield truncated, zero-padded content.
         final CompletableFuture<ByteBuffer> completableFuture = new CompletableFuture<>();
-        long fileSize;
         try
         {
-            fileSize = fileChannel.size();
+            completableFuture.complete(ByteBuffer.wrap(Files.readAllBytes(file)));
         }
         catch (IOException e)
         {
@@ -73,21 +74,6 @@ public class RawProvider
             return Optional.of(completableFuture);
         }
 
-        final ByteBuffer buffer = ByteBuffer.allocate(Math.toIntExact(fileSize));
-        fileChannel.read(buffer, 0, null, new CompletionHandler<Integer, Void>()
-        {
-            @Override
-            public void completed(Integer result, Void attachment)
-            {
-                completableFuture.complete(buffer);
-            }
-
-            @Override
-            public void failed(Throwable exc, Void attachment)
-            {
-                completableFuture.completeExceptionally(exc);
-            }
-        });
         logger.debug("Using data from buffer file {} of size {} for {} {}", file, size, serverDirection, requestId);
         return Optional.of(completableFuture);
     }

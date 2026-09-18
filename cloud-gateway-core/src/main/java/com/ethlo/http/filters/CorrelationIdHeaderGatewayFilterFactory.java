@@ -20,6 +20,12 @@ public class CorrelationIdHeaderGatewayFilterFactory extends AbstractGatewayFilt
     }
 
     @Override
+    public List<String> shortcutFieldOrder()
+    {
+        return List.of("headerName");
+    }
+
+    @Override
     public GatewayFilter apply(Config config)
     {
         return new GatewayFilter()
@@ -37,18 +43,6 @@ public class CorrelationIdHeaderGatewayFilterFactory extends AbstractGatewayFilt
             public String toString()
             {
                 return CorrelationIdHeaderGatewayFilterFactory.class + "{headerName=" + config.getHeaderName() + "}";
-            }
-
-            @Override
-            public List<String> shortcutFieldOrder()
-            {
-                return List.of("headerName");
-            }
-
-            @Override
-            public ShortcutType shortcutType()
-            {
-                return ShortcutType.GATHER_LIST;
             }
         };
     }

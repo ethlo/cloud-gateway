@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 
+import com.auth0.jwt.JWT;
+import com.auth0.jwt.algorithms.Algorithm;
 import com.ethlo.http.processors.auth.RealmUser;
 import com.ethlo.http.processors.auth.extractors.JwtAuthorizationConfig;
 import com.ethlo.http.processors.auth.extractors.JwtAuthorizationExtractor;
@@ -23,5 +25,18 @@ class JwtAuthorizationExtractorTest
         config.setRealmExpression("([^/]+)/?$");
         config.setUsernameClaimName("sub");
         assertThat(new JwtAuthorizationExtractor(config).getUser(headers, null)).hasValue(new RealmUser("acme", "1234567890"));
+    }
+
+    @Test
+    void testJwtWithoutRealmClaim()
+    {
+        final String tokenWithoutIssuer = JWT.create().withSubject("1234567890").sign(Algorithm.none());
+        final HttpHeaders headers = new HttpHeaders();
+        headers.add(HttpHeaders.AUTHORIZATION, "Bearer " + tokenWithoutIssuer);
+        final JwtAuthorizationConfig config = new JwtAuthorizationConfig();
+        config.setRealmClaimName("iss");
+        config.setRealmExpression("([^/]+)/?$");
+        config.setUsernameClaimName("sub");
+        assertThat(new JwtAuthorizationExtractor(config).getUser(headers, null)).hasValue(new RealmUser(null, "1234567890"));
     }
 }

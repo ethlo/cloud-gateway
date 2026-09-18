@@ -33,7 +33,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ServerWebExchange;
 
+import jakarta.annotation.PreDestroy;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 @RestController
 @RequestMapping("${static-files.url-prefix:files}")
@@ -158,7 +160,15 @@ public class FileResourceController
                     final ResponseEntity.HeadersBuilder<?> res = ResponseEntity.of(pd);
                     return Mono.just(res.build());
                 }
-        );
+                // The layered file system access is blocking, so keep it off the event loop
+        ).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @PreDestroy
+    public void destroy()
+    {
+        // Each layered file system owns a watch service and a watcher thread
+        layeredFileSystems.values().forEach(LayeredFileSystem::shutdown);
     }
 
     private Map.Entry<Path, LayeredFileSystem> getFileSystem(String relativePath)

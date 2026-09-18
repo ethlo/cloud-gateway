@@ -13,6 +13,7 @@ import org.springframework.cloud.gateway.route.Route;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.InvalidMediaTypeException;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.RequestPath;
 
@@ -165,6 +166,22 @@ public class WebExchangeDataProvider
         return remoteAddress;
     }
 
+    /**
+     * A client or upstream server may send a syntactically invalid Content-Type. Report it verbatim in that case,
+     * rather than letting the parse failure abort the access logging of the request.
+     */
+    private static String contentType(final HttpHeaders headers)
+    {
+        try
+        {
+            return Optional.ofNullable(headers.getContentType()).map(MediaType::toString).orElse(null);
+        }
+        catch (InvalidMediaTypeException e)
+        {
+            return headers.getFirst(HttpHeaders.CONTENT_TYPE);
+        }
+    }
+
     public Map<String, Object> asMetaMap()
     {
         final Map<String, Object> params = new TreeMap<>();
@@ -176,8 +193,8 @@ public class WebExchangeDataProvider
         params.put("host", getRequestHeaders().getFirst(HttpHeaders.HOST));
         params.put("user_agent", getRequestHeaders().getFirst(HttpHeaders.USER_AGENT));
 
-        params.put("request_content_type", Optional.ofNullable(getRequestHeaders().getContentType()).map(MediaType::toString).orElse(null));
-        params.put("response_content_type", Optional.ofNullable(getResponseHeaders().getContentType()).map(MediaType::toString).orElse(null));
+        params.put("request_content_type", contentType(getRequestHeaders()));
+        params.put("response_content_type", contentType(getResponseHeaders()));
 
         params.put("timestamp", getTimestamp());
         params.put("gateway_request_id", getRequestId());

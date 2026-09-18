@@ -8,6 +8,7 @@ import java.util.AbstractMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -24,30 +25,41 @@ public class HeaderPredicate implements Function<String, HeaderProcessing>
         setExcludes(excludes);
     }
 
+    private HeaderPredicate(Map<String, HeaderProcessing> includes, Map<String, HeaderProcessing> excludes)
+    {
+        this.includes = caseInsensitive(includes);
+        this.excludes = caseInsensitive(excludes);
+    }
+
+    /**
+     * Creates a predicate from already parsed header names and their processing instruction.
+     */
+    public static HeaderPredicate of(Map<String, HeaderProcessing> includes, Map<String, HeaderProcessing> excludes)
+    {
+        return new HeaderPredicate(includes, excludes);
+    }
+
+    private static Map<String, HeaderProcessing> caseInsensitive(Map<String, HeaderProcessing> source)
+    {
+        final Map<String, HeaderProcessing> result = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        result.putAll(source);
+        return result;
+    }
+
     @Override
     public HeaderProcessing apply(final String s)
     {
-        for (Map.Entry<String, HeaderProcessing> include : includes.entrySet())
+        final HeaderProcessing include = includes.get(s);
+        if (include != null)
         {
-            if (include.getKey().equalsIgnoreCase(s))
-            {
-                return include.getValue();
-            }
+            return include;
         }
         if (!includes.isEmpty())
         {
             return DELETE;
         }
 
-        for (Map.Entry<String, HeaderProcessing> exclude : excludes.entrySet())
-        {
-            if (exclude.getKey().equalsIgnoreCase(s))
-            {
-                return exclude.getValue();
-            }
-        }
-
-        return NONE;
+        return excludes.getOrDefault(s, NONE);
     }
 
     private Map.Entry<String, HeaderProcessing> parseProcessing(String line, HeaderProcessing defaultProcessing)
@@ -83,8 +95,7 @@ public class HeaderPredicate implements Function<String, HeaderProcessing>
 
     private void setIncludes(Set<String> includes)
     {
-        this.includes = Optional.ofNullable(includes).orElse(Set.of()).stream()
-                .collect(Collectors.toMap(e -> parseProcessing(e, NONE).getKey(), e -> parseProcessing(e, NONE).getValue()));
+        this.includes = parseAll(includes, NONE);
     }
 
     public Set<String> getExcludes()
@@ -94,8 +105,28 @@ public class HeaderPredicate implements Function<String, HeaderProcessing>
 
     public void setExcludes(final Set<String> excludes)
     {
-        this.excludes = Optional.ofNullable(excludes).orElse(Set.of()).stream()
-                .collect(Collectors.toMap(e -> parseProcessing(e, DELETE).getKey(), e -> parseProcessing(e, DELETE).getValue()));
+        this.excludes = parseAll(excludes, DELETE);
+    }
+
+    private Map<String, HeaderProcessing> parseAll(final Set<String> lines, final HeaderProcessing defaultProcessing)
+    {
+        final Map<String, HeaderProcessing> result = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        Optional.ofNullable(lines).orElse(Set.of()).forEach(line ->
+        {
+            final Map.Entry<String, HeaderProcessing> parsed = parseProcessing(line, defaultProcessing);
+            result.put(parsed.getKey(), parsed.getValue());
+        });
+        return result;
+    }
+
+    public Map<String, HeaderProcessing> getIncludeProcessing()
+    {
+        return includes;
+    }
+
+    public Map<String, HeaderProcessing> getExcludeProcessing()
+    {
+        return excludes;
     }
 
     private Set<String> toString(final Map<String, HeaderProcessing> map)

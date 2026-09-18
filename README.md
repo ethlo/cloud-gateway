@@ -173,6 +173,11 @@ filters:
 - CorrelationIdHeader
 ```
 The header name can be changed if necessary, by setting the `header-name` argument. The default is `X-Correlation-Id`.
+
+```yaml
+filters:
+- CorrelationIdHeader=X-My-Correlation-Id
+```
 ### TemplateRedirect
 
 It supports regexp named parameters, otherwise you can also use numeric variables like `{{1}}` and `{{2}}`. You also

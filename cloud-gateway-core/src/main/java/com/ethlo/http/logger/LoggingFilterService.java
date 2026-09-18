@@ -1,17 +1,21 @@
 package com.ethlo.http.logger;
 
-import java.util.HashSet;
+import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+import org.springframework.cloud.context.scope.refresh.RefreshScopeRefreshedEvent;
+import org.springframework.context.ApplicationListener;
+
 import com.ethlo.http.configuration.HttpLoggingConfiguration;
 import com.ethlo.http.match.HeaderPredicate;
+import com.ethlo.http.match.HeaderProcessing;
 import com.ethlo.http.match.LogOptions;
 import com.ethlo.http.netty.PredicateConfig;
 
-public class LoggingFilterService
+public class LoggingFilterService implements ApplicationListener<RefreshScopeRefreshedEvent>
 {
     private final HttpLoggingConfiguration httpLoggingConfiguration;
     private final ConcurrentMap<String, PredicateConfig> cache = new ConcurrentHashMap<>();
@@ -30,18 +34,22 @@ public class LoggingFilterService
 
     public static HeaderPredicate mergeHeader(HeaderPredicate global, HeaderPredicate local)
     {
-        final Set<String> globalIncludes = new HashSet<>(global.getIncludes());
-        final Set<String> globalExcludes = new HashSet<>(global.getExcludes());
+        // Merge on the parsed header names, as the string form carries the processing instruction
+        // as a suffix (for example 'Authorization,r') and would never match a plain header name.
+        final Map<String, HeaderProcessing> includes = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        includes.putAll(global.getIncludeProcessing());
+        final Map<String, HeaderProcessing> excludes = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        excludes.putAll(global.getExcludeProcessing());
 
         // Local includes overwrite global excludes
-        globalExcludes.removeAll(local.getIncludes());
-        globalExcludes.addAll(local.getExcludes());
+        local.getIncludeProcessing().keySet().forEach(excludes::remove);
+        excludes.putAll(local.getExcludeProcessing());
 
         // Local excludes overwrite global includes
-        globalIncludes.removeAll(local.getExcludes());
-        globalIncludes.addAll(local.getIncludes());
+        local.getExcludeProcessing().keySet().forEach(includes::remove);
+        includes.putAll(local.getIncludeProcessing());
 
-        return new HeaderPredicate(globalIncludes, globalExcludes);
+        return HeaderPredicate.of(includes, excludes);
     }
 
     public PredicateConfig merge(PredicateConfig predicateConfig)
@@ -52,5 +60,15 @@ public class LoggingFilterService
     public LogFilter getGlobalFilter()
     {
         return httpLoggingConfiguration.getFilter();
+    }
+
+    /**
+     * The merged result depends on the global filter configuration, and the matcher ids used as cache keys are
+     * stable across a refresh, so the cache has to be dropped explicitly to avoid serving a stale merge.
+     */
+    @Override
+    public void onApplicationEvent(final RefreshScopeRefreshedEvent event)
+    {
+        cache.clear();
     }
 }

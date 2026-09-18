@@ -7,6 +7,7 @@ import static com.ethlo.http.netty.ServerDirection.REQUEST;
 import static com.ethlo.http.netty.ServerDirection.RESPONSE;
 
 import java.io.ByteArrayInputStream;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -102,7 +103,8 @@ public class ClickHouseLogger implements HttpLogger
         final PredicateConfig predicateConfig = loggingFilterService.merge(logConfigOpt.get());
 
 
-        final Map<String, Object> params = dataProvider.asMetaMap();
+        // Synchronized as the request and response content is processed concurrently below
+        final Map<String, Object> params = Collections.synchronizedMap(dataProvider.asMetaMap());
 
         dataProvider.requestHeaders(HttpHeaders.copyOf(dataProvider.getRequestHeaders()));
         dataProvider.responseHeaders(HttpHeaders.copyOf(dataProvider.getResponseHeaders()));
@@ -153,7 +155,7 @@ public class ClickHouseLogger implements HttpLogger
 
         return AsyncUtil.join(List.of(
                         processContent(predicateConfig.request(), dataProvider.getRawRequest().orElse(null), REQUEST, params),
-                        processContent(predicateConfig.request(), dataProvider.getRawResponse().orElse(null), RESPONSE, params)
+                        processContent(predicateConfig.response(), dataProvider.getRawResponse().orElse(null), RESPONSE, params)
                 )
         ).thenApply(res ->
         {

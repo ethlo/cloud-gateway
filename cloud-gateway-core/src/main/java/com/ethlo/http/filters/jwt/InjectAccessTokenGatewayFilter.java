@@ -36,7 +36,7 @@ public class InjectAccessTokenGatewayFilter implements GatewayFilter
     private final JacksonJsonEncoder jacksonEncoder = new JacksonJsonEncoder();
     private final JwtTokenService tokenService = new JwtTokenService();
     private final InjectAccessTokenConfig config;
-    protected DecodedJWT jwt;
+    protected volatile DecodedJWT jwt;
 
     public InjectAccessTokenGatewayFilter(InjectAccessTokenConfig config, TaskScheduler taskScheduler)
     {
@@ -61,6 +61,7 @@ public class InjectAccessTokenGatewayFilter implements GatewayFilter
         if (jwt == null)
         {
             logger.warn("No auth token to inject for request to {}", exchange.getRequest().getURI());
+            exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
             return writeBodyJson(getErrorResponse(exchange), exchange);
         }
         else
@@ -98,35 +99,53 @@ public class InjectAccessTokenGatewayFilter implements GatewayFilter
 
     private void scheduledRefreshAccessToken()
     {
-        final long now = Instant.now().toEpochMilli();
-        final long expiresAt = jwt == null ? 0 : jwt.getExpiresAtAsInstant().toEpochMilli();
-        if (jwt == null || expiresAt - now < config.getMinimumTTL().toMillis())
+        // Any exception escaping here would cancel the scheduled task for good, so nothing is allowed out
+        try
         {
+            final DecodedJWT current = jwt;
+            if (!needsRefresh(current))
+            {
+                return;
+            }
 
             // We do not have an access token, or we are getting too close to expiry, refresh it
             logger.debug("Attempting to refresh access token from {}", config.getTokenUrl());
 
-            try
+            final @Nonnull DecodedJWT newToken = Objects.requireNonNull(tokenService.fetchAccessToken(config.getTokenUrl(), config.getRefreshToken(), config.getClientId(), config.getClientSecret()).block());
+            this.jwt = newToken;
+
+            if (current == null)
             {
-                final @Nonnull DecodedJWT newToken = Objects.requireNonNull(tokenService.fetchAccessToken(config.getTokenUrl(), config.getRefreshToken(), config.getClientId(), config.getClientSecret()).block());
-                if (jwt == null)
-                {
-                    final DecodedJWT refreshToken = JWT.decode(config.getRefreshToken());
-                    logger.debug("Refresh token {} will expire at: {}", refreshToken.getId(), refreshToken.getExpiresAtAsInstant() != null ? refreshToken.getExpiresAtAsInstant() : "never");
-                    logger.debug("Access token {} fetched with expiry at {} from {}", newToken.getId(), newToken.getExpiresAtAsInstant(), config.getTokenUrl());
-                }
-                else
-                {
-                    logger.debug("Refreshed access token from {}", config.getTokenUrl());
-                }
-                this.jwt = newToken;
+                final DecodedJWT refreshToken = JWT.decode(config.getRefreshToken());
+                logger.debug("Refresh token {} will expire at: {}", refreshToken.getId(), refreshToken.getExpiresAtAsInstant() != null ? refreshToken.getExpiresAtAsInstant() : "never");
+                logger.debug("Access token {} fetched with expiry at {} from {}", newToken.getId(), newToken.getExpiresAtAsInstant(), config.getTokenUrl());
             }
-            catch (Exception exc)
+            else
             {
-                logger.warn("Error refreshing access token from {}: {}", config.getTokenUrl(), exc.getMessage());
-                jwt = null;
+                logger.debug("Refreshed access token from {}", config.getTokenUrl());
             }
         }
+        catch (Exception exc)
+        {
+            logger.warn("Error refreshing access token from {}: {}", config.getTokenUrl(), exc.getMessage());
+            jwt = null;
+        }
+    }
+
+    private boolean needsRefresh(final DecodedJWT current)
+    {
+        if (current == null)
+        {
+            return true;
+        }
+
+        final Instant expiresAt = current.getExpiresAtAsInstant();
+        if (expiresAt == null)
+        {
+            // No expiry claim, so it never goes stale
+            return false;
+        }
+        return expiresAt.toEpochMilli() - Instant.now().toEpochMilli() < config.getMinimumTTL().toMillis();
     }
 
     public Publisher<DecodedJWT> fetchAccessToken()

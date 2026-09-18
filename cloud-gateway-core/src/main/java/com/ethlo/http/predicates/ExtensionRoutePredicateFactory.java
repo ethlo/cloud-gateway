@@ -40,7 +40,12 @@ public class ExtensionRoutePredicateFactory extends AbstractRoutePredicateFactor
         {
             final RequestPath path = serverWebExchange.getRequest().getPath();
             final List<PathContainer.Element> elements = path.pathWithinApplication().elements();
-            final String filename = elements.get(elements.size() - 1).value();
+            if (elements.isEmpty())
+            {
+                // A request for the base path itself has no filename to inspect
+                return false;
+            }
+            final String filename = elements.getLast().value();
             final String[] parts = filename.split("\\.");
             if (parts.length > 1)
             {

@@ -48,32 +48,24 @@ public class DataBufferRepository
         close(requestId);
 
         logger.debug("Cleaning up buffer files for request {}", requestId);
-        cleanup(getFilename(basePath, REQUEST, requestId));
-        cleanup(getFilename(basePath, RESPONSE, requestId));
-    }
-
-    private void cleanup(Path file)
-    {
-        Optional.ofNullable(pool.remove(file)).ifPresent(requestBuffer ->
-        {
-            if (logger.isDebugEnabled())
-            {
-                try
-                {
-                    logger.debug("Deleting buffer file {} with size of {} bytes", file, Files.size(file));
-                }
-                catch (IOException exc)
-                {
-                    logger.trace("Ignored: File size calculation failed", exc);
-                }
-            }
-
-            deleteSilently(file);
-        });
+        deleteSilently(getFilename(basePath, REQUEST, requestId));
+        deleteSilently(getFilename(basePath, RESPONSE, requestId));
     }
 
     private void deleteSilently(Path requestFile)
     {
+        if (logger.isDebugEnabled() && Files.exists(requestFile))
+        {
+            try
+            {
+                logger.debug("Deleting buffer file {} with size of {} bytes", requestFile, Files.size(requestFile));
+            }
+            catch (IOException exc)
+            {
+                logger.trace("Ignored: File size calculation failed", exc);
+            }
+        }
+
         try
         {
             Files.deleteIfExists(requestFile);
@@ -84,36 +76,57 @@ public class DataBufferRepository
         }
     }
 
+    /**
+     * Appends the data to the buffer file of the request. The target offset is claimed synchronously, so writes are
+     * appended in the order this method was called, rather than in the order they happen to complete.
+     * <p>
+     * Note that the buffer must not be modified or freed, and the file must not be read back, until the returned
+     * future completes.
+     */
     public CompletableFuture<Integer> write(final ServerDirection operation, final String requestId, final ByteBuffer data)
     {
         final BufferHolder holder = getAsyncFileChannel(operation, requestId);
         final CompletableFuture<Integer> completableFuture = new CompletableFuture<>();
-        long fileSize;
-        try
+        final int length = data.remaining();
+        final long offset = holder.size.getAndAdd(length);
+        writeFully(holder.fileChannel, data, offset, data.position(), length, 0, completableFuture);
+        return completableFuture;
+    }
+
+    /**
+     * A single write is not guaranteed to consume the whole buffer. As the offset was claimed for the full length,
+     * a short write must be followed up rather than leaving the tail unwritten and a gap in the file.
+     */
+    void writeFully(final AsynchronousFileChannel fileChannel, final ByteBuffer data, final long offset, final int startPosition, final int length, final int writtenSoFar, final CompletableFuture<Integer> result)
+    {
+        if (writtenSoFar >= length)
         {
-            fileSize = holder.fileChannel.size();
-        }
-        catch (IOException e)
-        {
-            completableFuture.completeExceptionally(e);
-            return completableFuture;
+            result.complete(writtenSoFar);
+            return;
         }
 
-        holder.fileChannel.write(data, fileSize, null, new CompletionHandler<Integer, Void>()
+        // Set explicitly rather than relying on the channel to have advanced the buffer for us
+        data.position(startPosition + writtenSoFar);
+
+        fileChannel.write(data, offset + writtenSoFar, null, new CompletionHandler<Integer, Void>()
         {
             @Override
-            public void completed(Integer result, Void attachment)
+            public void completed(Integer written, Void attachment)
             {
-                completableFuture.complete(result);
+                if (written <= 0 && writtenSoFar + written < length)
+                {
+                    result.completeExceptionally(new IOException("Wrote " + written + " bytes with " + (length - writtenSoFar) + " bytes remaining, giving up"));
+                    return;
+                }
+                writeFully(fileChannel, data, offset, startPosition, length, writtenSoFar + written, result);
             }
 
             @Override
             public void failed(Throwable exc, Void attachment)
             {
-                completableFuture.completeExceptionally(exc);
+                result.completeExceptionally(exc);
             }
         });
-        return completableFuture;
     }
 
     private BufferHolder getAsyncFileChannel(final ServerDirection serverDirection, final String requestId)
@@ -137,28 +150,26 @@ public class DataBufferRepository
         });
     }
 
+    /**
+     * Closes any open channel for the request and releases the pooled entries. Note that this always removes the
+     * entries from the pool, as the pool would otherwise grow unbounded for requests that are never cleaned up.
+     */
     public void close(final String requestId)
     {
-        final Path requestFile = getFilename(basePath, REQUEST, requestId);
-        getFileChannel(requestFile)
+        release(getFilename(basePath, REQUEST, requestId), REQUEST, requestId);
+        release(getFilename(basePath, RESPONSE, requestId), RESPONSE, requestId);
+    }
+
+    private void release(final Path file, final ServerDirection serverDirection, final String requestId)
+    {
+        Optional.ofNullable(pool.remove(file))
+                .map(BufferHolder::fileChannel)
+                .filter(AsynchronousFileChannel::isOpen)
                 .ifPresent(fc ->
                 {
-                    if (fc.isOpen())
-                    {
-                        logger.debug("Closing request file {} used by request {}", requestFile, requestId);
-                        CloseUtil.closeQuietly(fc);
-                    }
+                    logger.debug("Closing {} file {} used by request {}", serverDirection.name().toLowerCase(), file, requestId);
+                    CloseUtil.closeQuietly(fc);
                 });
-
-        final Path responseFile = getFilename(basePath, RESPONSE, requestId);
-        getFileChannel(responseFile).ifPresent(fc ->
-        {
-            if (fc.isOpen())
-            {
-                logger.debug("Closing response file {} used by request {}", responseFile, requestId);
-                CloseUtil.closeQuietly(fc);
-            }
-        });
     }
 
     private Optional<AsynchronousFileChannel> getFileChannel(Path file)

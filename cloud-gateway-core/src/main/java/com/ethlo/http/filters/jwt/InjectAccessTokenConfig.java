@@ -3,6 +3,7 @@ package com.ethlo.http.filters.jwt;
 import jakarta.validation.constraints.NotEmpty;
 
 import java.time.Duration;
+import java.util.Objects;
 import java.util.Optional;
 
 public class InjectAccessTokenConfig
@@ -74,5 +75,29 @@ public class InjectAccessTokenConfig
     {
         this.refreshToken = refreshToken;
         return this;
+    }
+
+    @Override
+    public boolean equals(final Object o)
+    {
+        if (this == o)
+        {
+            return true;
+        }
+        if (!(o instanceof final InjectAccessTokenConfig other))
+        {
+            return false;
+        }
+        return Objects.equals(tokenUrl, other.tokenUrl)
+                && Objects.equals(clientId, other.clientId)
+                && Objects.equals(clientSecret, other.clientSecret)
+                && Objects.equals(refreshToken, other.refreshToken)
+                && Objects.equals(getMinimumTTL(), other.getMinimumTTL());
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return Objects.hash(tokenUrl, clientId, clientSecret, refreshToken, getMinimumTTL());
     }
 }

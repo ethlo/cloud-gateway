@@ -25,18 +25,18 @@ public class FileConfigurationChangeDetector
 {
     private static final Logger logger = LoggerFactory.getLogger(FileConfigurationChangeDetector.class);
 
-    private final FileAlterationListenerAdaptor listener;
-    private final FileAlterationMonitor monitor;
+    private FileAlterationMonitor monitor;
 
     public FileConfigurationChangeDetector(final StandardEnvironment environment, final ApplicationEventPublisher applicationEventPublisher, final FileConfigurationChangeDetectorConfiguration config) throws Exception
     {
         if (!config.enabled())
         {
             logger.info("Configuration file watcher is disabled");
+            return;
         }
 
         logger.info("Starting configuration file watcher");
-        this.listener = new FileAlterationListenerAdaptor()
+        final FileAlterationListenerAdaptor listener = new FileAlterationListenerAdaptor()
         {
             @Override
             public void onFileChange(File file)
@@ -72,6 +72,9 @@ public class FileConfigurationChangeDetector
     @PreDestroy
     public void destroy() throws Exception
     {
-        monitor.stop();
+        if (monitor != null)
+        {
+            monitor.stop();
+        }
     }
 }
