@@ -8,6 +8,9 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -97,6 +100,63 @@ class DataBufferRepositoryTest
         dataBufferRepository.writeFully(channel, data, 0, data.position(), data.remaining(), 0, result);
 
         assertThat(result).isCompletedExceptionally();
+    }
+
+    @Test
+    void orphanedFilesOlderThanTheRetentionPeriodAreDeleted()
+    {
+        dataBufferRepository.write(ServerDirection.REQUEST, REQUEST_ID, buffer("left behind")).join();
+        dataBufferRepository.close(REQUEST_ID);
+        final Path file = DataBufferRepository.getFilename(logDirectory, ServerDirection.REQUEST, REQUEST_ID);
+        backdate(file, Duration.ofHours(2));
+
+        assertThat(dataBufferRepository.deleteOrphaned(Duration.ofHours(1))).containsExactly(file);
+        assertThat(file).doesNotExist();
+    }
+
+    @Test
+    void filesWithinTheRetentionPeriodAreKept()
+    {
+        dataBufferRepository.write(ServerDirection.REQUEST, REQUEST_ID, buffer("just written")).join();
+        dataBufferRepository.close(REQUEST_ID);
+        final Path file = DataBufferRepository.getFilename(logDirectory, ServerDirection.REQUEST, REQUEST_ID);
+
+        assertThat(dataBufferRepository.deleteOrphaned(Duration.ofHours(1))).isEmpty();
+        assertThat(file).exists();
+    }
+
+    @Test
+    void filesStillHeldByARequestAreKeptRegardlessOfAge()
+    {
+        // No close(), so the request is still considered in flight even though the file looks old
+        dataBufferRepository.write(ServerDirection.RESPONSE, REQUEST_ID, buffer("still streaming")).join();
+        final Path file = DataBufferRepository.getFilename(logDirectory, ServerDirection.RESPONSE, REQUEST_ID);
+        backdate(file, Duration.ofHours(2));
+
+        assertThat(dataBufferRepository.deleteOrphaned(Duration.ofHours(1))).isEmpty();
+        assertThat(file).exists();
+    }
+
+    @Test
+    void unrelatedFilesAreLeftAlone() throws IOException
+    {
+        final Path unrelated = Files.writeString(logDirectory.resolve("notes.txt"), "keep me");
+        backdate(unrelated, Duration.ofHours(2));
+
+        assertThat(dataBufferRepository.deleteOrphaned(Duration.ofHours(1))).isEmpty();
+        assertThat(unrelated).exists();
+    }
+
+    private void backdate(final Path file, final Duration age)
+    {
+        try
+        {
+            Files.setLastModifiedTime(file, FileTime.from(Instant.now().minus(age)));
+        }
+        catch (IOException e)
+        {
+            throw new UncheckedIOException(e);
+        }
     }
 
     private ByteBuffer buffer(final String content)

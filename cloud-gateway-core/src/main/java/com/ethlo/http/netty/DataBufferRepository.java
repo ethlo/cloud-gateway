@@ -11,11 +11,16 @@ import java.nio.channels.CompletionHandler;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Stream;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,6 +33,7 @@ import com.ethlo.http.model.RawProvider;
 public class DataBufferRepository
 {
     private static final Logger logger = LoggerFactory.getLogger(DataBufferRepository.class);
+    private static final String FILE_SUFFIX = ".raw";
 
     private final Path basePath;
     private final ConcurrentMap<Path, BufferHolder> pool;
@@ -40,7 +46,7 @@ public class DataBufferRepository
 
     public static Path getFilename(final Path basePath, ServerDirection operation, String id)
     {
-        return basePath.resolve(id + "_" + operation.name().toLowerCase() + ".raw");
+        return basePath.resolve(id + "_" + operation.name().toLowerCase() + FILE_SUFFIX);
     }
 
     public void cleanup(final String requestId)
@@ -50,6 +56,69 @@ public class DataBufferRepository
         logger.debug("Cleaning up buffer files for request {}", requestId);
         deleteSilently(getFilename(basePath, REQUEST, requestId));
         deleteSilently(getFilename(basePath, RESPONSE, requestId));
+    }
+
+    /**
+     * Deletes buffer files that no in-flight request is using and that have not been modified within the retention
+     * period.
+     * <p>
+     * Files are deliberately left behind whenever the access log entry could not be fully processed, for example when
+     * an upstream closes the connection mid-response and the truncated body fails to decode. The access log row has
+     * already been written at that point and nothing reads the files again, so without sweeping they accumulate for
+     * the lifetime of the log directory.
+     *
+     * @param retention How long a file must have been untouched before it counts as orphaned
+     * @return The files that were deleted
+     */
+    public List<Path> deleteOrphaned(final Duration retention)
+    {
+        final Instant cutoff = Instant.now().minus(retention);
+        final List<Path> candidates;
+        try (final Stream<Path> files = Files.list(basePath))
+        {
+            candidates = files.filter(DataBufferRepository::isBufferFile)
+                    .filter(file -> isUntouchedSince(file, cutoff))
+                    .toList();
+        }
+        catch (IOException e)
+        {
+            logger.warn("Unable to list buffer file directory {}: {}", basePath, e.getMessage(), e);
+            return List.of();
+        }
+
+        final List<Path> deleted = new ArrayList<>();
+        for (final Path file : candidates)
+        {
+            // Checked as late as possible: a file a request still holds open is in use, however old it looks
+            if (pool.containsKey(file))
+            {
+                continue;
+            }
+            deleteSilently(file);
+            deleted.add(file);
+        }
+        return deleted;
+    }
+
+    private static boolean isBufferFile(final Path file)
+    {
+        return file.getFileName().toString().endsWith(FILE_SUFFIX) && Files.isRegularFile(file);
+    }
+
+    /**
+     * Treats a file whose timestamp cannot be read as still in use, rather than deleting data we know nothing about.
+     */
+    private static boolean isUntouchedSince(final Path file, final Instant cutoff)
+    {
+        try
+        {
+            return Files.getLastModifiedTime(file).toInstant().isBefore(cutoff);
+        }
+        catch (IOException e)
+        {
+            logger.debug("Unable to read the last modified time of {}, leaving it alone: {}", file, e.getMessage());
+            return false;
+        }
     }
 
     private void deleteSilently(Path requestFile)
