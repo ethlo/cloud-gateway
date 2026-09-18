@@ -52,7 +52,24 @@ public class ClickHouseStatsEndpoint
                 from system.parts
                 where active and database = currentDatabase() and `table` = :table
                 group by table""";
-        return tpl.queryForMap(sql, Map.of("table", tableName));
+
+        // A table without any active parts, for example right after a fresh install, yields no rows at all
+        return tpl.queryForList(sql, Map.of("table", tableName))
+                .stream()
+                .findFirst()
+                .orElseGet(ClickHouseStatsEndpoint::noTableStats);
+    }
+
+    private static Map<String, Object> noTableStats()
+    {
+        final Map<String, Object> stats = new LinkedHashMap<>();
+        stats.put("row_count", 0L);
+        stats.put("latest_modification_timestamp", null);
+        stats.put("data_compressed_size", 0L);
+        stats.put("data_uncompressed_size", 0L);
+        stats.put("engine", null);
+        stats.put("primary_key_bytes_in_mem_size", 0L);
+        return stats;
     }
 
     public Map<String, Object> getStoredDataSizes()

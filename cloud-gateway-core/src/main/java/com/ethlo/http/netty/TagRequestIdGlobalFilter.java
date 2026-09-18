@@ -71,24 +71,12 @@ public class TagRequestIdGlobalFilter implements GlobalFilter, Ordered
         final Flux<PredicateConfig> filteredConfigs = Flux.fromIterable(predicateConfigs)
                 .filterWhen(c -> (Publisher<Boolean>) c.predicate().apply(exchange));
 
-        return filteredConfigs
-                .hasElements()  // Check if any predicate passed
-                .flatMapMany(hasMatches ->
-                {
-                    if (hasMatches)
-                    {
-                        // If there's at least one match, run prepareForLoggingIfApplicable once
-                        return filteredConfigs.take(1)
-                                .flatMap(predicateConfig ->
-                                        prepareForLoggingIfApplicable(exchange, chain, loggingFilterService.merge(predicateConfig)));
-                    }
-                    else
-                    {
-                        // If no matches, run chain.filter(exchange)
-                        return chain.filter(exchange).flux();
-                    }
-                })
-                .next();
+        // Subscribe once: evaluating the matcher predicates twice would run them for every request twice
+        return filteredConfigs.next()
+                .singleOptional()
+                .flatMap(match -> match
+                        .map(predicateConfig -> prepareForLoggingIfApplicable(exchange, chain, loggingFilterService.merge(predicateConfig)))
+                        .orElseGet(() -> chain.filter(exchange)));
     }
 
     private Mono<Void> prepareForLoggingIfApplicable(ServerWebExchange exchange, GatewayFilterChain chain, PredicateConfig predicateConfig)

@@ -129,6 +129,35 @@ class LayeredFileSystemImplTest {
     }
 
     @Test
+    void testFileWatcherCacheInvalidationInSubDirectory() throws IOException, InterruptedException {
+        // Let the watcher pick up 'nested', which was created after the file system was constructed
+        Thread.sleep(300);
+
+        // A change here is only seen if the watcher followed the directory tree down: deleting the file below
+        // leaves the modification time of 'nested' itself untouched
+        Files.createDirectory(layer2.resolve("nested/deeper"));
+        Thread.sleep(300);
+        Files.writeString(layer2.resolve("nested/deeper/file5.txt"), "layer2_nested_deeper_file5.txt");
+
+        final Path relativePath = Paths.get("nested/deeper/file5.txt");
+        assertResource(layer2, "nested/deeper/file5.txt", fileSystem.find(relativePath), "layer2_nested_deeper_file5.txt");
+
+        Files.delete(layer2.resolve("nested/deeper/file5.txt"));
+
+        assertThat(awaitNotFound(relativePath)).isTrue();
+    }
+
+    private boolean awaitNotFound(Path relativePath) throws InterruptedException {
+        for (int attempt = 0; attempt < 40; attempt++) {
+            if (fileSystem.find(relativePath).isEmpty()) {
+                return true;
+            }
+            Thread.sleep(50);
+        }
+        return false;
+    }
+
+    @Test
     void testFileWatcherCacheInvalidation() throws IOException, InterruptedException {
         // Find file1.txt to add it to the cache
         final Path relativePath = Paths.get("file3.txt");

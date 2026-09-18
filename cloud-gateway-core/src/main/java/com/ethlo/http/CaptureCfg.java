@@ -130,13 +130,20 @@ public class CaptureCfg
             try
             {
                 logger.debug("Waiting for queue capacity");
-                final long started = System.nanoTime();
-                if (!threadPoolExecutor.getQueue().offer(runnable, waitTimeout.toMillis(), TimeUnit.MILLISECONDS))
+
+                // Loop rather than recurse, as sustained saturation would otherwise grow the stack
+                // by one frame per timeout until it overflows
+                while (!threadPoolExecutor.isShutdown())
                 {
+                    final long started = System.nanoTime();
+                    if (threadPoolExecutor.getQueue().offer(runnable, waitTimeout.toMillis(), TimeUnit.MILLISECONDS))
+                    {
+                        return;
+                    }
                     rejectedDelayCounter.incrementAndGet();
                     rejectedDelay.addAndGet(System.nanoTime() - started);
-                    rejectedExecution(runnable, threadPoolExecutor);
                 }
+                throw new RejectedExecutionException("Executor is shut down, unable to queue task " + runnable);
             }
             catch (InterruptedException e)
             {

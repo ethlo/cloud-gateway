@@ -72,7 +72,8 @@ public class HttpRequestResponseLogger extends LoggingHandler
                                 return writtenBytes;
                             });
 
-                    // Wait for write
+                    // Wait for the write: the Netty buffer above is recycled once the pipeline is done with it,
+                    // and the buffer file is read back as soon as the request completes
                     writer.join();
                 }
             }

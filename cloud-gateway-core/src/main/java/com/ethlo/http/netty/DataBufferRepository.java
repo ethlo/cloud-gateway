@@ -76,22 +76,20 @@ public class DataBufferRepository
         }
     }
 
+    /**
+     * Appends the data to the buffer file of the request. The target offset is claimed synchronously, so writes are
+     * appended in the order this method was called, rather than in the order they happen to complete.
+     * <p>
+     * Note that the buffer must not be modified or freed, and the file must not be read back, until the returned
+     * future completes.
+     */
     public CompletableFuture<Integer> write(final ServerDirection operation, final String requestId, final ByteBuffer data)
     {
         final BufferHolder holder = getAsyncFileChannel(operation, requestId);
         final CompletableFuture<Integer> completableFuture = new CompletableFuture<>();
-        long fileSize;
-        try
-        {
-            fileSize = holder.fileChannel.size();
-        }
-        catch (IOException e)
-        {
-            completableFuture.completeExceptionally(e);
-            return completableFuture;
-        }
+        final long offset = holder.size.getAndAdd(data.remaining());
 
-        holder.fileChannel.write(data, fileSize, null, new CompletionHandler<Integer, Void>()
+        holder.fileChannel.write(data, offset, null, new CompletionHandler<Integer, Void>()
         {
             @Override
             public void completed(Integer result, Void attachment)

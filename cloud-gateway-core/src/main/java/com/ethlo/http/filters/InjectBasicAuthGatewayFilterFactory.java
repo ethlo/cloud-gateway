@@ -29,6 +29,12 @@ public class InjectBasicAuthGatewayFilterFactory extends AbstractGatewayFilterFa
     }
 
     @Override
+    public List<String> shortcutFieldOrder()
+    {
+        return List.of("username", "password");
+    }
+
+    @Override
     public GatewayFilter apply(Config config)
     {
         return new GatewayFilter()
@@ -47,18 +53,6 @@ public class InjectBasicAuthGatewayFilterFactory extends AbstractGatewayFilterFa
             public String toString()
             {
                 return InjectBasicAuthGatewayFilterFactory.class + "{username: " + config.getUsername() + ", password=*******}";
-            }
-
-            @Override
-            public List<String> shortcutFieldOrder()
-            {
-                return List.of("username", "password");
-            }
-
-            @Override
-            public ShortcutType shortcutType()
-            {
-                return ShortcutType.GATHER_LIST;
             }
         };
     }

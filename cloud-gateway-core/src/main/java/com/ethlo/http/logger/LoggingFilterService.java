@@ -6,13 +6,16 @@ import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+import org.springframework.cloud.context.scope.refresh.RefreshScopeRefreshedEvent;
+import org.springframework.context.ApplicationListener;
+
 import com.ethlo.http.configuration.HttpLoggingConfiguration;
 import com.ethlo.http.match.HeaderPredicate;
 import com.ethlo.http.match.HeaderProcessing;
 import com.ethlo.http.match.LogOptions;
 import com.ethlo.http.netty.PredicateConfig;
 
-public class LoggingFilterService
+public class LoggingFilterService implements ApplicationListener<RefreshScopeRefreshedEvent>
 {
     private final HttpLoggingConfiguration httpLoggingConfiguration;
     private final ConcurrentMap<String, PredicateConfig> cache = new ConcurrentHashMap<>();
@@ -57,5 +60,15 @@ public class LoggingFilterService
     public LogFilter getGlobalFilter()
     {
         return httpLoggingConfiguration.getFilter();
+    }
+
+    /**
+     * The merged result depends on the global filter configuration, and the matcher ids used as cache keys are
+     * stable across a refresh, so the cache has to be dropped explicitly to avoid serving a stale merge.
+     */
+    @Override
+    public void onApplicationEvent(final RefreshScopeRefreshedEvent event)
+    {
+        cache.clear();
     }
 }

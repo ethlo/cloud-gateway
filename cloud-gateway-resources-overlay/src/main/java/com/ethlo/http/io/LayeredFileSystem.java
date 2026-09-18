@@ -73,7 +73,28 @@ public class LayeredFileSystem extends FileSystem
     {
         for (Path layer : layers)
         {
-            layer.register(watchService, StandardWatchEventKinds.ENTRY_CREATE, StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_MODIFY);
+            registerRecursively(layer);
+        }
+    }
+
+    /**
+     * Registers the directory and all its sub-directories, as a watch registration only covers the entries
+     * directly in the registered directory.
+     */
+    private void registerRecursively(final Path directory) throws IOException
+    {
+        if (!Files.isDirectory(directory))
+        {
+            return;
+        }
+
+        try (Stream<Path> paths = Files.walk(directory))
+        {
+            for (Path dir : paths.filter(Files::isDirectory).toList())
+            {
+                dir.register(watchService, StandardWatchEventKinds.ENTRY_CREATE, StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_MODIFY);
+                logger.debug("Watching directory {}", dir);
+            }
         }
     }
 
@@ -83,20 +104,25 @@ public class LayeredFileSystem extends FileSystem
         {
             try
             {
-                WatchKey key = watchService.take();
+                final WatchKey key = watchService.take();
+                final Path watched = key.watchable() instanceof Path p ? p : null;
                 for (WatchEvent<?> event : key.pollEvents())
                 {
-                    WatchEvent.Kind<?> kind = event.kind();
-                    if (kind == StandardWatchEventKinds.ENTRY_CREATE || kind == StandardWatchEventKinds.ENTRY_DELETE || kind == StandardWatchEventKinds.ENTRY_MODIFY)
+                    final WatchEvent.Kind<?> kind = event.kind();
+                    pathCache.invalidateAll();
+
+                    if (kind == StandardWatchEventKinds.ENTRY_CREATE && watched != null && event.context() instanceof Path context)
                     {
-                        pathCache.invalidateAll();
+                        // A newly created directory is not covered by the existing registrations
+                        registerNewDirectory(watched.resolve(context));
                     }
                 }
                 key.reset();
             }
-            catch (ClosedWatchServiceException ignored)
+            catch (ClosedWatchServiceException e)
             {
-
+                // Nothing more to watch, so there is no point in looping
+                break;
             }
             catch (InterruptedException e)
             {
@@ -106,8 +132,25 @@ public class LayeredFileSystem extends FileSystem
         }
     }
 
+    private void registerNewDirectory(final Path created)
+    {
+        try
+        {
+            registerRecursively(created);
+        }
+        catch (IOException e)
+        {
+            logger.warn("Unable to watch newly created directory {}: {}", created, e.getMessage());
+        }
+    }
+
     public void shutdown()
     {
+        if (!open)
+        {
+            return;
+        }
+
         open = false;
         watcherThread.interrupt();
         try

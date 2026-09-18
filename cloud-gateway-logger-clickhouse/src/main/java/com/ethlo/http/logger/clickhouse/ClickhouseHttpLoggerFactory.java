@@ -5,8 +5,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.function.BiFunction;
 
-import javax.sql.DataSource;
-
 import org.flywaydb.core.Flyway;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.DataAccessResourceFailureException;
@@ -19,11 +17,14 @@ import com.ethlo.http.logger.HttpLoggerFactory;
 import com.ethlo.http.logger.LoggingFilterService;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import jakarta.annotation.PreDestroy;
 
 @ConditionalOnProperty(prefix = "http-logging.providers.clickhouse", name = "enabled", havingValue = "true")
 @Component
 public class ClickhouseHttpLoggerFactory implements HttpLoggerFactory
 {
+    private HikariDataSource dataSource;
+
     @Override
     public String getName()
     {
@@ -51,8 +52,20 @@ public class ClickhouseHttpLoggerFactory implements HttpLoggerFactory
         config.setUsername(clickHouseProviderConfig.getUsername());
         config.setPassword(clickHouseProviderConfig.getPassword());
         config.setConnectionInitSql(clickHouseProviderConfig.getConnectionInitSql());
-        final DataSource dataSource = new HikariDataSource(config);
-        return new NamedParameterJdbcTemplate(dataSource);
+        // Keep a handle on the pool, as nothing else owns it and it has to be closed on shutdown
+        closeDataSource();
+        this.dataSource = new HikariDataSource(config);
+        return new NamedParameterJdbcTemplate(this.dataSource);
+    }
+
+    @PreDestroy
+    public void closeDataSource()
+    {
+        if (dataSource != null)
+        {
+            dataSource.close();
+            dataSource = null;
+        }
     }
 
     public ClickHouseStatsEndpoint clickHouseStatsEndpoint(NamedParameterJdbcTemplate tpl)
