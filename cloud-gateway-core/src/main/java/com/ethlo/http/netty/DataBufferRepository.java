@@ -48,32 +48,24 @@ public class DataBufferRepository
         close(requestId);
 
         logger.debug("Cleaning up buffer files for request {}", requestId);
-        cleanup(getFilename(basePath, REQUEST, requestId));
-        cleanup(getFilename(basePath, RESPONSE, requestId));
-    }
-
-    private void cleanup(Path file)
-    {
-        Optional.ofNullable(pool.remove(file)).ifPresent(requestBuffer ->
-        {
-            if (logger.isDebugEnabled())
-            {
-                try
-                {
-                    logger.debug("Deleting buffer file {} with size of {} bytes", file, Files.size(file));
-                }
-                catch (IOException exc)
-                {
-                    logger.trace("Ignored: File size calculation failed", exc);
-                }
-            }
-
-            deleteSilently(file);
-        });
+        deleteSilently(getFilename(basePath, REQUEST, requestId));
+        deleteSilently(getFilename(basePath, RESPONSE, requestId));
     }
 
     private void deleteSilently(Path requestFile)
     {
+        if (logger.isDebugEnabled() && Files.exists(requestFile))
+        {
+            try
+            {
+                logger.debug("Deleting buffer file {} with size of {} bytes", requestFile, Files.size(requestFile));
+            }
+            catch (IOException exc)
+            {
+                logger.trace("Ignored: File size calculation failed", exc);
+            }
+        }
+
         try
         {
             Files.deleteIfExists(requestFile);
@@ -137,28 +129,26 @@ public class DataBufferRepository
         });
     }
 
+    /**
+     * Closes any open channel for the request and releases the pooled entries. Note that this always removes the
+     * entries from the pool, as the pool would otherwise grow unbounded for requests that are never cleaned up.
+     */
     public void close(final String requestId)
     {
-        final Path requestFile = getFilename(basePath, REQUEST, requestId);
-        getFileChannel(requestFile)
+        release(getFilename(basePath, REQUEST, requestId), REQUEST, requestId);
+        release(getFilename(basePath, RESPONSE, requestId), RESPONSE, requestId);
+    }
+
+    private void release(final Path file, final ServerDirection serverDirection, final String requestId)
+    {
+        Optional.ofNullable(pool.remove(file))
+                .map(BufferHolder::fileChannel)
+                .filter(AsynchronousFileChannel::isOpen)
                 .ifPresent(fc ->
                 {
-                    if (fc.isOpen())
-                    {
-                        logger.debug("Closing request file {} used by request {}", requestFile, requestId);
-                        CloseUtil.closeQuietly(fc);
-                    }
+                    logger.debug("Closing {} file {} used by request {}", serverDirection.name().toLowerCase(), file, requestId);
+                    CloseUtil.closeQuietly(fc);
                 });
-
-        final Path responseFile = getFilename(basePath, RESPONSE, requestId);
-        getFileChannel(responseFile).ifPresent(fc ->
-        {
-            if (fc.isOpen())
-            {
-                logger.debug("Closing response file {} used by request {}", responseFile, requestId);
-                CloseUtil.closeQuietly(fc);
-            }
-        });
     }
 
     private Optional<AsynchronousFileChannel> getFileChannel(Path file)

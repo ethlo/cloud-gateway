@@ -51,8 +51,9 @@ public class LocalRateLimiter extends AbstractRateLimiter<LocalRateLimiter.Confi
         final Duration refreshPeriod = routeConfig.getRefreshPeriod();
         final int tokensRequiredForRequest = routeConfig.getRequestedTokens();
 
+        // The registry name must include the route, as the limits are configured per route
         final io.github.resilience4j.ratelimiter.RateLimiter rateLimiter = rateLimiterRegistry
-                .rateLimiter(key, RateLimiterConfig.custom()
+                .rateLimiter(routeId + "|" + key, RateLimiterConfig.custom()
                         .timeoutDuration(Duration.ZERO)
                         .limitRefreshPeriod(refreshPeriod)
                         .limitForPeriod(replenishRate)
@@ -72,7 +73,7 @@ public class LocalRateLimiter extends AbstractRateLimiter<LocalRateLimiter.Confi
 
     private Config loadConfiguration(String routeId)
     {
-        Config routeConfig = getConfig().getOrDefault(routeId, new Config());
+        Config routeConfig = getConfig().get(routeId);
 
         if (routeConfig == null)
         {

@@ -18,10 +18,11 @@ import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.cloud.context.config.annotation.RefreshScope;
+import org.springframework.cloud.endpoint.event.RefreshEvent;
 import org.springframework.cloud.gateway.filter.FilterDefinition;
 import org.springframework.cloud.gateway.handler.predicate.PredicateDefinition;
 import org.springframework.cloud.gateway.route.RouteDefinition;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -34,21 +35,28 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import reactor.core.publisher.Mono;
 import reactor.netty.http.client.HttpClient;
 
+/**
+ * Deliberately not refresh scoped: the {@link #lastModified} change detection state must survive the refresh that
+ * {@link #update()} triggers, or every poll would see the configuration as new and refresh again indefinitely.
+ * {@link UpstreamServiceConfiguration} is refresh scoped and injected as a scoped proxy, so configuration changes
+ * are still picked up.
+ */
 @Component
-@RefreshScope
 public class HttpUpstreamServicesUpdateServiceImpl implements HttpUpstreamServicesUpdateService
 {
     private static final Logger logger = LoggerFactory.getLogger(HttpUpstreamServicesUpdateServiceImpl.class);
     private final HttpClient httpClient;
     private final UpstreamServiceConfiguration upstreamServiceConfiguration;
+    private final ApplicationEventPublisher applicationEventPublisher;
     private final ObjectMapper mapper = new ObjectMapper(new YAMLFactory().enable(YAMLGenerator.Feature.MINIMIZE_QUOTES));
 
     private final ConcurrentMap<String, LastModifiedRouteDefinition> lastModified = new ConcurrentHashMap<>();
 
-    public HttpUpstreamServicesUpdateServiceImpl(final HttpClient httpClient, UpstreamServiceConfiguration upstreamServiceConfiguration)
+    public HttpUpstreamServicesUpdateServiceImpl(final HttpClient httpClient, UpstreamServiceConfiguration upstreamServiceConfiguration, final ApplicationEventPublisher applicationEventPublisher)
     {
         this.httpClient = httpClient;
         this.upstreamServiceConfiguration = upstreamServiceConfiguration;
+        this.applicationEventPublisher = applicationEventPublisher;
     }
 
     private Map<String, RouteDefinition> parse(final ConfigSourceData configSourceData) throws IOException
@@ -111,7 +119,12 @@ public class HttpUpstreamServicesUpdateServiceImpl implements HttpUpstreamServic
     @Scheduled(fixedDelayString = "${upstream.interval:30000}")
     public void update()
     {
-        updateAll();
+        if (Boolean.TRUE.equals(updateAll().getValue()))
+        {
+            // Refreshes the scope so the new route definitions are picked up and the routes rebuilt
+            logger.info("Upstream configuration changed, triggering refresh");
+            applicationEventPublisher.publishEvent(new RefreshEvent(this, "RefreshEvent", "Upstream configuration changed"));
+        }
     }
 
     @Override
