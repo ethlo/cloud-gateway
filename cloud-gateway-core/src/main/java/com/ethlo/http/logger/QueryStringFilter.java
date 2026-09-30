@@ -1,5 +1,10 @@
 package com.ethlo.http.logger;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
 import com.ethlo.http.match.HeaderProcessing;
 import com.ethlo.http.match.QueryParamPredicate;
 
@@ -15,20 +20,20 @@ public class QueryStringFilter
     {
     }
 
-    public static String filter(final String rawQuery, final QueryParamPredicate predicate)
+    /**
+     * Parses a raw query string into a name-to-values map (preserving all values for repeated parameter names in
+     * their encounter order), applying the accept-list/redact semantics of the given predicate.
+     */
+    public static Map<String, List<String>> parse(final String rawQuery, final QueryParamPredicate predicate)
     {
-        if (rawQuery == null || rawQuery.isEmpty())
-        {
-            return rawQuery;
-        }
+        final Map<String, List<String>> result = new LinkedHashMap<>();
 
         // No accept-list configured at all: keep query-string logging off by default.
-        if (predicate == null || predicate.getIncludes().isEmpty())
+        if (rawQuery == null || rawQuery.isEmpty() || predicate == null || predicate.getIncludes().isEmpty())
         {
-            return null;
+            return result;
         }
 
-        final StringBuilder result = new StringBuilder();
         for (final String pair : rawQuery.split("&"))
         {
             if (pair.isEmpty())
@@ -44,19 +49,15 @@ public class QueryStringFilter
             final String rendered = switch (processing)
             {
                 case DELETE -> null;
-                case REDACT -> name + "=" + (value != null ? RedactUtil.redact(value) : "");
-                case NONE -> pair;
+                case REDACT -> value != null ? RedactUtil.redact(value) : "";
+                case NONE -> value != null ? value : "";
             };
 
             if (rendered != null)
             {
-                if (!result.isEmpty())
-                {
-                    result.append('&');
-                }
-                result.append(rendered);
+                result.computeIfAbsent(name, k -> new ArrayList<>()).add(rendered);
             }
         }
-        return !result.isEmpty() ? result.toString() : null;
+        return result;
     }
 }

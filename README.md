@@ -159,6 +159,10 @@ http-logging:
       url: jdbc:ch://localhost:18123?database=default&async_insert=1,wait_for_async_insert=0
 ```
 
+> This accept-list populates a `query_params` column (`Map(String, Array(String))`), keyed by parameter name with
+> its values as an array (repeated names keep every value). The plain `query` column is no longer populated by
+> the ClickHouse logger; query the structured `query_params` column instead.
+
 ### Handling Unprocessed Requests
 
 If the upstream server is down, the request contents may be lost. You can still capture the request by configuring a

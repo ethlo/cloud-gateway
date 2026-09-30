@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -44,6 +45,7 @@ class ClickHouseLoggerQueryFilteringTest
     {
         final Map<String, Object> params = accessLog(new HttpLoggingConfiguration(), "foo=bar&api_key=secret");
         assertThat(params).containsEntry("query", null);
+        assertThat(params).containsEntry("query_params", Map.of());
     }
 
     @Test
@@ -53,7 +55,8 @@ class ClickHouseLoggerQueryFilteringTest
         configuration.setFilter(new LogFilter().setQueryParams(new QueryParamPredicate(Set.of("foo"))));
 
         final Map<String, Object> params = accessLog(configuration, "foo=bar&api_key=secret");
-        assertThat(params).containsEntry("query", "foo=bar");
+        assertThat(params).containsEntry("query", null);
+        assertThat(params).containsEntry("query_params", Map.of("foo", List.of("bar")));
     }
 
     private Map<String, Object> accessLog(final HttpLoggingConfiguration configuration, final String rawQuery) throws IOException
