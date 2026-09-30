@@ -1,1 +1,1 @@
-ALTER TABLE log ADD COLUMN query LowCardinality(Nullable(String));
+ALTER TABLE log ADD COLUMN query Nullable(String) codec (ZSTD(3));
