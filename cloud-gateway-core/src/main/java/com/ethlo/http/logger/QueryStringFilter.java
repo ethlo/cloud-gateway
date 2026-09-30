@@ -21,8 +21,8 @@ public class QueryStringFilter
     }
 
     /**
-     * Parses a raw query string into a name-to-values map (preserving repeated parameter names as separate
-     * entries), applying the accept-list/redact semantics of the given predicate.
+     * Parses a raw query string into a name-to-values map (preserving all values for repeated parameter names in
+     * their encounter order), applying the accept-list/redact semantics of the given predicate.
      */
     public static Map<String, List<String>> parse(final String rawQuery, final QueryParamPredicate predicate)
     {
