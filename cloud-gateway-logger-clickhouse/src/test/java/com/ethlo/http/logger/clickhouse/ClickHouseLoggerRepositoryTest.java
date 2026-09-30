@@ -65,6 +65,7 @@ class ClickHouseLoggerRepositoryTest
         params.put("method", "POST");
         params.put("path", "/api/v1/users");
         params.put("query", "foo=bar&baz=qux");
+        params.put("query_params", Map.of("foo", List.of("bar"), "baz", List.of("qux")));
         params.put("host", "api.example.com");
 
         params.put("duration", 145L); // milliseconds
@@ -119,6 +120,12 @@ class ClickHouseLoggerRepositoryTest
                 .containsEntry("path", "/api/v1/users")
                 .containsEntry("query", "foo=bar&baz=qux")
                 .containsKey("timestamp");
+
+        @SuppressWarnings("unchecked")
+        Map<String, List<String>> queryParams = (Map<String, List<String>>) row.get("query_params");
+        assertThat(queryParams)
+                .containsEntry("foo", List.of("bar"))
+                .containsEntry("baz", List.of("qux"));
 
         assertThat(((Number) row.get("response_time")).longValue()).isEqualTo(145L);
         assertThat(((Number) row.get("request_body_size")).longValue()).isEqualTo(2048L);

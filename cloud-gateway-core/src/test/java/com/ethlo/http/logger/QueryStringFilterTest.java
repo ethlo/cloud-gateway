@@ -2,6 +2,8 @@ package com.ethlo.http.logger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.junit.jupiter.api.Test;
@@ -51,5 +53,28 @@ class QueryStringFilterTest
         // "page" must not also match "PAGE" or "Page".
         final QueryParamPredicate predicate = new QueryParamPredicate(Set.of("page"));
         assertThat(QueryStringFilter.filter("page=2&PAGE=secret&Page=other", predicate)).isEqualTo("page=2");
+    }
+
+    @Test
+    void parseReturnsEmptyMapWhenDisabled()
+    {
+        assertThat(QueryStringFilter.parse("foo=bar", null)).isEmpty();
+        assertThat(QueryStringFilter.parse("foo=bar", new QueryParamPredicate(null))).isEmpty();
+    }
+
+    @Test
+    void parseReturnsAcceptListedParamsAsMapOfLists()
+    {
+        final QueryParamPredicate predicate = new QueryParamPredicate(Set.of("tag"));
+        assertThat(QueryStringFilter.parse("tag=a&tag=b&api_key=secret", predicate))
+                .isEqualTo(Map.of("tag", List.of("a", "b")));
+    }
+
+    @Test
+    void parseRedactsValuesJustLikeFilter()
+    {
+        final QueryParamPredicate predicate = new QueryParamPredicate(Set.of("foo,r"));
+        assertThat(QueryStringFilter.parse("foo=bar", predicate))
+                .isEqualTo(Map.of("foo", List.of("*****")));
     }
 }

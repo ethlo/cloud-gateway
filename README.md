@@ -159,6 +159,10 @@ http-logging:
       url: jdbc:ch://localhost:18123?database=default&async_insert=1,wait_for_async_insert=0
 ```
 
+> The same accept-list also populates a `query_params` column (`Map(String, Array(String))`), holding the
+> filtered parameters split into names/values (repeated names keep every value), for easier querying than the
+> reassembled `query` string.
+
 ### Handling Unprocessed Requests
 
 If the upstream server is down, the request contents may be lost. You can still capture the request by configuring a

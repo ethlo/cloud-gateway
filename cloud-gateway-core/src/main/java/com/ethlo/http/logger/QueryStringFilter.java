@@ -1,5 +1,11 @@
 package com.ethlo.http.logger;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.BiConsumer;
+
 import com.ethlo.http.match.HeaderProcessing;
 import com.ethlo.http.match.QueryParamPredicate;
 
@@ -22,13 +28,42 @@ public class QueryStringFilter
             return rawQuery;
         }
 
+        final StringBuilder result = new StringBuilder();
+        process(rawQuery, predicate, (name, value) ->
+        {
+            if (!result.isEmpty())
+            {
+                result.append('&');
+            }
+            result.append(name).append('=').append(value != null ? value : "");
+        });
+        return !result.isEmpty() ? result.toString() : null;
+    }
+
+    /**
+     * Same accept-list/redact semantics as {@link #filter(String, QueryParamPredicate)}, but structured as a
+     * name-to-values map (preserving repeated parameter names) rather than reassembled into a query string.
+     */
+    public static Map<String, List<String>> parse(final String rawQuery, final QueryParamPredicate predicate)
+    {
+        final Map<String, List<String>> result = new LinkedHashMap<>();
+        if (rawQuery == null || rawQuery.isEmpty())
+        {
+            return result;
+        }
+
+        process(rawQuery, predicate, (name, value) -> result.computeIfAbsent(name, k -> new ArrayList<>()).add(value != null ? value : ""));
+        return result;
+    }
+
+    private static void process(final String rawQuery, final QueryParamPredicate predicate, final BiConsumer<String, String> renderedConsumer)
+    {
         // No accept-list configured at all: keep query-string logging off by default.
         if (predicate == null || predicate.getIncludes().isEmpty())
         {
-            return null;
+            return;
         }
 
-        final StringBuilder result = new StringBuilder();
         for (final String pair : rawQuery.split("&"))
         {
             if (pair.isEmpty())
@@ -41,22 +76,15 @@ public class QueryStringFilter
             final String value = idx >= 0 ? pair.substring(idx + 1) : null;
 
             final HeaderProcessing processing = predicate.apply(name);
-            final String rendered = switch (processing)
+            switch (processing)
             {
-                case DELETE -> null;
-                case REDACT -> name + "=" + (value != null ? RedactUtil.redact(value) : "");
-                case NONE -> pair;
-            };
-
-            if (rendered != null)
-            {
-                if (!result.isEmpty())
+                case DELETE ->
                 {
-                    result.append('&');
+                    // Omit entirely
                 }
-                result.append(rendered);
+                case REDACT -> renderedConsumer.accept(name, value != null ? RedactUtil.redact(value) : "");
+                case NONE -> renderedConsumer.accept(name, value);
             }
         }
-        return !result.isEmpty() ? result.toString() : null;
     }
 }

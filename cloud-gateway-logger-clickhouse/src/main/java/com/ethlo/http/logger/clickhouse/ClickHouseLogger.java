@@ -115,7 +115,9 @@ public class ClickHouseLogger implements HttpLogger
         // Query strings often carry sensitive data (tokens, API keys), so unlike headers they are hidden by
         // default and only surfaced for parameter names explicitly added to the "query-params" accept-list.
         final QueryParamPredicate queryParamsPredicate = Optional.ofNullable(loggingFilterService.getGlobalFilter()).map(LogFilter::getQueryParams).orElse(null);
-        params.put("query", QueryStringFilter.filter((String) params.get("query"), queryParamsPredicate));
+        final String rawQuery = (String) params.get("query");
+        params.put("query", QueryStringFilter.filter(rawQuery, queryParamsPredicate));
+        params.put("query_params", QueryStringFilter.parse(rawQuery, queryParamsPredicate));
 
         dataProvider.requestHeaders(HttpHeaders.copyOf(dataProvider.getRequestHeaders()));
         dataProvider.responseHeaders(HttpHeaders.copyOf(dataProvider.getResponseHeaders()));
