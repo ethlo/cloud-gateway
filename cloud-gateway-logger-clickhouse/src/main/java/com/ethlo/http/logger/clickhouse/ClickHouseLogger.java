@@ -26,8 +26,8 @@ import com.ethlo.http.logger.LogFilter;
 import com.ethlo.http.logger.LoggingFilterService;
 import com.ethlo.http.logger.QueryStringFilter;
 import com.ethlo.http.logger.RedactUtil;
-import com.ethlo.http.match.HeaderPredicate;
 import com.ethlo.http.match.HeaderProcessing;
+import com.ethlo.http.match.QueryParamPredicate;
 import com.ethlo.http.match.LogOptions;
 import com.ethlo.http.model.AccessLogResult;
 import com.ethlo.http.model.BodyProvider;
@@ -114,7 +114,7 @@ public class ClickHouseLogger implements HttpLogger
 
         // Query strings often carry sensitive data (tokens, API keys), so unlike headers they are hidden by
         // default and only surfaced for parameter names explicitly added to the "query-params" accept-list.
-        final HeaderPredicate queryParamsPredicate = Optional.ofNullable(loggingFilterService.getGlobalFilter()).map(LogFilter::getQueryParams).orElse(null);
+        final QueryParamPredicate queryParamsPredicate = Optional.ofNullable(loggingFilterService.getGlobalFilter()).map(LogFilter::getQueryParams).orElse(null);
         params.put("query", QueryStringFilter.filter((String) params.get("query"), queryParamsPredicate));
 
         dataProvider.requestHeaders(HttpHeaders.copyOf(dataProvider.getRequestHeaders()));

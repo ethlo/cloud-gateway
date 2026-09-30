@@ -24,7 +24,7 @@ import com.ethlo.http.configuration.HttpLoggingConfiguration;
 import com.ethlo.http.logger.CaptureConfiguration;
 import com.ethlo.http.logger.LogFilter;
 import com.ethlo.http.logger.LoggingFilterService;
-import com.ethlo.http.match.HeaderPredicate;
+import com.ethlo.http.match.QueryParamPredicate;
 import com.ethlo.http.match.LogOptions;
 import com.ethlo.http.model.WebExchangeDataProvider;
 import com.ethlo.http.netty.DataBufferRepository;
@@ -50,7 +50,7 @@ class ClickHouseLoggerQueryFilteringTest
     void onlyAcceptListedParamsAreLogged() throws IOException
     {
         final HttpLoggingConfiguration configuration = new HttpLoggingConfiguration();
-        configuration.setFilter(new LogFilter().setQueryParams(new HeaderPredicate(Set.of("foo"), null)));
+        configuration.setFilter(new LogFilter().setQueryParams(new QueryParamPredicate(Set.of("foo"), null)));
 
         final Map<String, Object> params = accessLog(configuration, "foo=bar&api_key=secret");
         assertThat(params).containsEntry("query", "foo=bar");

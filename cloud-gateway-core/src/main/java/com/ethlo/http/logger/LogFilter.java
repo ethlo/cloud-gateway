@@ -3,12 +3,13 @@ package com.ethlo.http.logger;
 import java.util.Optional;
 
 import com.ethlo.http.match.HeaderPredicate;
+import com.ethlo.http.match.QueryParamPredicate;
 
 public class LogFilter
 {
     private HeaderPredicate requestHeaders;
     private HeaderPredicate responseHeaders;
-    private HeaderPredicate queryParams;
+    private QueryParamPredicate queryParams;
 
     public HeaderPredicate getRequestHeaders()
     {
@@ -32,14 +33,14 @@ public class LogFilter
         return this;
     }
 
-    public HeaderPredicate getQueryParams()
+    public QueryParamPredicate getQueryParams()
     {
         return queryParams;
     }
 
-    public LogFilter setQueryParams(final HeaderPredicate queryParams)
+    public LogFilter setQueryParams(final QueryParamPredicate queryParams)
     {
-        this.queryParams = Optional.ofNullable(queryParams).orElse(new HeaderPredicate(null, null));
+        this.queryParams = Optional.ofNullable(queryParams).orElse(new QueryParamPredicate(null, null));
         return this;
     }
 

@@ -1,7 +1,7 @@
 package com.ethlo.http.logger;
 
-import com.ethlo.http.match.HeaderPredicate;
 import com.ethlo.http.match.HeaderProcessing;
+import com.ethlo.http.match.QueryParamPredicate;
 
 /**
  * Query strings frequently carry sensitive data (API keys, tokens, session identifiers), so unlike headers, which
@@ -15,7 +15,7 @@ public class QueryStringFilter
     {
     }
 
-    public static String filter(final String rawQuery, final HeaderPredicate predicate)
+    public static String filter(final String rawQuery, final QueryParamPredicate predicate)
     {
         if (rawQuery == null || rawQuery.isEmpty())
         {
