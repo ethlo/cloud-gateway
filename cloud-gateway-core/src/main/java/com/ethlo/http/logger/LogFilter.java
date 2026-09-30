@@ -8,6 +8,7 @@ public class LogFilter
 {
     private HeaderPredicate requestHeaders;
     private HeaderPredicate responseHeaders;
+    private HeaderPredicate queryParams;
 
     public HeaderPredicate getRequestHeaders()
     {
@@ -31,9 +32,20 @@ public class LogFilter
         return this;
     }
 
+    public HeaderPredicate getQueryParams()
+    {
+        return queryParams;
+    }
+
+    public LogFilter setQueryParams(final HeaderPredicate queryParams)
+    {
+        this.queryParams = Optional.ofNullable(queryParams).orElse(new HeaderPredicate(null, null));
+        return this;
+    }
+
     @Override
     public String toString()
     {
-        return "requestHeaders={" + requestHeaders + "}, responseHeaders={" + responseHeaders + "}";
+        return "requestHeaders={" + requestHeaders + "}, responseHeaders={" + responseHeaders + "}, queryParams={" + queryParams + "}";
     }
 }

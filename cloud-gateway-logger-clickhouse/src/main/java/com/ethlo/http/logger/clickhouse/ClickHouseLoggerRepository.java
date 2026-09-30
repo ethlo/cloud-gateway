@@ -26,13 +26,13 @@ public class ClickHouseLoggerRepository
 
         tpl.update("""                    
                         INSERT INTO log (
-                          timestamp, route_id, route_uri, gateway_request_id, method, path,
+                          timestamp, route_id, route_uri, gateway_request_id, method, path, query,
                           response_time, request_body_size, response_body_size, request_total_size,
                           response_total_size, status, is_error, user_claim, realm_claim, host,
                           request_content_type, response_content_type, user_agent,
                           request_headers, response_headers, request_body, response_body, request_raw, response_raw, exception_type, exception_message)
                         VALUES(
-                          :timestamp, :route_id, :route_uri, :gateway_request_id, :method, :path,
+                          :timestamp, :route_id, :route_uri, :gateway_request_id, :method, :path, :query,
                           :duration, :request_body_size, :response_body_size,
                           :request_total_size, :response_total_size, :status, :is_error, :user_claim, :realm_claim,
                           :host, :request_content_type, :response_content_type, :user_agent,

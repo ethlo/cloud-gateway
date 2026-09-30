@@ -200,6 +200,7 @@ public class WebExchangeDataProvider
         params.put("gateway_request_id", getRequestId());
         params.put("method", getMethod().name());
         params.put("path", getPath().value());
+        params.put("query", getUri().getRawQuery());
         params.put("duration", getDuration().toMillis());
         params.put("status", getStatusCode().value());
         params.put("is_error", getStatusCode().isError());
