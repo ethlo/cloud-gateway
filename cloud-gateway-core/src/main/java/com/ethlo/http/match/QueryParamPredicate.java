@@ -13,35 +13,26 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Same include/exclude/redact semantics as {@link HeaderPredicate}, but matches names case-sensitively. Unlike
- * HTTP header names, query parameter names are case-sensitive, so an accept-list entry for "page" must not also
- * match "PAGE" or "Page".
+ * An include-only accept-list, matching names case-sensitively (unlike {@link HeaderPredicate}). Query parameter
+ * names are case-sensitive per the URI spec, so an accept-list entry for "page" must not also match "PAGE" or
+ * "Page".
+ * <p>
+ * Query logging is deliberately allow-list-only: a name not in the list is always {@link HeaderProcessing#DELETE},
+ * so there is no separate exclude list to configure.
  */
 public class QueryParamPredicate implements Function<String, HeaderProcessing>
 {
     private Map<String, HeaderProcessing> includes;
-    private Map<String, HeaderProcessing> excludes;
 
-    public QueryParamPredicate(Set<String> includes, Set<String> excludes)
+    public QueryParamPredicate(Set<String> includes)
     {
         setIncludes(includes);
-        setExcludes(excludes);
     }
 
     @Override
     public HeaderProcessing apply(final String s)
     {
-        final HeaderProcessing include = includes.get(s);
-        if (include != null)
-        {
-            return include;
-        }
-        if (!includes.isEmpty())
-        {
-            return DELETE;
-        }
-
-        return excludes.getOrDefault(s, NONE);
+        return includes.getOrDefault(s, DELETE);
     }
 
     private Map.Entry<String, HeaderProcessing> parseProcessing(String line, HeaderProcessing defaultProcessing)
@@ -66,53 +57,29 @@ public class QueryParamPredicate implements Function<String, HeaderProcessing>
     @Override
     public String toString()
     {
-        return (includes.isEmpty() ? "" : "includes=" + includes) +
-                (excludes.isEmpty() ? "" : ((includes.isEmpty() ? "" : ", ") + "excludes=" + excludes));
+        return includes.isEmpty() ? "" : "includes=" + includes;
     }
 
     public Set<String> getIncludes()
     {
-        return toString(includes);
+        return includes.entrySet().stream()
+                .map(e -> e.getValue().getId().isEmpty() ? e.getKey() : e.getKey() + "," + e.getValue().getId())
+                .collect(Collectors.toSet());
     }
 
     private void setIncludes(Set<String> includes)
     {
-        this.includes = parseAll(includes, NONE);
-    }
-
-    public Set<String> getExcludes()
-    {
-        return toString(excludes);
-    }
-
-    public void setExcludes(final Set<String> excludes)
-    {
-        this.excludes = parseAll(excludes, DELETE);
-    }
-
-    private Map<String, HeaderProcessing> parseAll(final Set<String> lines, final HeaderProcessing defaultProcessing)
-    {
         final Map<String, HeaderProcessing> result = new TreeMap<>();
-        Optional.ofNullable(lines).orElse(Set.of()).forEach(line ->
+        Optional.ofNullable(includes).orElse(Set.of()).forEach(line ->
         {
-            final Map.Entry<String, HeaderProcessing> parsed = parseProcessing(line, defaultProcessing);
+            final Map.Entry<String, HeaderProcessing> parsed = parseProcessing(line, NONE);
             result.put(parsed.getKey(), parsed.getValue());
         });
-        return result;
+        this.includes = result;
     }
 
     public Map<String, HeaderProcessing> getIncludeProcessing()
     {
         return includes;
-    }
-
-    public Map<String, HeaderProcessing> getExcludeProcessing()
-    {
-        return excludes;
-    }
-
-    private Set<String> toString(final Map<String, HeaderProcessing> map)
-    {
-        return map.entrySet().stream().map(e -> e.getValue().getId().isEmpty() ? e.getKey() : e.getKey() + "," + e.getValue().getId()).collect(Collectors.toSet());
     }
 }

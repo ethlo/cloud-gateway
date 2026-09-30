@@ -13,34 +13,34 @@ class QueryStringFilterTest
     @Test
     void nullQueryIsUnchanged()
     {
-        assertThat(QueryStringFilter.filter(null, new QueryParamPredicate(Set.of("foo"), null))).isNull();
+        assertThat(QueryStringFilter.filter(null, new QueryParamPredicate(Set.of("foo")))).isNull();
     }
 
     @Test
     void disabledByDefaultWhenNoAcceptListIsConfigured()
     {
         assertThat(QueryStringFilter.filter("foo=bar", null)).isNull();
-        assertThat(QueryStringFilter.filter("foo=bar", new QueryParamPredicate(null, null))).isNull();
+        assertThat(QueryStringFilter.filter("foo=bar", new QueryParamPredicate(null))).isNull();
     }
 
     @Test
     void onlyAcceptListedParamsArePassedThrough()
     {
-        final QueryParamPredicate predicate = new QueryParamPredicate(Set.of("foo"), null);
+        final QueryParamPredicate predicate = new QueryParamPredicate(Set.of("foo"));
         assertThat(QueryStringFilter.filter("foo=bar&api_key=secret", predicate)).isEqualTo("foo=bar");
     }
 
     @Test
     void acceptListedParamCanStillBeRedacted()
     {
-        final QueryParamPredicate predicate = new QueryParamPredicate(Set.of("foo,r"), null);
+        final QueryParamPredicate predicate = new QueryParamPredicate(Set.of("foo,r"));
         assertThat(QueryStringFilter.filter("foo=bar", predicate)).isEqualTo("foo=*****");
     }
 
     @Test
     void allParamsRemovedWhenNoneMatchTheAcceptList()
     {
-        final QueryParamPredicate predicate = new QueryParamPredicate(Set.of("foo"), null);
+        final QueryParamPredicate predicate = new QueryParamPredicate(Set.of("foo"));
         assertThat(QueryStringFilter.filter("api_key=secret", predicate)).isNull();
     }
 
@@ -49,7 +49,7 @@ class QueryStringFilterTest
     {
         // Unlike HTTP header names, query parameter names are case-sensitive: an accept-list entry for
         // "page" must not also match "PAGE" or "Page".
-        final QueryParamPredicate predicate = new QueryParamPredicate(Set.of("page"), null);
+        final QueryParamPredicate predicate = new QueryParamPredicate(Set.of("page"));
         assertThat(QueryStringFilter.filter("page=2&PAGE=secret&Page=other", predicate)).isEqualTo("page=2");
     }
 }

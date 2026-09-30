@@ -40,7 +40,7 @@ public class LogFilter
 
     public LogFilter setQueryParams(final QueryParamPredicate queryParams)
     {
-        this.queryParams = Optional.ofNullable(queryParams).orElse(new QueryParamPredicate(null, null));
+        this.queryParams = Optional.ofNullable(queryParams).orElse(new QueryParamPredicate(null));
         return this;
     }
 
