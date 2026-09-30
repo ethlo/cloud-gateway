@@ -127,8 +127,11 @@ http-logging:
   providers:
     file:
       enabled: true
-      pattern: '{{gateway_request_id}} {{method}} {{path}} {{request_headers["Content-Length"][0]}} {{status}}'
+      pattern: '{{gateway_request_id}} {{method}} {{path}}{% if query %}?{{query}}{% endif %} {{request_headers["Content-Length"][0]}} {{status}}'
 ```
+
+> The `query` field contains the raw, unfiltered query string. Since query parameters can carry sensitive data
+> (API keys, tokens), only include `{{query}}` in your pattern for routes where that is acceptable.
 
 #### ClickHouse Logging
 
@@ -142,6 +145,14 @@ http-logging:
           # r = REDACT, default is DELETE
         - Authorization,r 
         - Api-Access-Key
+    query-params:
+      # Query parameters are hidden by default, since they may carry sensitive data (API keys, tokens).
+      # Only the names listed here are logged; everything else is removed.
+      includes:
+        - page
+        - sort
+          # r = REDACT, shows the parameter name with its value masked instead of removing it entirely
+        - session_id,r
   providers:
     clickhouse:
       enabled: true

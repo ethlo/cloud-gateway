@@ -64,6 +64,7 @@ class ClickHouseLoggerRepositoryTest
         params.put("gateway_request_id", "req-12345-abcde");
         params.put("method", "POST");
         params.put("path", "/api/v1/users");
+        params.put("query", "foo=bar&baz=qux");
         params.put("host", "api.example.com");
 
         params.put("duration", 145L); // milliseconds
@@ -116,6 +117,7 @@ class ClickHouseLoggerRepositoryTest
 
         assertThat(row).containsEntry("method", "POST")
                 .containsEntry("path", "/api/v1/users")
+                .containsEntry("query", "foo=bar&baz=qux")
                 .containsKey("timestamp");
 
         assertThat(((Number) row.get("response_time")).longValue()).isEqualTo(145L);
