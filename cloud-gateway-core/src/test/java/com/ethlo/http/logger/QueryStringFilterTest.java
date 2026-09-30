@@ -13,37 +13,39 @@ import com.ethlo.http.match.QueryParamPredicate;
 class QueryStringFilterTest
 {
     @Test
-    void nullQueryIsUnchanged()
+    void nullQueryReturnsEmptyMap()
     {
-        assertThat(QueryStringFilter.filter(null, new QueryParamPredicate(Set.of("foo")))).isNull();
+        assertThat(QueryStringFilter.parse(null, new QueryParamPredicate(Set.of("foo")))).isEmpty();
     }
 
     @Test
     void disabledByDefaultWhenNoAcceptListIsConfigured()
     {
-        assertThat(QueryStringFilter.filter("foo=bar", null)).isNull();
-        assertThat(QueryStringFilter.filter("foo=bar", new QueryParamPredicate(null))).isNull();
+        assertThat(QueryStringFilter.parse("foo=bar", null)).isEmpty();
+        assertThat(QueryStringFilter.parse("foo=bar", new QueryParamPredicate(null))).isEmpty();
     }
 
     @Test
-    void onlyAcceptListedParamsArePassedThrough()
+    void onlyAcceptListedParamsAreIncluded()
     {
         final QueryParamPredicate predicate = new QueryParamPredicate(Set.of("foo"));
-        assertThat(QueryStringFilter.filter("foo=bar&api_key=secret", predicate)).isEqualTo("foo=bar");
+        assertThat(QueryStringFilter.parse("foo=bar&api_key=secret", predicate))
+                .isEqualTo(Map.of("foo", List.of("bar")));
     }
 
     @Test
     void acceptListedParamCanStillBeRedacted()
     {
         final QueryParamPredicate predicate = new QueryParamPredicate(Set.of("foo,r"));
-        assertThat(QueryStringFilter.filter("foo=bar", predicate)).isEqualTo("foo=*****");
+        assertThat(QueryStringFilter.parse("foo=bar", predicate))
+                .isEqualTo(Map.of("foo", List.of("*****")));
     }
 
     @Test
     void allParamsRemovedWhenNoneMatchTheAcceptList()
     {
         final QueryParamPredicate predicate = new QueryParamPredicate(Set.of("foo"));
-        assertThat(QueryStringFilter.filter("api_key=secret", predicate)).isNull();
+        assertThat(QueryStringFilter.parse("api_key=secret", predicate)).isEmpty();
     }
 
     @Test
@@ -52,29 +54,15 @@ class QueryStringFilterTest
         // Unlike HTTP header names, query parameter names are case-sensitive: an accept-list entry for
         // "page" must not also match "PAGE" or "Page".
         final QueryParamPredicate predicate = new QueryParamPredicate(Set.of("page"));
-        assertThat(QueryStringFilter.filter("page=2&PAGE=secret&Page=other", predicate)).isEqualTo("page=2");
+        assertThat(QueryStringFilter.parse("page=2&PAGE=secret&Page=other", predicate))
+                .isEqualTo(Map.of("page", List.of("2")));
     }
 
     @Test
-    void parseReturnsEmptyMapWhenDisabled()
-    {
-        assertThat(QueryStringFilter.parse("foo=bar", null)).isEmpty();
-        assertThat(QueryStringFilter.parse("foo=bar", new QueryParamPredicate(null))).isEmpty();
-    }
-
-    @Test
-    void parseReturnsAcceptListedParamsAsMapOfLists()
+    void repeatedParamNameKeepsAllValues()
     {
         final QueryParamPredicate predicate = new QueryParamPredicate(Set.of("tag"));
         assertThat(QueryStringFilter.parse("tag=a&tag=b&api_key=secret", predicate))
                 .isEqualTo(Map.of("tag", List.of("a", "b")));
-    }
-
-    @Test
-    void parseRedactsValuesJustLikeFilter()
-    {
-        final QueryParamPredicate predicate = new QueryParamPredicate(Set.of("foo,r"));
-        assertThat(QueryStringFilter.parse("foo=bar", predicate))
-                .isEqualTo(Map.of("foo", List.of("*****")));
     }
 }

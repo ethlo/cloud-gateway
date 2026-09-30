@@ -55,7 +55,7 @@ class ClickHouseLoggerQueryFilteringTest
         configuration.setFilter(new LogFilter().setQueryParams(new QueryParamPredicate(Set.of("foo"))));
 
         final Map<String, Object> params = accessLog(configuration, "foo=bar&api_key=secret");
-        assertThat(params).containsEntry("query", "foo=bar");
+        assertThat(params).containsEntry("query", null);
         assertThat(params).containsEntry("query_params", Map.of("foo", List.of("bar")));
     }
 
