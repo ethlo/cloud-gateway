@@ -2,6 +2,7 @@ package com.ethlo.http;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -15,6 +16,8 @@ import java.sql.Statement;
 import java.util.Base64;
 import java.util.Optional;
 
+import com.auth0.jwt.JWT;
+import com.auth0.jwt.algorithms.Algorithm;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +32,7 @@ import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
 class UpstreamDownLoggingTest extends BaseTest
 {
     private static final String USERNAME = "down-user";
+    private static final String JWT_USERNAME = "jwt-down-user";
     private static final String REALM = "down-realm";
 
     @RegisterExtension
@@ -44,8 +48,8 @@ class UpstreamDownLoggingTest extends BaseTest
     {
         registry.add("spring.cloud.gateway.server.webflux.routes[0].id", () -> "upstream-down");
         registry.add("spring.cloud.gateway.server.webflux.routes[0].uri", () -> "http://localhost:" + server.getPort());
-        registry.add("spring.cloud.gateway.server.webflux.routes[0].predicates[0].name", () -> "Path");
-        registry.add("spring.cloud.gateway.server.webflux.routes[0].predicates[0].args.pattern", () -> "/get");
+        registry.add("spring.cloud.gateway.server.webflux.routes[0].predicates[0]", () -> "Path=/get,/jwt");
+        registry.add("http-logging.auth.jwt.username-claim-name", () -> "preferred_username");
         registry.add("spring.cloud.gateway.server.webflux.routes[0].filters[0].name", () -> "SetRequestHeader");
         registry.add("spring.cloud.gateway.server.webflux.routes[0].filters[0].args.name", () -> "x-realm");
         registry.add("spring.cloud.gateway.server.webflux.routes[0].filters[0].args.value", () -> REALM);
@@ -75,22 +79,48 @@ class UpstreamDownLoggingTest extends BaseTest
 
         assertThat(status).isGreaterThanOrEqualTo(500);
 
-        final Optional<String> user = awaitLoggedUser();
+        final Optional<String> user = awaitLoggedUser("/get", REALM);
         assertThat(user).as("log row for failed request").contains(USERNAME);
     }
 
-    private Optional<String> awaitLoggedUser() throws Exception
+    @Test
+    void jwtUserIsLoggedForPostWhenUpstreamIsDown() throws Exception
+    {
+        server.stubFor(post(urlPathEqualTo("/jwt"))
+                .willReturn(aResponse().withFault(Fault.CONNECTION_RESET_BY_PEER)));
+
+        final String token = JWT.create()
+                .withIssuer("https://idp.example.com/" + REALM)
+                .withClaim("preferred_username", JWT_USERNAME)
+                .sign(Algorithm.HMAC256("secret"));
+
+        final int status = client.post()
+                .uri("/jwt")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .bodyValue("{\"some\":\"payload\"}")
+                .exchange()
+                .returnResult(String.class)
+                .getStatus()
+                .value();
+
+        assertThat(status).isGreaterThanOrEqualTo(500);
+
+        final Optional<String> user = awaitLoggedUser("/jwt", REALM);
+        assertThat(user).as("log row for failed request").contains(JWT_USERNAME);
+    }
+
+    private Optional<String> awaitLoggedUser(final String path, final String expectedRealm) throws Exception
     {
         final long deadline = System.currentTimeMillis() + 15_000;
         while (System.currentTimeMillis() < deadline)
         {
             try (final Connection conn = DriverManager.getConnection(clickHouse().getJdbcUrl(), clickHouse().getUsername(), clickHouse().getPassword());
                  final Statement stmt = conn.createStatement();
-                 final ResultSet rs = stmt.executeQuery("SELECT user_claim, realm_claim FROM log WHERE route_id = 'upstream-down' AND status >= 500 ORDER BY timestamp DESC LIMIT 1"))
+                 final ResultSet rs = stmt.executeQuery("SELECT user_claim, realm_claim FROM log WHERE route_id = 'upstream-down' AND path = '" + path + "' AND status >= 500 ORDER BY timestamp DESC LIMIT 1"))
             {
                 if (rs.next())
                 {
-                    assertThat(rs.getString("realm_claim")).isEqualTo(REALM);
+                    assertThat(rs.getString("realm_claim")).isEqualTo(expectedRealm);
                     return Optional.ofNullable(rs.getString("user_claim"));
                 }
             }
