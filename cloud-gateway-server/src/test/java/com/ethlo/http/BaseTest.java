@@ -27,6 +27,11 @@ public class BaseTest
         Startables.deepStart(Stream.of(CLICKHOUSE)).join();
     }
 
+    protected static ClickHouseContainer clickHouse()
+    {
+        return CLICKHOUSE;
+    }
+
     public static void configureClickHouseProperties(DynamicPropertyRegistry registry)
     {
         registry.add("http-logging.providers.clickhouse.url", CLICKHOUSE::getJdbcUrl);
