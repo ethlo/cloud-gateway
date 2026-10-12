@@ -1,9 +1,11 @@
 package com.ethlo.http;
 
+import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
+import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.io.IOException;
-import java.net.ServerSocket;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -14,40 +16,34 @@ import java.util.Base64;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
+import com.github.tomakehurst.wiremock.http.Fault;
+import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
+
 class UpstreamDownLoggingTest extends BaseTest
 {
     private static final String USERNAME = "down-user";
     private static final String REALM = "down-realm";
 
-    // Port that was free at startup and has nothing listening on it
-    private static final int DEAD_PORT = findFreePort();
+    @RegisterExtension
+    static WireMockExtension server = WireMockExtension.newInstance()
+            .options(wireMockConfig().dynamicPort())
+            .build();
 
     @Autowired
     private WebTestClient client;
-
-    private static int findFreePort()
-    {
-        try (final ServerSocket socket = new ServerSocket(0))
-        {
-            return socket.getLocalPort();
-        }
-        catch (IOException exc)
-        {
-            throw new IllegalStateException(exc);
-        }
-    }
 
     @DynamicPropertySource
     static void configure(DynamicPropertyRegistry registry)
     {
         registry.add("spring.cloud.gateway.server.webflux.routes[0].id", () -> "upstream-down");
-        registry.add("spring.cloud.gateway.server.webflux.routes[0].uri", () -> "http://localhost:" + DEAD_PORT);
+        registry.add("spring.cloud.gateway.server.webflux.routes[0].uri", () -> "http://localhost:" + server.getPort());
         registry.add("spring.cloud.gateway.server.webflux.routes[0].predicates[0].name", () -> "Path");
         registry.add("spring.cloud.gateway.server.webflux.routes[0].predicates[0].args.pattern", () -> "/get");
         registry.add("spring.cloud.gateway.server.webflux.routes[0].filters[0].name", () -> "SetRequestHeader");
@@ -63,6 +59,9 @@ class UpstreamDownLoggingTest extends BaseTest
     @Test
     void usernameIsLoggedWhenUpstreamIsDown() throws Exception
     {
+        server.stubFor(get(urlPathEqualTo("/get"))
+                .willReturn(aResponse().withFault(Fault.CONNECTION_RESET_BY_PEER)));
+
         final String credentials = Base64.getEncoder().encodeToString((USERNAME + ":secret-password").getBytes(StandardCharsets.UTF_8));
 
         final int status = client.get()
