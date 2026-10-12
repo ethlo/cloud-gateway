@@ -114,10 +114,11 @@ class UpstreamDownLoggingTest extends BaseTest
         {
             try (final Connection conn = DriverManager.getConnection(clickHouse().getJdbcUrl(), clickHouse().getUsername(), clickHouse().getPassword());
                  final Statement stmt = conn.createStatement();
-                 final ResultSet rs = stmt.executeQuery("SELECT user_claim, realm_claim FROM log WHERE route_id = 'upstream-down' AND path = '" + path + "' AND status >= 500 ORDER BY timestamp DESC LIMIT 1"))
+                 final ResultSet rs = stmt.executeQuery("SELECT user_claim, realm_claim, matcher_id FROM log WHERE route_id = 'upstream-down' AND path = '" + path + "' AND status >= 500 ORDER BY timestamp DESC LIMIT 1"))
             {
                 if (rs.next())
                 {
+                    assertThat(rs.getString("matcher_id")).isEqualTo("All");
                     assertThat(rs.getString("realm_claim")).isEqualTo(expectedRealm);
                     return Optional.ofNullable(rs.getString("user_claim"));
                 }

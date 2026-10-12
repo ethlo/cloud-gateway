@@ -60,6 +60,7 @@ class ClickHouseLoggerRepositoryTest
         // Core Request Info
         params.put("timestamp", OffsetDateTime.now());
         params.put("route_id", "my-upstream-service");
+        params.put("matcher_id", "my-matcher");
         params.put("route_uri", "http://backend-service:8080");
         params.put("gateway_request_id", "req-12345-abcde");
         params.put("method", "POST");
@@ -117,6 +118,7 @@ class ClickHouseLoggerRepositoryTest
         Map<String, Object> row = results.getFirst();
 
         assertThat(row).containsEntry("method", "POST")
+                .containsEntry("matcher_id", "my-matcher")
                 .containsEntry("path", "/api/v1/users")
                 .containsEntry("query", "foo=bar&baz=qux")
                 .containsKey("timestamp");

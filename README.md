@@ -130,6 +130,9 @@ http-logging:
       pattern: '{{gateway_request_id}} {{method}} {{path}}{% if query %}?{{query}}{% endif %} {{request_headers["Content-Length"][0]}} {{status}}'
 ```
 
+> The `matcher_id` field holds the `id` of the `http-logging.matchers` entry that captured the request, and is also
+> stored in the `matcher_id` column in ClickHouse.
+
 > The `query` field contains the raw, unfiltered query string. Since query parameters can carry sensitive data
 > (API keys, tokens), only include `{{query}}` in your pattern for routes where that is acceptable.
 
