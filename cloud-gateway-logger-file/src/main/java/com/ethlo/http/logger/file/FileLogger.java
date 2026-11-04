@@ -73,8 +73,8 @@ public class FileLogger implements HttpLogger
     }
 
     /**
-     * @param trustedUids The users besides root and the owner of the gateway's files that may own the storage directory
-     *                    and the directories above it; empty if the user running the gateway is unknown
+     * @param trustedUids The users besides root that may own the storage directory and the directories above it;
+     *                    empty if the user running the gateway is unknown
      */
     FileLogger(final AccessLogTemplateRenderer accessLogTemplateRenderer, final Path storageDirectory, final UserPrincipal owner, final Set<Integer> trustedUids)
     {
@@ -165,7 +165,7 @@ public class FileLogger implements HttpLogger
         Path result = root;
         if (result == null)
         {
-            result = PayloadDirectory.prepareRoot(storageDirectory, trustedUids, this::getOwner, ownerOnly("rwx------"));
+            result = PayloadDirectory.prepareRoot(storageDirectory, trustedUids, ownerOnly("rwx------"));
             root = result;
         }
         return result;

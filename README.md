@@ -137,10 +137,10 @@ matcher sets to `STORE` is written to `<storage-directory>/<yyyy-MM-dd>/<gateway
 day directories are only accessible by the user running the gateway. A day directory that is a symbolic link, owned by another user
 or writable by other users is refused, and nothing is stored in it. The same goes for the storage directory when it,
 or any directory above it (also along symbolic links), is writable by other users without the sticky bit set (like `/tmp`
-has), or is owned by someone other than root, the user running the gateway or the user that the gateway's files on that
-mount belong to (for NFS or CIFS mounts that map ids). The storage directory is checked once, on the first payload stored.
-Whoever owns these directories can still tamper with them, and in a user namespace all unmapped users show up as the
-same overflow uid as root, so use a directory only trusted users own. Volumes mounted group-writable (Kubernetes `fsGroup`) or world-writable (`emptyDir`) are
+has), or is owned by someone other than root or the user running the gateway. On NFS with `root_squash`, use an export
+directory owned by root with the sticky bit set. The storage directory is checked once, on the first payload stored.
+In a user namespace all unmapped users show up under the same overflow uid as root, so there it only helps with a
+directory that no other host user owns. Volumes mounted group-writable (Kubernetes `fsGroup`) or world-writable (`emptyDir`) are
 refused unless you `chmod g-w,o-w` them, or set the sticky bit (`chmod +t`). The files are not cleaned up by the gateway.
 
 ```

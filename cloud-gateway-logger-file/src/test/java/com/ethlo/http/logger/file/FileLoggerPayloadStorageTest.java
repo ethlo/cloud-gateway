@@ -218,16 +218,24 @@ class FileLoggerPayloadStorageTest
     }
 
     @Test
-    void trustsTheOwnerOfTheGatewaysFilesWhenTheGatewayUserIsUnknown() throws IOException
+    void onlyTrustsRootWhenTheGatewayUserIsUnknown() throws IOException
     {
         assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("unix"));
         final int me = (Integer) Files.getAttribute(storageDirectory, "unix:uid");
-        assumeTrue(me != 0 && me != 65534 && me != (Integer) Files.getAttribute(Path.of("/"), "unix:uid"));
-        final UserPrincipal myself = Files.getOwner(storageDirectory);
-        final UserPrincipal someoneElse = FileSystems.getDefault().getUserPrincipalLookupService().lookupPrincipalByName("65534");
+        assumeTrue(me != 0 && me != (Integer) Files.getAttribute(Path.of("/"), "unix:uid"));
 
-        assertThat(PayloadDirectory.prepareRoot(storageDirectory, Set.of(), directory -> myself)).isEqualTo(storageDirectory.toRealPath());
-        assertThatThrownBy(() -> PayloadDirectory.prepareRoot(storageDirectory, Set.of(), directory -> someoneElse)).hasMessageContaining(storageDirectory.toRealPath() + " is owned by uid " + me);
+        assertThatThrownBy(() -> PayloadDirectory.prepareRoot(storageDirectory, Set.of())).hasMessageContaining(storageDirectory.toRealPath() + " is owned by uid " + me);
+        assertThat(PayloadDirectory.prepareRoot(storageDirectory, Set.of(me))).isEqualTo(storageDirectory.toRealPath());
+    }
+
+    @Test
+    void skipsDotsInMissingPart() throws IOException
+    {
+        assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("posix"));
+        final Path payloads = storageDirectory.resolve("new/./payloads");
+
+        assertThat(PayloadDirectory.prepareRoot(payloads, PayloadDirectory.processUid().map(Set::of).orElse(Set.of()), PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")))).isEqualTo(storageDirectory.toRealPath().resolve("new/payloads"));
+        assertThat(storageDirectory.resolve("new/payloads")).isDirectory();
     }
 
     @Test
