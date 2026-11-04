@@ -17,6 +17,8 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Map;
 
+import java.util.Set;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -151,6 +153,39 @@ class FileLoggerPayloadStorageTest
 
         assertThat(result.isOk()).isTrue();
         assertThat(storageDirectory.resolve("2026-11-04").resolve(REQUEST_ID + ".request.body")).hasContent("{\"hello\":\"x\"}");
+    }
+
+    @Test
+    void refusesStorageDirectoryOwnedBySomeoneElse() throws IOException
+    {
+        assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("unix"));
+        final int me = (Integer) Files.getAttribute(storageDirectory, "unix:uid");
+        assumeTrue(me != 0 && me != 65534 && me != (Integer) Files.getAttribute(Path.of("/"), "unix:uid"));
+        capture(REQUEST, RESPONSE);
+
+        final LogOptions options = new LogOptions(null, ContentProcessing.STORE, ContentProcessing.NONE);
+        final PredicateConfig predicateConfig = new PredicateConfig("test-matcher", AsyncPredicate.from(exchange -> true), options, options);
+        final FileLogger logger = new FileLogger(new PebbleAccessLogTemplateRenderer("{{status}}", false), storageDirectory, null, Set.of(65534));
+        final AccessLogResult result = logger.accessLog(dataProvider(predicateConfig)).join();
+
+        assertThat(result.isOk()).isFalse();
+        assertThat(result.getProcessingErrors()).hasSize(2).allSatisfy(e -> assertThat(e.getMessage()).contains(storageDirectory.toRealPath() + " is owned by uid " + me));
+        assertThat(storageDirectory).isEmptyDirectory();
+    }
+
+    @Test
+    void refusesStorageDirectoryBelowADirectoryWritableByOthers() throws IOException
+    {
+        assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("unix"));
+        capture(REQUEST, RESPONSE);
+        Files.setAttribute(storageDirectory, "unix:mode", 0777);
+        final Path payloads = storageDirectory.resolve("payloads");
+
+        final AccessLogResult result = accessLog(payloads, ContentProcessing.NONE, ContentProcessing.STORE);
+
+        assertThat(result.isOk()).isFalse();
+        assertThat(result.getProcessingErrors()).hasSize(2).allSatisfy(e -> assertThat(e.getMessage()).contains(storageDirectory.toRealPath() + " is writable by other users without the sticky bit"));
+        assertThat(payloads).isEmptyDirectory();
     }
 
     @Test

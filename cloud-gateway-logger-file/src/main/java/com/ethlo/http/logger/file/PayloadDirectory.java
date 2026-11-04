@@ -18,6 +18,7 @@ import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.nio.file.attribute.UserPrincipal;
 import java.util.EnumSet;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -128,36 +129,70 @@ final class PayloadDirectory implements Closeable
 
     private static final int GROUP_OR_OTHERS_WRITE = 0022;
     private static final int STICKY = 01000;
+    private static final int ROOT_UID = 0;
 
     /**
-     * Refuse a storage root where other users can rename or delete the gateway's entries, as they could then swap the
-     * owner probe or a day directory. Writable by others is fine with the sticky bit set, as for <code>/tmp</code>.
+     * Refuse a storage directory that someone else could swap, or swap entries in, as they could then tamper with the
+     * owner probe or the day directories. The directory and every directory above it must belong to root or one of
+     * <code>trustedUids</code>, and must not be writable by other users unless the sticky bit is set (as for
+     * <code>/tmp</code>). Only checked where the unix attribute view is available (Linux, macOS).
+     *
+     * @param trustedUids The users besides root that may own these directories, typically the user running the gateway,
+     *                    or <code>null</code> to only check permissions
      */
-    static void requireSafeRoot(final Path root) throws IOException
+    static void requireSafeRoot(final Path root, final Set<Integer> trustedUids) throws IOException
     {
-        final int mode;
-        try
+        if (!root.getFileSystem().supportedFileAttributeViews().contains("unix"))
         {
-            mode = (Integer) Files.getAttribute(root, "unix:mode");
-        }
-        catch (UnsupportedOperationException | IllegalArgumentException e)
-        {
-            // Without the unix view the sticky bit is unknown, so refuse anything writable by others
-            final PosixFileAttributeView view = Files.getFileAttributeView(root, PosixFileAttributeView.class);
-            if (view != null)
-            {
-                final Set<PosixFilePermission> permissions = view.readAttributes().permissions();
-                if (permissions.contains(PosixFilePermission.GROUP_WRITE) || permissions.contains(PosixFilePermission.OTHERS_WRITE))
-                {
-                    throw new IOException("Refusing to store payloads in " + root + ": it is writable by other users (" + PosixFilePermissions.toString(permissions) + ")");
-                }
-            }
             return;
         }
 
-        if ((mode & GROUP_OR_OTHERS_WRITE) != 0 && (mode & STICKY) == 0)
+        final Path realRoot = root.toRealPath();
+        // In a user namespace root's files show up under the overflow uid, so whoever owns / counts as root
+        final int systemUid = (Integer) Files.getAttribute(realRoot.getRoot(), "unix:uid", LinkOption.NOFOLLOW_LINKS);
+        for (Path directory = realRoot; directory != null; directory = directory.getParent())
         {
-            throw new IOException("Refusing to store payloads in " + root + ": it is writable by other users without the sticky bit (" + String.format("%04o", mode & 07777) + ")");
+            final int uid = (Integer) Files.getAttribute(directory, "unix:uid", LinkOption.NOFOLLOW_LINKS);
+            if (trustedUids != null && uid != ROOT_UID && uid != systemUid && !trustedUids.contains(uid))
+            {
+                throw new IOException("Refusing to store payloads in " + root + ": " + directory + " is owned by uid " + uid + ", not by root or the user running the gateway");
+            }
+
+            final int mode = (Integer) Files.getAttribute(directory, "unix:mode", LinkOption.NOFOLLOW_LINKS);
+            if ((mode & GROUP_OR_OTHERS_WRITE) != 0 && (mode & STICKY) == 0)
+            {
+                throw new IOException("Refusing to store payloads in " + root + ": " + directory + " is writable by other users without the sticky bit (" + String.format("%04o", mode & 07777) + ")");
+            }
+        }
+    }
+
+    /**
+     * The uid of the user running the gateway, or empty where it cannot be determined. Taken from the owner of
+     * <code>/proc/self</code> on Linux, else from the JDK's <code>UnixSystem</code>.
+     */
+    static Optional<Integer> processUid()
+    {
+        try
+        {
+            final Path self = Path.of("/proc/self");
+            if (Files.isDirectory(self))
+            {
+                return Optional.of((Integer) Files.getAttribute(self, "unix:uid"));
+            }
+        }
+        catch (IOException | RuntimeException ignored)
+        {
+            // Fall through to UnixSystem
+        }
+
+        try
+        {
+            final Object unixSystem = Class.forName("com.sun.security.auth.module.UnixSystem").getConstructor().newInstance();
+            return Optional.of(((Number) unixSystem.getClass().getMethod("getUid").invoke(unixSystem)).intValue());
+        }
+        catch (ReflectiveOperationException | LinkageError | RuntimeException e)
+        {
+            return Optional.empty();
         }
     }
 

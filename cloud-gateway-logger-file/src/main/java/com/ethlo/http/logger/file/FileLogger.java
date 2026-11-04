@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -44,6 +45,7 @@ public class FileLogger implements HttpLogger
 
     private final AccessLogTemplateRenderer accessLogTemplateRenderer;
     private final Path storageDirectory;
+    private final Set<Integer> trustedUids;
     private volatile UserPrincipal owner;
 
     public FileLogger(final AccessLogTemplateRenderer accessLogTemplateRenderer)
@@ -66,9 +68,19 @@ public class FileLogger implements HttpLogger
      */
     FileLogger(final AccessLogTemplateRenderer accessLogTemplateRenderer, final Path storageDirectory, final UserPrincipal owner)
     {
+        this(accessLogTemplateRenderer, storageDirectory, owner, PayloadDirectory.processUid().map(Set::of).orElse(null));
+    }
+
+    /**
+     * @param trustedUids The users besides root that may own the storage directory and the directories above it, or
+     *                    <code>null</code> if the user running the gateway is unknown, to only check their permissions
+     */
+    FileLogger(final AccessLogTemplateRenderer accessLogTemplateRenderer, final Path storageDirectory, final UserPrincipal owner, final Set<Integer> trustedUids)
+    {
         this.accessLogTemplateRenderer = accessLogTemplateRenderer;
         this.storageDirectory = storageDirectory;
         this.owner = owner;
+        this.trustedUids = trustedUids;
     }
 
     @Override
@@ -124,7 +136,7 @@ public class FileLogger implements HttpLogger
             try (InputStream in = source.get())
             {
                 Files.createDirectories(storageDirectory, ownerOnly("rwx------"));
-                PayloadDirectory.requireSafeRoot(storageDirectory);
+                PayloadDirectory.requireSafeRoot(storageDirectory, trustedUids);
                 Files.createDirectories(target.getParent(), ownerOnly("rwx------"));
                 try (PayloadDirectory directory = PayloadDirectory.open(target.getParent(), getOwner()))
                 {

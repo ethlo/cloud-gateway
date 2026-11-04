@@ -135,8 +135,9 @@ matcher sets to `STORE` is written to `<storage-directory>/<yyyy-MM-dd>/<gateway
 `body` is the decoded body (empty bodies are skipped), `raw` the full message including headers. Use
 `{{gateway_request_id}}` in the pattern to find the files for an access log line. On POSIX systems the files and
 day directories are only accessible by the user running the gateway. A day directory that is a symbolic link, owned by another user
-or writable by other users is refused, and nothing is stored in it. The same goes for a storage directory that
-other users can write to, unless it has the sticky bit set (like `/tmp`). The files are not cleaned up by the gateway.
+or writable by other users is refused, and nothing is stored in it. The same goes for a storage directory where
+the directory itself or any directory above it is owned by someone other than root or the user running the gateway, or is
+writable by other users without the sticky bit set (like `/tmp` has). The files are not cleaned up by the gateway.
 
 ```
 http-logging:
