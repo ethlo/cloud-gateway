@@ -1,13 +1,16 @@
 package com.ethlo.http.logger.file;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -91,6 +94,31 @@ class FileLoggerPayloadStorageTest
     }
 
     @Test
+    void filesAreOnlyReadableByTheOwner() throws IOException
+    {
+        assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("posix"));
+        capture(REQUEST, RESPONSE);
+        accessLog(storageDirectory, ContentProcessing.STORE, ContentProcessing.STORE);
+
+        final Path day = storageDirectory.resolve("2026-11-04");
+        assertThat(PosixFilePermissions.toString(Files.getPosixFilePermissions(day))).isEqualTo("rwx------");
+        assertThat(PosixFilePermissions.toString(Files.getPosixFilePermissions(day.resolve(REQUEST_ID + ".request.raw")))).isEqualTo("rw-------");
+        assertThat(day).isDirectoryNotContaining("glob:**.tmp");
+    }
+
+    @Test
+    void writeFailureIsReported() throws IOException
+    {
+        capture(REQUEST, RESPONSE);
+        // A regular file where the day directory should be makes every write fail
+        Files.writeString(storageDirectory.resolve("2026-11-04"), "in the way");
+        final AccessLogResult result = accessLog(storageDirectory, ContentProcessing.STORE, ContentProcessing.NONE);
+
+        assertThat(result.isOk()).isFalse();
+        assertThat(result.getProcessingErrors()).hasSize(2).allSatisfy(e -> assertThat(e.getMessage()).startsWith("Unable to write"));
+    }
+
+    @Test
     void onlyStoresWhatTheMatcherAsksFor()
     {
         capture(REQUEST, RESPONSE);
@@ -124,7 +152,7 @@ class FileLoggerPayloadStorageTest
     }
 
     @Test
-    void undecodableBodyIsReportedSoTheBufferFilesAreKept()
+    void undecodableBodyIsReportedAndRawIsStillStored()
     {
         capture(REQUEST, TRUNCATED_CHUNKED_RESPONSE);
         final AccessLogResult result = accessLog(storageDirectory, ContentProcessing.STORE, ContentProcessing.STORE);

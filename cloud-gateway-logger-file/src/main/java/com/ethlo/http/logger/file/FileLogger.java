@@ -7,9 +7,13 @@ import static com.ethlo.http.netty.ServerDirection.RESPONSE;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.FileAttribute;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -36,6 +40,7 @@ public class FileLogger implements HttpLogger
 {
     private static final Logger accessLogLogger = LoggerFactory.getLogger("access-log");
     private static final Logger logger = LoggerFactory.getLogger(FileLogger.class);
+    private static final boolean POSIX = FileSystems.getDefault().supportedFileAttributeViews().contains("posix");
 
     private final AccessLogTemplateRenderer accessLogTemplateRenderer;
     private final Path storageDirectory;
@@ -85,7 +90,9 @@ public class FileLogger implements HttpLogger
         }
 
         return rawProvider.flatMap(RawProvider::getBuffer)
-                .map(future -> future.thenApply(buffer -> write(dataProvider, logOptions, buffer.array(), direction)))
+                .map(future -> future
+                        .thenApply(buffer -> write(dataProvider, logOptions, buffer.array(), direction))
+                        .exceptionally(e -> List.of(new IOException("Unable to read captured " + direction.name().toLowerCase() + " of request " + dataProvider.getRequestId() + ": " + e.getMessage(), e))))
                 .orElse(CompletableFuture.completedFuture(List.of()));
     }
 
@@ -112,6 +119,10 @@ public class FileLogger implements HttpLogger
             {
                 errors.add(e);
             }
+            catch (RuntimeException e)
+            {
+                errors.add(new IOException("Unable to decode " + direction.name().toLowerCase() + " body of request " + dataProvider.getRequestId() + ": " + e.getMessage(), e));
+            }
         }
         return errors;
     }
@@ -119,16 +130,47 @@ public class FileLogger implements HttpLogger
     private Optional<IOException> writeFile(final WebExchangeDataProvider dataProvider, final ServerDirection direction, final String kind, final InputStream data)
     {
         final Path target = getFile(dataProvider, direction, kind);
+        Path temp = null;
         try (data)
         {
-            Files.createDirectories(target.getParent());
-            Files.copy(data, target, StandardCopyOption.REPLACE_EXISTING);
+            Files.createDirectories(target.getParent(), ownerOnly("rwx------"));
+            // Written next to the target and moved into place, so a failed write never leaves a truncated file under the expected name
+            temp = Files.createTempFile(target.getParent(), target.getFileName().toString(), ".tmp", ownerOnly("rw-------"));
+            try (OutputStream out = Files.newOutputStream(temp))
+            {
+                data.transferTo(out);
+            }
+            Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
             logger.debug("Stored {} {} for request {} in {}", direction.name().toLowerCase(), kind, dataProvider.getRequestId(), target);
             return Optional.empty();
         }
         catch (IOException e)
         {
+            deleteQuietly(temp);
             return Optional.of(new IOException("Unable to write " + target + ": " + e.getMessage(), e));
+        }
+    }
+
+    /**
+     * Payloads can hold credentials, so they are only readable by the user running the gateway.
+     */
+    private static FileAttribute<?>[] ownerOnly(final String permissions)
+    {
+        return POSIX ? new FileAttribute<?>[]{PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString(permissions))} : new FileAttribute<?>[0];
+    }
+
+    private static void deleteQuietly(final Path file)
+    {
+        if (file != null)
+        {
+            try
+            {
+                Files.deleteIfExists(file);
+            }
+            catch (IOException e)
+            {
+                logger.warn("Unable to delete temporary file {}: {}", file, e.getMessage());
+            }
         }
     }
 
