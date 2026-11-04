@@ -123,6 +123,8 @@ public class FileLogger implements HttpLogger
 
             try (InputStream in = source.get())
             {
+                Files.createDirectories(storageDirectory, ownerOnly("rwx------"));
+                PayloadDirectory.requireSafeRoot(storageDirectory);
                 Files.createDirectories(target.getParent(), ownerOnly("rwx------"));
                 try (PayloadDirectory directory = PayloadDirectory.open(target.getParent(), getOwner()))
                 {

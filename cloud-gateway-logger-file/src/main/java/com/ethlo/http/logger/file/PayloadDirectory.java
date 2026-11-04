@@ -126,6 +126,41 @@ final class PayloadDirectory implements Closeable
         }
     }
 
+    private static final int GROUP_OR_OTHERS_WRITE = 0022;
+    private static final int STICKY = 01000;
+
+    /**
+     * Refuse a storage root where other users can rename or delete the gateway's entries, as they could then swap the
+     * owner probe or a day directory. Writable by others is fine with the sticky bit set, as for <code>/tmp</code>.
+     */
+    static void requireSafeRoot(final Path root) throws IOException
+    {
+        final int mode;
+        try
+        {
+            mode = (Integer) Files.getAttribute(root, "unix:mode");
+        }
+        catch (UnsupportedOperationException | IllegalArgumentException e)
+        {
+            // Without the unix view the sticky bit is unknown, so refuse anything writable by others
+            final PosixFileAttributeView view = Files.getFileAttributeView(root, PosixFileAttributeView.class);
+            if (view != null)
+            {
+                final Set<PosixFilePermission> permissions = view.readAttributes().permissions();
+                if (permissions.contains(PosixFilePermission.GROUP_WRITE) || permissions.contains(PosixFilePermission.OTHERS_WRITE))
+                {
+                    throw new IOException("Refusing to store payloads in " + root + ": it is writable by other users (" + PosixFilePermissions.toString(permissions) + ")");
+                }
+            }
+            return;
+        }
+
+        if ((mode & GROUP_OR_OTHERS_WRITE) != 0 && (mode & STICKY) == 0)
+        {
+            throw new IOException("Refusing to store payloads in " + root + ": it is writable by other users without the sticky bit (" + String.format("%04o", mode & 07777) + ")");
+        }
+    }
+
     private static void requireSafe(final Path directory, final PosixFileAttributes attributes, final UserPrincipal expectedOwner) throws IOException
     {
         if (expectedOwner != null && !expectedOwner.equals(attributes.owner()))

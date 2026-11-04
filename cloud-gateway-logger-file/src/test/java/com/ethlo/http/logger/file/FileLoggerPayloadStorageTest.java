@@ -125,6 +125,34 @@ class FileLoggerPayloadStorageTest
         assertThat(day).isEmptyDirectory();
     }
 
+    @ParameterizedTest
+    @ValueSource(ints = {0777, 0770, 0707})
+    void refusesStorageDirectoryWritableByOthersWithoutStickyBit(final int mode) throws IOException
+    {
+        assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("unix"));
+        capture(REQUEST, RESPONSE);
+        Files.setAttribute(storageDirectory, "unix:mode", mode);
+
+        final AccessLogResult result = accessLog(storageDirectory, ContentProcessing.STORE, ContentProcessing.NONE);
+
+        assertThat(result.isOk()).isFalse();
+        assertThat(result.getProcessingErrors()).hasSize(2).allSatisfy(e -> assertThat(e.getMessage()).contains("writable by other users without the sticky bit"));
+        assertThat(storageDirectory).isEmptyDirectory();
+    }
+
+    @Test
+    void acceptsStorageDirectoryWritableByOthersWithStickyBit() throws IOException
+    {
+        assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("unix"));
+        capture(REQUEST, RESPONSE);
+        Files.setAttribute(storageDirectory, "unix:mode", 01777);
+
+        final AccessLogResult result = accessLog(storageDirectory, ContentProcessing.NONE, ContentProcessing.STORE);
+
+        assertThat(result.isOk()).isTrue();
+        assertThat(storageDirectory.resolve("2026-11-04").resolve(REQUEST_ID + ".request.body")).hasContent("{\"hello\":\"x\"}");
+    }
+
     @Test
     void replacesAnExistingPayloadFile() throws IOException
     {
