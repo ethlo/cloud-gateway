@@ -4,7 +4,6 @@ import static com.ethlo.http.match.LogOptions.ContentProcessing.STORE;
 import static com.ethlo.http.netty.ServerDirection.REQUEST;
 import static com.ethlo.http.netty.ServerDirection.RESPONSE;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -25,15 +24,14 @@ import java.util.concurrent.CompletableFuture;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.ethlo.http.BodyDecodeException;
 import com.ethlo.http.logger.HttpLogger;
 import com.ethlo.http.match.LogOptions;
 import com.ethlo.http.model.AccessLogResult;
-import com.ethlo.http.model.BodyProvider;
 import com.ethlo.http.model.RawProvider;
 import com.ethlo.http.model.WebExchangeDataProvider;
 import com.ethlo.http.netty.PredicateConfig;
 import com.ethlo.http.netty.ServerDirection;
-import com.ethlo.http.util.AsyncUtil;
 import com.ethlo.http.util.HttpBodyUtil;
 
 public class FileLogger implements HttpLogger
@@ -72,83 +70,84 @@ public class FileLogger implements HttpLogger
             return CompletableFuture.completedFuture(AccessLogResult.ok(predicateConfig));
         }
 
-        return AsyncUtil.join(List.of(
-                store(dataProvider, predicateConfig.request(), dataProvider.getRawRequest(), REQUEST),
-                store(dataProvider, predicateConfig.response(), dataProvider.getRawResponse(), RESPONSE)
-        )).thenApply(results ->
-        {
-            final List<IOException> errors = results.stream().flatMap(List::stream).toList();
-            return errors.isEmpty() ? AccessLogResult.ok(predicateConfig) : AccessLogResult.error(predicateConfig, errors);
-        });
+        final List<IOException> errors = new ArrayList<>();
+        store(dataProvider, predicateConfig.request(), dataProvider.getRawRequest(), REQUEST, errors);
+        store(dataProvider, predicateConfig.response(), dataProvider.getRawResponse(), RESPONSE, errors);
+        return CompletableFuture.completedFuture(errors.isEmpty() ? AccessLogResult.ok(predicateConfig) : AccessLogResult.error(predicateConfig, errors));
     }
 
-    private CompletableFuture<List<IOException>> store(final WebExchangeDataProvider dataProvider, final LogOptions logOptions, final Optional<RawProvider> rawProvider, final ServerDirection direction)
+    /**
+     * Streams from the capture buffer file to the target files, so payloads of any size are never held in memory.
+     */
+    private void store(final WebExchangeDataProvider dataProvider, final LogOptions logOptions, final Optional<RawProvider> rawProvider, final ServerDirection direction, final List<IOException> errors)
     {
-        if (logOptions.raw() != STORE && logOptions.body() != STORE)
+        if (rawProvider.isEmpty())
         {
-            return CompletableFuture.completedFuture(List.of());
+            return;
         }
 
-        return rawProvider.flatMap(RawProvider::getBuffer)
-                .map(future -> future
-                        .thenApply(buffer -> write(dataProvider, logOptions, buffer.array(), direction))
-                        .exceptionally(e -> List.of(new IOException("Unable to read captured " + direction.name().toLowerCase() + " of request " + dataProvider.getRequestId() + ": " + e.getMessage(), e))))
-                .orElse(CompletableFuture.completedFuture(List.of()));
-    }
-
-    private List<IOException> write(final WebExchangeDataProvider dataProvider, final LogOptions logOptions, final byte[] raw, final ServerDirection direction)
-    {
-        final List<IOException> errors = new ArrayList<>();
         if (logOptions.raw() == STORE)
         {
-            writeFile(dataProvider, direction, "raw", new ByteArrayInputStream(raw)).ifPresent(errors::add);
+            writeFile(dataProvider, direction, "raw", rawProvider.get(), (in, out) -> in.transferTo(out)).ifPresent(errors::add);
         }
 
         if (logOptions.body() == STORE)
         {
-            try
-            {
-                final BodyProvider body = HttpBodyUtil.extractBody(new ByteArrayInputStream(raw), direction);
-                // Most requests have no body, so skip the empty files rather than clutter the directory
-                if (body.bodyLength() > 0)
-                {
-                    writeFile(dataProvider, direction, "body", body.data()).ifPresent(errors::add);
-                }
-            }
-            catch (IOException e)
-            {
-                errors.add(e);
-            }
-            catch (RuntimeException e)
-            {
-                errors.add(new IOException("Unable to decode " + direction.name().toLowerCase() + " body of request " + dataProvider.getRequestId() + ": " + e.getMessage(), e));
-            }
+            writeFile(dataProvider, direction, "body", rawProvider.get(), (in, out) -> HttpBodyUtil.writeBody(in, direction, out)).ifPresent(errors::add);
         }
-        return errors;
     }
 
-    private Optional<IOException> writeFile(final WebExchangeDataProvider dataProvider, final ServerDirection direction, final String kind, final InputStream data)
+    private Optional<IOException> writeFile(final WebExchangeDataProvider dataProvider, final ServerDirection direction, final String kind, final RawProvider rawProvider, final ContentWriter writer)
     {
         final Path target = getFile(dataProvider, direction, kind);
         Path temp = null;
-        try (data)
+        try
         {
-            Files.createDirectories(target.getParent(), ownerOnly("rwx------"));
-            // Written next to the target and moved into place, so a failed write never leaves a truncated file under the expected name
-            temp = Files.createTempFile(target.getParent(), target.getFileName().toString(), ".tmp", ownerOnly("rw-------"));
-            try (OutputStream out = Files.newOutputStream(temp))
+            final Optional<InputStream> source = rawProvider.openStream();
+            if (source.isEmpty())
             {
-                data.transferTo(out);
+                return Optional.empty();
             }
+
+            final long written;
+            try (InputStream in = source.get())
+            {
+                Files.createDirectories(target.getParent(), ownerOnly("rwx------"));
+                // Written next to the target and moved into place, so a failed write never leaves a truncated file under the expected name
+                temp = Files.createTempFile(target.getParent(), target.getFileName().toString(), ".tmp", ownerOnly("rw-------"));
+                try (OutputStream out = Files.newOutputStream(temp))
+                {
+                    written = writer.write(in, out);
+                }
+            }
+
+            // Most requests have no body, so skip the empty files rather than clutter the directory
+            if (written == 0)
+            {
+                deleteQuietly(temp);
+                return Optional.empty();
+            }
+
             Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
             logger.debug("Stored {} {} for request {} in {}", direction.name().toLowerCase(), kind, dataProvider.getRequestId(), target);
             return Optional.empty();
         }
-        catch (IOException e)
+        catch (BodyDecodeException e)
+        {
+            deleteQuietly(temp);
+            return Optional.of(e);
+        }
+        catch (IOException | RuntimeException e)
         {
             deleteQuietly(temp);
             return Optional.of(new IOException("Unable to write " + target + ": " + e.getMessage(), e));
         }
+    }
+
+    @FunctionalInterface
+    private interface ContentWriter
+    {
+        long write(InputStream in, OutputStream out) throws IOException;
     }
 
     /**
