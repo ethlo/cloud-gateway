@@ -1,6 +1,7 @@
 package com.ethlo.http.model;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousFileChannel;
@@ -52,6 +53,18 @@ public class RawProvider
     public long size()
     {
         return size;
+    }
+
+    /**
+     * Stream the captured bytes straight from the buffer file, for consumers that should not hold the whole capture in memory.
+     */
+    public Optional<InputStream> openStream() throws IOException
+    {
+        if (fileChannel == null)
+        {
+            return Optional.empty();
+        }
+        return Optional.of(Files.newInputStream(file));
     }
 
     public Optional<CompletableFuture<ByteBuffer>> getBuffer()

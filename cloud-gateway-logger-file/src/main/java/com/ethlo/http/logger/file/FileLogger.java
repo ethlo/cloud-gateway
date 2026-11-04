@@ -1,39 +1,191 @@
 package com.ethlo.http.logger.file;
 
+import static com.ethlo.http.match.LogOptions.ContentProcessing.STORE;
+import static com.ethlo.http.netty.ServerDirection.REQUEST;
+import static com.ethlo.http.netty.ServerDirection.RESPONSE;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.FileAttribute;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.ethlo.http.BodyDecodeException;
 import com.ethlo.http.logger.HttpLogger;
+import com.ethlo.http.match.LogOptions;
 import com.ethlo.http.model.AccessLogResult;
+import com.ethlo.http.model.RawProvider;
 import com.ethlo.http.model.WebExchangeDataProvider;
+import com.ethlo.http.netty.PredicateConfig;
+import com.ethlo.http.netty.ServerDirection;
+import com.ethlo.http.util.HttpBodyUtil;
 
 public class FileLogger implements HttpLogger
 {
     private static final Logger accessLogLogger = LoggerFactory.getLogger("access-log");
+    private static final Logger logger = LoggerFactory.getLogger(FileLogger.class);
+    private static final boolean POSIX = FileSystems.getDefault().supportedFileAttributeViews().contains("posix");
 
     private final AccessLogTemplateRenderer accessLogTemplateRenderer;
+    private final Path storageDirectory;
 
     public FileLogger(final AccessLogTemplateRenderer accessLogTemplateRenderer)
     {
+        this(accessLogTemplateRenderer, null);
+    }
+
+    /**
+     * @param storageDirectory Where to write the request and response content that the matcher asks to <code>STORE</code>,
+     *                         one file per request, direction and kind. <code>null</code> to only write the access log line.
+     */
+    public FileLogger(final AccessLogTemplateRenderer accessLogTemplateRenderer, final Path storageDirectory)
+    {
         this.accessLogTemplateRenderer = accessLogTemplateRenderer;
+        this.storageDirectory = storageDirectory;
     }
 
     @Override
     public CompletableFuture<AccessLogResult> accessLog(final WebExchangeDataProvider dataProvider)
     {
+        final PredicateConfig predicateConfig = dataProvider.getPredicateConfig().orElseThrow();
         final Map<String, Object> metaMap = dataProvider.asMetaMap();
         accessLogLogger.info(accessLogTemplateRenderer.render(metaMap));
-        final CompletableFuture<AccessLogResult> cf = new CompletableFuture<>();
-        cf.complete(AccessLogResult.ok(dataProvider.getPredicateConfig().orElseThrow()));
-        return cf;
+
+        if (storageDirectory == null)
+        {
+            return CompletableFuture.completedFuture(AccessLogResult.ok(predicateConfig));
+        }
+
+        final List<IOException> errors = new ArrayList<>();
+        store(dataProvider, predicateConfig.request(), dataProvider.getRawRequest(), REQUEST, errors);
+        store(dataProvider, predicateConfig.response(), dataProvider.getRawResponse(), RESPONSE, errors);
+        return CompletableFuture.completedFuture(errors.isEmpty() ? AccessLogResult.ok(predicateConfig) : AccessLogResult.error(predicateConfig, errors));
+    }
+
+    /**
+     * Streams from the capture buffer file to the target files, so payloads of any size are never held in memory.
+     */
+    private void store(final WebExchangeDataProvider dataProvider, final LogOptions logOptions, final Optional<RawProvider> rawProvider, final ServerDirection direction, final List<IOException> errors)
+    {
+        if (rawProvider.isEmpty())
+        {
+            return;
+        }
+
+        if (logOptions.raw() == STORE)
+        {
+            writeFile(dataProvider, direction, "raw", rawProvider.get(), (in, out) -> in.transferTo(out)).ifPresent(errors::add);
+        }
+
+        if (logOptions.body() == STORE)
+        {
+            writeFile(dataProvider, direction, "body", rawProvider.get(), (in, out) -> HttpBodyUtil.writeBody(in, direction, out)).ifPresent(errors::add);
+        }
+    }
+
+    private Optional<IOException> writeFile(final WebExchangeDataProvider dataProvider, final ServerDirection direction, final String kind, final RawProvider rawProvider, final ContentWriter writer)
+    {
+        final Path target = getFile(dataProvider, direction, kind);
+        Path temp = null;
+        try
+        {
+            final Optional<InputStream> source = rawProvider.openStream();
+            if (source.isEmpty())
+            {
+                return Optional.empty();
+            }
+
+            final long written;
+            try (InputStream in = source.get())
+            {
+                Files.createDirectories(target.getParent(), ownerOnly("rwx------"));
+                // Written next to the target and moved into place, so a failed write never leaves a truncated file under the expected name
+                temp = Files.createTempFile(target.getParent(), target.getFileName().toString(), ".tmp", ownerOnly("rw-------"));
+                try (OutputStream out = Files.newOutputStream(temp))
+                {
+                    written = writer.write(in, out);
+                }
+            }
+
+            // Most requests have no body, so skip the empty files rather than clutter the directory
+            if (written == 0)
+            {
+                deleteQuietly(temp);
+                return Optional.empty();
+            }
+
+            Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            logger.debug("Stored {} {} for request {} in {}", direction.name().toLowerCase(), kind, dataProvider.getRequestId(), target);
+            return Optional.empty();
+        }
+        catch (BodyDecodeException e)
+        {
+            deleteQuietly(temp);
+            return Optional.of(e);
+        }
+        catch (IOException | RuntimeException e)
+        {
+            deleteQuietly(temp);
+            return Optional.of(new IOException("Unable to write " + target + ": " + e.getMessage(), e));
+        }
+    }
+
+    @FunctionalInterface
+    private interface ContentWriter
+    {
+        long write(InputStream in, OutputStream out) throws IOException;
+    }
+
+    /**
+     * Payloads can hold credentials, so they are only readable by the user running the gateway.
+     */
+    private static FileAttribute<?>[] ownerOnly(final String permissions)
+    {
+        return POSIX ? new FileAttribute<?>[]{PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString(permissions))} : new FileAttribute<?>[0];
+    }
+
+    private static void deleteQuietly(final Path file)
+    {
+        if (file != null)
+        {
+            try
+            {
+                Files.deleteIfExists(file);
+            }
+            catch (IOException e)
+            {
+                logger.warn("Unable to delete temporary file {}: {}", file, e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * Files are grouped in a directory per day, so old ones are easy to remove, and named after the request id that
+     * is also available to the access log pattern as <code>gateway_request_id</code>.
+     */
+    Path getFile(final WebExchangeDataProvider dataProvider, final ServerDirection direction, final String kind)
+    {
+        final String day = Objects.requireNonNull(dataProvider.getTimestamp(), "timestamp").format(DateTimeFormatter.ISO_LOCAL_DATE);
+        return storageDirectory.resolve(day).resolve(dataProvider.getRequestId() + "." + direction.name().toLowerCase() + "." + kind);
     }
 
     @Override
     public String toString()
     {
-        return getClass().getSimpleName() + " - pattern='" + accessLogTemplateRenderer.getPattern() + "'";
+        return getClass().getSimpleName() + " - pattern='" + accessLogTemplateRenderer.getPattern() + "', storageDirectory=" + storageDirectory;
     }
 }

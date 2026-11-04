@@ -130,6 +130,24 @@ http-logging:
       pattern: '{{gateway_request_id}} {{method}} {{path}}{% if query %}?{{query}}{% endif %} {{request_headers["Content-Length"][0]}} {{status}}'
 ```
 
+To also keep the payloads as plain files, set `storage-directory`. For each logged request, the content that its
+matcher sets to `STORE` is written to `<storage-directory>/<yyyy-MM-dd>/<gateway_request_id>.<request|response>.<body|raw>`.
+`body` is the decoded body (empty bodies are skipped), `raw` the full message including headers. Use
+`{{gateway_request_id}}` in the pattern to find the files for an access log line. On POSIX systems the files and
+day directories are only accessible by the user running the gateway. The files are not cleaned up by the gateway.
+
+```
+http-logging:
+  providers:
+    file:
+      enabled: true
+      pattern: '{{gateway_request_id}} {{method}} {{path}} {{status}}'
+      storage-directory: /var/log/cloud-gateway/payloads
+```
+
+**Warning**: Like `raw: STORE`, these files may include sensitive information such as passwords and API keys, and the
+`raw` files include all headers, regardless of the header filters.
+
 > The `matcher_id` field holds the `id` of the `http-logging.matchers` entry that captured the request, and is also
 > stored in the `matcher_id` column in ClickHouse.
 
