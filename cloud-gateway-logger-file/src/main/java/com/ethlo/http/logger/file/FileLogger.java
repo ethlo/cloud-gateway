@@ -69,12 +69,12 @@ public class FileLogger implements HttpLogger
      */
     FileLogger(final AccessLogTemplateRenderer accessLogTemplateRenderer, final Path storageDirectory, final UserPrincipal owner)
     {
-        this(accessLogTemplateRenderer, storageDirectory, owner, PayloadDirectory.processUid().map(Set::of).orElse(null));
+        this(accessLogTemplateRenderer, storageDirectory, owner, PayloadDirectory.processUid().map(Set::of).orElse(Set.of()));
     }
 
     /**
-     * @param trustedUids The users besides root that may own the storage directory and the directories above it, or
-     *                    <code>null</code> if the user running the gateway is unknown, to only check their permissions
+     * @param trustedUids The users besides root and the owner of the gateway's files that may own the storage directory
+     *                    and the directories above it; empty if the user running the gateway is unknown
      */
     FileLogger(final AccessLogTemplateRenderer accessLogTemplateRenderer, final Path storageDirectory, final UserPrincipal owner, final Set<Integer> trustedUids)
     {

@@ -218,15 +218,30 @@ class FileLoggerPayloadStorageTest
     }
 
     @Test
-    void onlyChecksPermissionsWhenTheGatewayUserIsUnknown() throws IOException
+    void trustsTheOwnerOfTheGatewaysFilesWhenTheGatewayUserIsUnknown() throws IOException
+    {
+        assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("unix"));
+        final int me = (Integer) Files.getAttribute(storageDirectory, "unix:uid");
+        assumeTrue(me != 0 && me != 65534 && me != (Integer) Files.getAttribute(Path.of("/"), "unix:uid"));
+        final UserPrincipal myself = Files.getOwner(storageDirectory);
+        final UserPrincipal someoneElse = FileSystems.getDefault().getUserPrincipalLookupService().lookupPrincipalByName("65534");
+
+        assertThat(PayloadDirectory.prepareRoot(storageDirectory, Set.of(), directory -> myself)).isEqualTo(storageDirectory.toRealPath());
+        assertThatThrownBy(() -> PayloadDirectory.prepareRoot(storageDirectory, Set.of(), directory -> someoneElse)).hasMessageContaining(storageDirectory.toRealPath() + " is owned by uid " + me);
+    }
+
+    @Test
+    void refusesSymlinkOwnedBySomeoneElse(@TempDir final Path elsewhere) throws IOException
     {
         assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("unix"));
         final int me = (Integer) Files.getAttribute(storageDirectory, "unix:uid");
         assumeTrue(me != 0 && me != 65534 && me != (Integer) Files.getAttribute(Path.of("/"), "unix:uid"));
         final UserPrincipal someoneElse = FileSystems.getDefault().getUserPrincipalLookupService().lookupPrincipalByName("65534");
+        final Path link = Files.createSymbolicLink(storageDirectory.resolve("payloads"), elsewhere);
+        Files.setAttribute(storageDirectory, "unix:mode", 01777);
 
-        assertThat(PayloadDirectory.prepareRoot(storageDirectory, null, directory -> someoneElse)).isEqualTo(storageDirectory.toRealPath());
-        assertThatThrownBy(() -> PayloadDirectory.prepareRoot(storageDirectory, Set.of(65534), directory -> someoneElse)).hasMessageContaining("is owned by uid " + me);
+        // Only the link and its directory are trusted here, the link must still be refused
+        assertThatThrownBy(() -> PayloadDirectory.prepareRoot(link, Set.of(65534), directory -> someoneElse)).hasMessageContaining(link + " is owned by uid " + me);
     }
 
     @Test

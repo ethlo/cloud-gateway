@@ -140,7 +140,8 @@ or any directory above it (also along symbolic links), is writable by other user
 has), or is owned by someone other than root, the user running the gateway or the user that the gateway's files on that
 mount belong to (for NFS or CIFS mounts that map ids). The storage directory is checked once, on the first payload stored.
 Whoever owns these directories can still tamper with them, and in a user namespace all unmapped users show up as the
-same overflow uid as root, so use a directory only trusted users own. The files are not cleaned up by the gateway.
+same overflow uid as root, so use a directory only trusted users own. Volumes mounted group-writable (Kubernetes `fsGroup`) or world-writable (`emptyDir`) are
+refused unless you `chmod g-w,o-w` them, or set the sticky bit (`chmod +t`). The files are not cleaned up by the gateway.
 
 ```
 http-logging:

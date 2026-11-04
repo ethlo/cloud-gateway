@@ -140,8 +140,7 @@ final class PayloadDirectory implements Closeable
      * <code>trustedUids</code> or the owner of the files the gateway creates there. Only checked where the unix
      * attribute view is available (Linux, macOS).
      *
-     * @param trustedUids The users besides root that may own these directories, typically the user running the gateway,
-     *                    or <code>null</code> to only check permissions
+     * @param trustedUids The users besides root that may own these directories, typically the user running the gateway
      * @param ownerProbe  Finds who owns the files the gateway creates in the (real) storage directory
      */
     static Path prepareRoot(final Path root, final Set<Integer> trustedUids, final OwnerProbe ownerProbe, final FileAttribute<?>... attributes) throws IOException
@@ -163,7 +162,13 @@ final class PayloadDirectory implements Closeable
         final Path real = absolute.toRealPath();
         if (unix)
         {
-            requireSafePath(root, absolute, trustedUids, ownerProbe.probe(real), true);
+            final UserPrincipal owner = ownerProbe.probe(real);
+            requireSafePath(root, absolute, trustedUids, owner, true);
+            requireSafePath(root, real, trustedUids, owner, true);
+            if (!absolute.toRealPath().equals(real))
+            {
+                throw new IOException("Refusing to store payloads in " + root + ": it no longer resolves to " + real);
+            }
         }
         return real;
     }
@@ -184,18 +189,18 @@ final class PayloadDirectory implements Closeable
         for (Path directory = path; directory != null; directory = directory.getParent())
         {
             final Map<String, Object> attributes = Files.readAttributes(directory, "unix:uid,owner,mode,isSymbolicLink", LinkOption.NOFOLLOW_LINKS);
-            if ((Boolean) attributes.get("isSymbolicLink"))
-            {
-                // The link itself has no meaningful permissions; its parent is checked next, and its target here
-                requireSafePath(root, directory.toRealPath(), trustedUids, trustedOwner, checkOwners);
-                continue;
-            }
-
             final int uid = (Integer) attributes.get("uid");
             // In a user namespace root's files show up under the overflow uid, so whoever owns / counts as root
-            if (checkOwners && trustedUids != null && uid != ROOT_UID && uid != systemUid && !trustedUids.contains(uid) && !attributes.get("owner").equals(trustedOwner))
+            if (checkOwners && uid != ROOT_UID && uid != systemUid && !trustedUids.contains(uid) && !attributes.get("owner").equals(trustedOwner))
             {
                 throw new IOException("Refusing to store payloads in " + root + ": " + directory + " is owned by uid " + uid + ", not by root or the user running the gateway");
+            }
+
+            if ((Boolean) attributes.get("isSymbolicLink"))
+            {
+                // A link's own permissions mean nothing; its parent is checked next, and its target here
+                requireSafePath(root, directory.toRealPath(), trustedUids, trustedOwner, checkOwners);
+                continue;
             }
 
             final int mode = (Integer) attributes.get("mode");
