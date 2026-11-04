@@ -7,18 +7,20 @@ import static com.ethlo.http.netty.ServerDirection.RESPONSE;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.channels.Channels;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.FileAttribute;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.nio.file.attribute.UserPrincipal;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import org.slf4j.Logger;
@@ -42,6 +44,7 @@ public class FileLogger implements HttpLogger
 
     private final AccessLogTemplateRenderer accessLogTemplateRenderer;
     private final Path storageDirectory;
+    private volatile UserPrincipal owner;
 
     public FileLogger(final AccessLogTemplateRenderer accessLogTemplateRenderer)
     {
@@ -54,8 +57,18 @@ public class FileLogger implements HttpLogger
      */
     public FileLogger(final AccessLogTemplateRenderer accessLogTemplateRenderer, final Path storageDirectory)
     {
+        this(accessLogTemplateRenderer, storageDirectory, null);
+    }
+
+    /**
+     * @param owner The user that day directories must belong to, or <code>null</code> to use the owner of a file the
+     *              gateway creates in the storage directory
+     */
+    FileLogger(final AccessLogTemplateRenderer accessLogTemplateRenderer, final Path storageDirectory, final UserPrincipal owner)
+    {
         this.accessLogTemplateRenderer = accessLogTemplateRenderer;
         this.storageDirectory = storageDirectory;
+        this.owner = owner;
     }
 
     @Override
@@ -100,7 +113,6 @@ public class FileLogger implements HttpLogger
     private Optional<IOException> writeFile(final WebExchangeDataProvider dataProvider, final ServerDirection direction, final String kind, final RawProvider rawProvider, final ContentWriter writer)
     {
         final Path target = getFile(dataProvider, direction, kind);
-        Path temp = null;
         try
         {
             final Optional<InputStream> source = rawProvider.openStream();
@@ -109,38 +121,80 @@ public class FileLogger implements HttpLogger
                 return Optional.empty();
             }
 
-            final long written;
             try (InputStream in = source.get())
             {
                 Files.createDirectories(target.getParent(), ownerOnly("rwx------"));
-                // Written next to the target and moved into place, so a failed write never leaves a truncated file under the expected name
-                temp = Files.createTempFile(target.getParent(), target.getFileName().toString(), ".tmp", ownerOnly("rw-------"));
-                try (OutputStream out = Files.newOutputStream(temp))
+                try (PayloadDirectory directory = PayloadDirectory.open(target.getParent(), getOwner()))
                 {
-                    written = writer.write(in, out);
+                    write(directory, target.getFileName().toString(), in, writer);
                 }
             }
-
-            // Most requests have no body, so skip the empty files rather than clutter the directory
-            if (written == 0)
-            {
-                deleteQuietly(temp);
-                return Optional.empty();
-            }
-
-            Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
             logger.debug("Stored {} {} for request {} in {}", direction.name().toLowerCase(), kind, dataProvider.getRequestId(), target);
             return Optional.empty();
         }
         catch (BodyDecodeException e)
         {
-            deleteQuietly(temp);
             return Optional.of(e);
         }
         catch (IOException | RuntimeException e)
         {
-            deleteQuietly(temp);
             return Optional.of(new IOException("Unable to write " + target + ": " + e.getMessage(), e));
+        }
+    }
+
+    /**
+     * Probed on the storage file system itself, as mounts that map or squash ids (NFS, CIFS, rootless containers)
+     * make the gateway's files owned by someone other than the user running it.
+     */
+    private UserPrincipal getOwner() throws IOException
+    {
+        if (!POSIX)
+        {
+            return null;
+        }
+        UserPrincipal result = owner;
+        if (result == null)
+        {
+            result = PayloadDirectory.probeOwner(storageDirectory, ownerOnly("rw-------"));
+            owner = result;
+        }
+        return result;
+    }
+
+    /**
+     * Written to a new temp file through the channel that created it and then moved into place, so a failed write
+     * never leaves a truncated file under the expected name.
+     */
+    private static void write(final PayloadDirectory directory, final String name, final InputStream in, final ContentWriter writer) throws IOException
+    {
+        final String temp = name + "." + UUID.randomUUID() + ".tmp";
+        final long written;
+        try
+        {
+            try (OutputStream out = Channels.newOutputStream(directory.create(temp, ownerOnly("rw-------"))))
+            {
+                written = writer.write(in, out);
+            }
+
+            // Most requests have no body, so skip the empty files rather than clutter the directory
+            if (written == 0)
+            {
+                directory.delete(temp);
+                return;
+            }
+            directory.rename(temp, name);
+        }
+        catch (IOException | RuntimeException e)
+        {
+            try
+            {
+                directory.delete(temp);
+            }
+            catch (IOException | RuntimeException suppressed)
+            {
+                e.addSuppressed(suppressed);
+            }
+            throw e;
         }
     }
 
@@ -156,21 +210,6 @@ public class FileLogger implements HttpLogger
     private static FileAttribute<?>[] ownerOnly(final String permissions)
     {
         return POSIX ? new FileAttribute<?>[]{PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString(permissions))} : new FileAttribute<?>[0];
-    }
-
-    private static void deleteQuietly(final Path file)
-    {
-        if (file != null)
-        {
-            try
-            {
-                Files.deleteIfExists(file);
-            }
-            catch (IOException e)
-            {
-                logger.warn("Unable to delete temporary file {}: {}", file, e.getMessage());
-            }
-        }
     }
 
     /**

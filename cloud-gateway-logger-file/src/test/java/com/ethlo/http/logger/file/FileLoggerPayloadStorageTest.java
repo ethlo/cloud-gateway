@@ -11,6 +11,7 @@ import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.nio.file.attribute.UserPrincipal;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -19,6 +20,8 @@ import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.cloud.gateway.handler.AsyncPredicate;
 import org.springframework.cloud.gateway.route.Route;
 import org.springframework.http.HttpHeaders;
@@ -104,6 +107,72 @@ class FileLoggerPayloadStorageTest
         assertThat(PosixFilePermissions.toString(Files.getPosixFilePermissions(day))).isEqualTo("rwx------");
         assertThat(PosixFilePermissions.toString(Files.getPosixFilePermissions(day.resolve(REQUEST_ID + ".request.raw")))).isEqualTo("rw-------");
         assertThat(day).isDirectoryNotContaining("glob:**.tmp");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"rwxrwxrwx", "rwxrwx---", "rwx---rwx"})
+    void refusesDayDirectoryWritableByOthers(final String permissions) throws IOException
+    {
+        assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("posix"));
+        capture(REQUEST, RESPONSE);
+        final Path day = Files.createDirectory(storageDirectory.resolve("2026-11-04"));
+        Files.setPosixFilePermissions(day, PosixFilePermissions.fromString(permissions));
+
+        final AccessLogResult result = accessLog(storageDirectory, ContentProcessing.STORE, ContentProcessing.NONE);
+
+        assertThat(result.isOk()).isFalse();
+        assertThat(result.getProcessingErrors()).hasSize(2).allSatisfy(e -> assertThat(e.getMessage()).contains("writable by other users"));
+        assertThat(day).isEmptyDirectory();
+    }
+
+    @Test
+    void replacesAnExistingPayloadFile() throws IOException
+    {
+        capture(REQUEST, RESPONSE);
+        final Path day = Files.createDirectory(storageDirectory.resolve("2026-11-04"));
+        if (FileSystems.getDefault().supportedFileAttributeViews().contains("posix"))
+        {
+            Files.setPosixFilePermissions(day, PosixFilePermissions.fromString("rwx------"));
+        }
+        Files.writeString(day.resolve(REQUEST_ID + ".response.body"), "old");
+
+        final AccessLogResult result = accessLog(storageDirectory, ContentProcessing.NONE, ContentProcessing.STORE);
+
+        assertThat(result.isOk()).isTrue();
+        assertThat(day.resolve(REQUEST_ID + ".response.body")).hasContent("ok");
+    }
+
+    @Test
+    void refusesDayDirectoryOwnedBySomeoneElse() throws IOException
+    {
+        assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("posix"));
+        capture(REQUEST, RESPONSE);
+        final UserPrincipal me = Files.getOwner(storageDirectory);
+        final UserPrincipal someoneElse = FileSystems.getDefault().getUserPrincipalLookupService().lookupPrincipalByName("65534");
+        assumeTrue(!someoneElse.equals(me));
+
+        final LogOptions options = new LogOptions(null, ContentProcessing.STORE, ContentProcessing.NONE);
+        final PredicateConfig predicateConfig = new PredicateConfig("test-matcher", AsyncPredicate.from(exchange -> true), options, options);
+        final FileLogger logger = new FileLogger(new PebbleAccessLogTemplateRenderer("{{status}}", false), storageDirectory, someoneElse);
+        final AccessLogResult result = logger.accessLog(dataProvider(predicateConfig)).join();
+
+        assertThat(result.isOk()).isFalse();
+        assertThat(result.getProcessingErrors()).hasSize(2).allSatisfy(e -> assertThat(e.getMessage()).contains("is owned by"));
+        assertThat(storageDirectory.resolve("2026-11-04")).isEmptyDirectory();
+    }
+
+    @Test
+    void refusesSymlinkedDayDirectory(@TempDir final Path elsewhere) throws IOException
+    {
+        assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("posix"));
+        capture(REQUEST, RESPONSE);
+        Files.createSymbolicLink(storageDirectory.resolve("2026-11-04"), elsewhere);
+
+        final AccessLogResult result = accessLog(storageDirectory, ContentProcessing.STORE, ContentProcessing.NONE);
+
+        assertThat(result.isOk()).isFalse();
+        assertThat(result.getProcessingErrors()).hasSize(2).allSatisfy(e -> assertThat(e.getMessage()).contains("Refusing to store payloads").contains("symbolic link"));
+        assertThat(elsewhere).isEmptyDirectory();
     }
 
     @Test
