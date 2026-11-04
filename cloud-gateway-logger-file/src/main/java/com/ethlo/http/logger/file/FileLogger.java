@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -44,7 +45,9 @@ public class FileLogger implements HttpLogger
 
     private final AccessLogTemplateRenderer accessLogTemplateRenderer;
     private final Path storageDirectory;
+    private final Set<Integer> trustedUids;
     private volatile UserPrincipal owner;
+    private volatile Path root;
 
     public FileLogger(final AccessLogTemplateRenderer accessLogTemplateRenderer)
     {
@@ -66,9 +69,19 @@ public class FileLogger implements HttpLogger
      */
     FileLogger(final AccessLogTemplateRenderer accessLogTemplateRenderer, final Path storageDirectory, final UserPrincipal owner)
     {
+        this(accessLogTemplateRenderer, storageDirectory, owner, PayloadDirectory.processUid().map(Set::of).orElse(Set.of()));
+    }
+
+    /**
+     * @param trustedUids The users besides root that may own the storage directory and the directories above it;
+     *                    empty if the user running the gateway is unknown
+     */
+    FileLogger(final AccessLogTemplateRenderer accessLogTemplateRenderer, final Path storageDirectory, final UserPrincipal owner, final Set<Integer> trustedUids)
+    {
         this.accessLogTemplateRenderer = accessLogTemplateRenderer;
         this.storageDirectory = storageDirectory;
         this.owner = owner;
+        this.trustedUids = trustedUids;
     }
 
     @Override
@@ -123,8 +136,10 @@ public class FileLogger implements HttpLogger
 
             try (InputStream in = source.get())
             {
-                Files.createDirectories(target.getParent(), ownerOnly("rwx------"));
-                try (PayloadDirectory directory = PayloadDirectory.open(target.getParent(), getOwner()))
+                final Path realRoot = getRoot();
+                final Path day = realRoot.resolve(target.getParent().getFileName());
+                Files.createDirectories(day, ownerOnly("rwx------"));
+                try (PayloadDirectory directory = PayloadDirectory.open(day, getOwner(realRoot)))
                 {
                     write(directory, target.getFileName().toString(), in, writer);
                 }
@@ -143,10 +158,32 @@ public class FileLogger implements HttpLogger
     }
 
     /**
+     * The real path of the storage directory, checked once, as only trusted users can change it after that check.
+     */
+    private Path getRoot() throws IOException
+    {
+        Path result = root;
+        if (result == null)
+        {
+            // Concurrent first payloads would otherwise race to create the same directories, and the loser is refused
+            synchronized (this)
+            {
+                result = root;
+                if (result == null)
+                {
+                    result = PayloadDirectory.prepareRoot(storageDirectory, trustedUids, ownerOnly("rwx------"));
+                    root = result;
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
      * Probed on the storage file system itself, as mounts that map or squash ids (NFS, CIFS, rootless containers)
      * make the gateway's files owned by someone other than the user running it.
      */
-    private UserPrincipal getOwner() throws IOException
+    private UserPrincipal getOwner(final Path realRoot) throws IOException
     {
         if (!POSIX)
         {
@@ -155,7 +192,7 @@ public class FileLogger implements HttpLogger
         UserPrincipal result = owner;
         if (result == null)
         {
-            result = PayloadDirectory.probeOwner(storageDirectory, ownerOnly("rw-------"));
+            result = PayloadDirectory.probeOwner(realRoot, ownerOnly("rw-------"));
             owner = result;
         }
         return result;

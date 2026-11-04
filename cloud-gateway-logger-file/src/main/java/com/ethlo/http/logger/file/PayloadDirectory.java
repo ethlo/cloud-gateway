@@ -4,6 +4,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.file.DirectoryStream;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.FileSystemException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
@@ -17,7 +18,13 @@ import java.nio.file.attribute.PosixFileAttributes;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.nio.file.attribute.UserPrincipal;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
 import java.util.EnumSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -123,6 +130,191 @@ final class PayloadDirectory implements Closeable
         finally
         {
             Files.delete(file);
+        }
+    }
+
+    private static final int GROUP_OR_OTHERS_WRITE = 0022;
+    private static final int STICKY = 01000;
+    private static final int ROOT_UID = 0;
+
+    /**
+     * Create the storage directory if needed and return its real path, after making sure nobody but trusted users can
+     * swap it, or entries in it, as they could then tamper with the owner probe or the day directories. Every directory
+     * and symbolic link that resolving the path passes through must be owned by root, the owner of <code>/</code> or
+     * one of <code>trustedUids</code>, and directories must not be writable by other users unless the sticky bit is
+     * set (as for <code>/tmp</code>). Only checked where the unix attribute view is available (Linux, macOS).
+     *
+     * @param trustedUids The users besides root that may own these directories, typically the user running the gateway
+     */
+    static Path prepareRoot(final Path root, final Set<Integer> trustedUids, final FileAttribute<?>... attributes) throws IOException
+    {
+        final Path absolute = root.toAbsolutePath();
+        if (!root.getFileSystem().supportedFileAttributeViews().contains("unix"))
+        {
+            Files.createDirectories(absolute, attributes);
+            return absolute.toRealPath();
+        }
+
+        // Before creating anything, so nothing is created where the directories could be swapped
+        final Resolved existing = resolve(root, absolute, trustedUids);
+        Path created = existing.directory();
+        for (String name : existing.missing())
+        {
+            if (name.equals("."))
+            {
+                continue;
+            }
+            created = created.resolve(name);
+            try
+            {
+                Files.createDirectory(created, attributes);
+            }
+            catch (FileAlreadyExistsException e)
+            {
+                throw new IOException("Refusing to store payloads in " + root + ": " + created + " was created by someone else meanwhile", e);
+            }
+        }
+
+        final Resolved checked = resolve(root, absolute, trustedUids);
+        if (!checked.missing().isEmpty())
+        {
+            throw new IOException("Refusing to store payloads in " + root + ": " + checked.directory().resolve(checked.missing().getFirst()) + " was removed meanwhile");
+        }
+        return checked.directory();
+    }
+
+    /**
+     * @param directory The real path of the part of the path that exists
+     * @param missing   The names below it that do not exist yet
+     */
+    private record Resolved(Path directory, List<String> missing)
+    {
+    }
+
+    private static final int MAX_LINKS = 40;
+
+    /**
+     * Resolves <code>path</code> one name at a time, like the kernel does, checking every directory it passes through
+     * and every symbolic link on the way, as the directory holding a link decides where it can point, and a link's
+     * owner can repoint it.
+     */
+    private static Resolved resolve(final Path root, final Path path, final Set<Integer> trustedUids) throws IOException
+    {
+        final int systemUid = (Integer) Files.getAttribute(path.getRoot(), "unix:uid", LinkOption.NOFOLLOW_LINKS);
+        final Deque<String> names = new ArrayDeque<>();
+        path.forEach(name -> names.addLast(name.toString()));
+
+        Path current = path.getRoot();
+        check(root, current, systemUid, trustedUids);
+        int links = 0;
+        while (!names.isEmpty())
+        {
+            final String name = names.removeFirst();
+            if (name.equals("."))
+            {
+                continue;
+            }
+            if (name.equals(".."))
+            {
+                // current holds no links, so its parent is where .. leads
+                current = current.getParent() != null ? current.getParent() : current;
+                continue;
+            }
+
+            final Path next = current.resolve(name);
+            if (!Files.exists(next, LinkOption.NOFOLLOW_LINKS))
+            {
+                names.addFirst(name);
+                if (names.contains(".."))
+                {
+                    throw new IOException("Refusing to store payloads in " + root + ": it goes through " + next + ", which does not exist");
+                }
+                return new Resolved(current, List.copyOf(names));
+            }
+
+            if (check(root, next, systemUid, trustedUids))
+            {
+                if (++links > MAX_LINKS)
+                {
+                    throw new IOException("Refusing to store payloads in " + root + ": too many symbolic links");
+                }
+                final Path target = Files.readSymbolicLink(next);
+                if (target.isAbsolute())
+                {
+                    current = target.getRoot();
+                    check(root, current, systemUid, trustedUids);
+                }
+                final List<String> targetNames = new ArrayList<>();
+                target.forEach(n -> targetNames.add(n.toString()));
+                for (int i = targetNames.size() - 1; i >= 0; i--)
+                {
+                    names.addFirst(targetNames.get(i));
+                }
+                continue;
+            }
+            current = next;
+        }
+        return new Resolved(current, List.of());
+    }
+
+    /**
+     * @return Whether <code>file</code> is a symbolic link
+     */
+    private static boolean check(final Path root, final Path file, final int systemUid, final Set<Integer> trustedUids) throws IOException
+    {
+        final Map<String, Object> attributes = Files.readAttributes(file, "unix:uid,mode,isSymbolicLink,isDirectory", LinkOption.NOFOLLOW_LINKS);
+        final int uid = (Integer) attributes.get("uid");
+        // In a user namespace root's files show up under the overflow uid, so whoever owns / counts as root
+        if (uid != ROOT_UID && uid != systemUid && !trustedUids.contains(uid))
+        {
+            throw new IOException("Refusing to store payloads in " + root + ": " + file + " is owned by uid " + uid + ", not by root or the user running the gateway");
+        }
+
+        if ((Boolean) attributes.get("isSymbolicLink"))
+        {
+            // A link's own permissions mean nothing, what matters is the directory holding it
+            return true;
+        }
+        if (!(Boolean) attributes.get("isDirectory"))
+        {
+            throw new IOException("Refusing to store payloads in " + root + ": " + file + " is not a directory");
+        }
+
+        final int mode = (Integer) attributes.get("mode");
+        if ((mode & GROUP_OR_OTHERS_WRITE) != 0 && (mode & STICKY) == 0)
+        {
+            throw new IOException("Refusing to store payloads in " + root + ": " + file + " is writable by other users without the sticky bit (" + String.format("%04o", mode & 07777) + ")");
+        }
+        return false;
+    }
+
+    /**
+     * The uid of the user running the gateway, or empty where it cannot be determined. Taken from the owner of
+     * <code>/proc/self</code> on Linux, else from the JDK's <code>UnixSystem</code>.
+     */
+    static Optional<Integer> processUid()
+    {
+        try
+        {
+            final Path self = Path.of("/proc/self");
+            if (Files.isDirectory(self))
+            {
+                return Optional.of((Integer) Files.getAttribute(self, "unix:uid"));
+            }
+        }
+        catch (IOException | RuntimeException ignored)
+        {
+            // Fall through to UnixSystem
+        }
+
+        try
+        {
+            final Object unixSystem = Class.forName("com.sun.security.auth.module.UnixSystem").getConstructor().newInstance();
+            return Optional.of(((Number) unixSystem.getClass().getMethod("getUid").invoke(unixSystem)).intValue());
+        }
+        catch (ReflectiveOperationException | LinkageError | RuntimeException e)
+        {
+            return Optional.empty();
         }
     }
 

@@ -1,6 +1,7 @@
 package com.ethlo.http.logger.file;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.io.IOException;
@@ -16,6 +17,8 @@ import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Map;
+
+import java.util.Set;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -123,6 +126,160 @@ class FileLoggerPayloadStorageTest
         assertThat(result.isOk()).isFalse();
         assertThat(result.getProcessingErrors()).hasSize(2).allSatisfy(e -> assertThat(e.getMessage()).contains("writable by other users"));
         assertThat(day).isEmptyDirectory();
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0777, 0770, 0707})
+    void refusesStorageDirectoryWritableByOthersWithoutStickyBit(final int mode) throws IOException
+    {
+        assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("unix"));
+        capture(REQUEST, RESPONSE);
+        Files.setAttribute(storageDirectory, "unix:mode", mode);
+
+        final AccessLogResult result = accessLog(storageDirectory, ContentProcessing.STORE, ContentProcessing.NONE);
+
+        assertThat(result.isOk()).isFalse();
+        assertThat(result.getProcessingErrors()).hasSize(2).allSatisfy(e -> assertThat(e.getMessage()).contains("writable by other users without the sticky bit"));
+        assertThat(storageDirectory).isEmptyDirectory();
+    }
+
+    @Test
+    void acceptsStorageDirectoryWritableByOthersWithStickyBit() throws IOException
+    {
+        assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("unix"));
+        capture(REQUEST, RESPONSE);
+        Files.setAttribute(storageDirectory, "unix:mode", 01777);
+
+        final AccessLogResult result = accessLog(storageDirectory, ContentProcessing.NONE, ContentProcessing.STORE);
+
+        assertThat(result.isOk()).isTrue();
+        assertThat(storageDirectory.resolve("2026-11-04").resolve(REQUEST_ID + ".request.body")).hasContent("{\"hello\":\"x\"}");
+    }
+
+    @Test
+    void refusesStorageDirectoryOwnedBySomeoneElse() throws IOException
+    {
+        assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("unix"));
+        final int me = (Integer) Files.getAttribute(storageDirectory, "unix:uid");
+        assumeTrue(me != 0 && me != 65534 && me != (Integer) Files.getAttribute(Path.of("/"), "unix:uid"));
+        capture(REQUEST, RESPONSE);
+
+        final LogOptions options = new LogOptions(null, ContentProcessing.STORE, ContentProcessing.NONE);
+        final PredicateConfig predicateConfig = new PredicateConfig("test-matcher", AsyncPredicate.from(exchange -> true), options, options);
+        final UserPrincipal someoneElse = FileSystems.getDefault().getUserPrincipalLookupService().lookupPrincipalByName("65534");
+        final FileLogger logger = new FileLogger(new PebbleAccessLogTemplateRenderer("{{status}}", false), storageDirectory, someoneElse, Set.of(65534));
+        final AccessLogResult result = logger.accessLog(dataProvider(predicateConfig)).join();
+
+        assertThat(result.isOk()).isFalse();
+        assertThat(result.getProcessingErrors()).hasSize(2).allSatisfy(e -> assertThat(e.getMessage()).contains(storageDirectory.toRealPath() + " is owned by uid " + me));
+        assertThat(storageDirectory).isEmptyDirectory();
+    }
+
+    @Test
+    void refusesStorageDirectoryBelowADirectoryWritableByOthers() throws IOException
+    {
+        assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("unix"));
+        capture(REQUEST, RESPONSE);
+        Files.setAttribute(storageDirectory, "unix:mode", 0777);
+        final Path payloads = storageDirectory.resolve("payloads");
+
+        final AccessLogResult result = accessLog(payloads, ContentProcessing.NONE, ContentProcessing.STORE);
+
+        assertThat(result.isOk()).isFalse();
+        assertThat(result.getProcessingErrors()).hasSize(2).allSatisfy(e -> assertThat(e.getMessage()).contains(storageDirectory + " is writable by other users without the sticky bit"));
+        assertThat(payloads).doesNotExist();
+    }
+
+    @Test
+    void refusesSymlinkInStoragePathPlacedInDirectoryWritableByOthers(@TempDir final Path elsewhere) throws IOException
+    {
+        assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("unix"));
+        capture(REQUEST, RESPONSE);
+        final Path link = Files.createSymbolicLink(storageDirectory.resolve("payloads"), elsewhere);
+        Files.setAttribute(storageDirectory, "unix:mode", 0777);
+
+        final AccessLogResult result = accessLog(link, ContentProcessing.NONE, ContentProcessing.STORE);
+
+        assertThat(result.isOk()).isFalse();
+        assertThat(result.getProcessingErrors()).hasSize(2).allSatisfy(e -> assertThat(e.getMessage()).contains(storageDirectory + " is writable by other users without the sticky bit"));
+        assertThat(elsewhere).isEmptyDirectory();
+    }
+
+    @Test
+    void followsSymlinkInSafeStoragePath(@TempDir final Path elsewhere) throws IOException
+    {
+        capture(REQUEST, RESPONSE);
+        final Path link = Files.createSymbolicLink(storageDirectory.resolve("payloads"), elsewhere);
+
+        final AccessLogResult result = accessLog(link, ContentProcessing.NONE, ContentProcessing.STORE);
+
+        assertThat(result.isOk()).isTrue();
+        assertThat(elsewhere.resolve("2026-11-04").resolve(REQUEST_ID + ".request.body")).hasContent("{\"hello\":\"x\"}");
+    }
+
+    @Test
+    void onlyTrustsRootWhenTheGatewayUserIsUnknown() throws IOException
+    {
+        assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("unix"));
+        final int me = (Integer) Files.getAttribute(storageDirectory, "unix:uid");
+        assumeTrue(me != 0 && me != (Integer) Files.getAttribute(Path.of("/"), "unix:uid"));
+
+        assertThatThrownBy(() -> PayloadDirectory.prepareRoot(storageDirectory, Set.of())).hasMessageContaining(storageDirectory.toRealPath() + " is owned by uid " + me);
+        assertThatThrownBy(() -> PayloadDirectory.prepareRoot(storageDirectory.resolve("new"), Set.of())).hasMessageContaining(storageDirectory.toRealPath() + " is owned by uid " + me);
+        assertThat(storageDirectory.resolve("new")).doesNotExist();
+        assertThat(PayloadDirectory.prepareRoot(storageDirectory, Set.of(me))).isEqualTo(storageDirectory.toRealPath());
+    }
+
+    @Test
+    void skipsDotsInMissingPart() throws IOException
+    {
+        assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("posix"));
+        final Path payloads = storageDirectory.resolve("new/./payloads");
+
+        assertThat(PayloadDirectory.prepareRoot(payloads, PayloadDirectory.processUid().map(Set::of).orElse(Set.of()), PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")))).isEqualTo(storageDirectory.toRealPath().resolve("new/payloads"));
+        assertThat(storageDirectory.resolve("new/payloads")).isDirectory();
+    }
+
+    @Test
+    void refusesSymlinkChainHoppingThroughDirectoryWritableByOthers(@TempDir final Path elsewhere, @TempDir final Path target) throws IOException
+    {
+        assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("unix"));
+        capture(REQUEST, RESPONSE);
+        final Path unsafe = Files.createDirectory(elsewhere.resolve("unsafe"));
+        Files.createSymbolicLink(unsafe.resolve("hop"), target);
+        Files.setAttribute(unsafe, "unix:mode", 0777);
+        final Path link = Files.createSymbolicLink(storageDirectory.resolve("payloads"), unsafe.resolve("hop"));
+
+        final AccessLogResult result = accessLog(link, ContentProcessing.NONE, ContentProcessing.STORE);
+
+        assertThat(result.isOk()).isFalse();
+        assertThat(result.getProcessingErrors()).hasSize(2).allSatisfy(e -> assertThat(e.getMessage()).contains(unsafe.toRealPath() + " is writable by other users without the sticky bit"));
+        assertThat(target).isEmptyDirectory();
+    }
+
+    @Test
+    void resolvesDotDotAfterSymlinkLikeTheKernel(@TempDir final Path elsewhere) throws IOException
+    {
+        capture(REQUEST, RESPONSE);
+        final Path child = Files.createDirectory(elsewhere.resolve("child"));
+        if (FileSystems.getDefault().supportedFileAttributeViews().contains("posix"))
+        {
+            Files.setPosixFilePermissions(child, PosixFilePermissions.fromString("rwx------"));
+        }
+        Files.createSymbolicLink(storageDirectory.resolve("link"), child);
+
+        final AccessLogResult result = accessLog(storageDirectory.resolve("link/../payloads"), ContentProcessing.NONE, ContentProcessing.STORE);
+
+        assertThat(result.getProcessingErrors()).isEmpty();
+        assertThat(elsewhere.resolve("payloads/2026-11-04").resolve(REQUEST_ID + ".request.body")).hasContent("{\"hello\":\"x\"}");
+        assertThat(storageDirectory.resolve("payloads")).doesNotExist();
+    }
+
+    @Test
+    void processUidIsTheUserRunningTheTests() throws IOException
+    {
+        assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("unix"));
+        assertThat(PayloadDirectory.processUid()).contains((Integer) Files.getAttribute(storageDirectory, "unix:uid"));
     }
 
     @Test

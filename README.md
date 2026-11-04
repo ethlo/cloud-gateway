@@ -135,7 +135,13 @@ matcher sets to `STORE` is written to `<storage-directory>/<yyyy-MM-dd>/<gateway
 `body` is the decoded body (empty bodies are skipped), `raw` the full message including headers. Use
 `{{gateway_request_id}}` in the pattern to find the files for an access log line. On POSIX systems the files and
 day directories are only accessible by the user running the gateway. A day directory that is a symbolic link, owned by another user
-or writable by other users is refused, and nothing is stored in it. The files are not cleaned up by the gateway.
+or writable by other users is refused, and nothing is stored in it. The same goes for the storage directory when it,
+or any directory above it (also along symbolic links), is writable by other users without the sticky bit set (like `/tmp`
+has), or is owned by someone other than root or the user running the gateway. On NFS with `root_squash`, use an export
+directory owned by root with the sticky bit set. The storage directory is checked once, on the first payload stored.
+In a user namespace all unmapped users show up under the same overflow uid as root, so there it only helps with a
+directory that no other host user owns. Volumes mounted group-writable (Kubernetes `fsGroup`) or world-writable (`emptyDir`) are
+refused unless you `chmod g-w,o-w` them, or set the sticky bit (`chmod +t`). The files are not cleaned up by the gateway.
 
 ```
 http-logging:
