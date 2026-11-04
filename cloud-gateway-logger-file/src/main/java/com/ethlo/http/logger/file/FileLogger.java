@@ -7,18 +7,25 @@ import static com.ethlo.http.netty.ServerDirection.RESPONSE;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.channels.Channels;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.FileAttribute;
+import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import org.slf4j.Logger;
@@ -112,10 +119,13 @@ public class FileLogger implements HttpLogger
             final long written;
             try (InputStream in = source.get())
             {
-                Files.createDirectories(target.getParent(), ownerOnly("rwx------"));
-                // Written next to the target and moved into place, so a failed write never leaves a truncated file under the expected name
-                temp = Files.createTempFile(target.getParent(), target.getFileName().toString(), ".tmp", ownerOnly("rw-------"));
-                try (OutputStream out = Files.newOutputStream(temp))
+                final Path directory = target.getParent();
+                Files.createDirectories(directory, ownerOnly("rwx------"));
+                requireSafeDirectory(directory);
+                // Written next to the target and moved into place, so a failed write never leaves a truncated file under the expected name.
+                // Written through the channel that created it (CREATE_NEW fails on an existing file or symlink), so it is never reopened by path.
+                temp = directory.resolve(target.getFileName() + "." + UUID.randomUUID() + ".tmp");
+                try (OutputStream out = Channels.newOutputStream(Files.newByteChannel(temp, EnumSet.of(StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE), ownerOnly("rw-------"))))
                 {
                     written = writer.write(in, out);
                 }
@@ -148,6 +158,27 @@ public class FileLogger implements HttpLogger
     private interface ContentWriter
     {
         long write(InputStream in, OutputStream out) throws IOException;
+    }
+
+    /**
+     * <code>createDirectories</code> leaves an existing directory as it is. If other users could write to it, they could
+     * swap the files written there, so refuse to use it rather than write payloads into it.
+     */
+    private static void requireSafeDirectory(final Path directory) throws IOException
+    {
+        if (Files.isSymbolicLink(directory))
+        {
+            throw new IOException("Refusing to store payloads in " + directory + ": it is a symbolic link");
+        }
+
+        if (POSIX)
+        {
+            final Set<PosixFilePermission> permissions = Files.getPosixFilePermissions(directory, LinkOption.NOFOLLOW_LINKS);
+            if (permissions.contains(PosixFilePermission.GROUP_WRITE) || permissions.contains(PosixFilePermission.OTHERS_WRITE))
+            {
+                throw new IOException("Refusing to store payloads in " + directory + ": it is writable by other users (" + PosixFilePermissions.toString(permissions) + ")");
+            }
+        }
     }
 
     /**

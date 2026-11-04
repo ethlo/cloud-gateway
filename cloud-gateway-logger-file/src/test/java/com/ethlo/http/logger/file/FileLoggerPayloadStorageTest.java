@@ -107,6 +107,34 @@ class FileLoggerPayloadStorageTest
     }
 
     @Test
+    void refusesDayDirectoryWritableByOthers() throws IOException
+    {
+        assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("posix"));
+        capture(REQUEST, RESPONSE);
+        final Path day = Files.createDirectory(storageDirectory.resolve("2026-11-04"));
+        Files.setPosixFilePermissions(day, PosixFilePermissions.fromString("rwxrwxrwx"));
+
+        final AccessLogResult result = accessLog(storageDirectory, ContentProcessing.STORE, ContentProcessing.NONE);
+
+        assertThat(result.isOk()).isFalse();
+        assertThat(result.getProcessingErrors()).hasSize(2).allSatisfy(e -> assertThat(e.getMessage()).contains("writable by other users"));
+        assertThat(day).isEmptyDirectory();
+    }
+
+    @Test
+    void refusesSymlinkedDayDirectory(@TempDir final Path elsewhere) throws IOException
+    {
+        capture(REQUEST, RESPONSE);
+        Files.createSymbolicLink(storageDirectory.resolve("2026-11-04"), elsewhere);
+
+        final AccessLogResult result = accessLog(storageDirectory, ContentProcessing.STORE, ContentProcessing.NONE);
+
+        assertThat(result.isOk()).isFalse();
+        assertThat(result.getProcessingErrors()).hasSize(2).allSatisfy(e -> assertThat(e.getMessage()).contains("symbolic link"));
+        assertThat(elsewhere).isEmptyDirectory();
+    }
+
+    @Test
     void writeFailureIsReported() throws IOException
     {
         capture(REQUEST, RESPONSE);
