@@ -126,11 +126,28 @@ class FileLoggerPayloadStorageTest
     }
 
     @Test
+    void replacesAnExistingPayloadFile() throws IOException
+    {
+        capture(REQUEST, RESPONSE);
+        final Path day = Files.createDirectory(storageDirectory.resolve("2026-11-04"));
+        if (FileSystems.getDefault().supportedFileAttributeViews().contains("posix"))
+        {
+            Files.setPosixFilePermissions(day, PosixFilePermissions.fromString("rwx------"));
+        }
+        Files.writeString(day.resolve(REQUEST_ID + ".response.body"), "old");
+
+        final AccessLogResult result = accessLog(storageDirectory, ContentProcessing.NONE, ContentProcessing.STORE);
+
+        assertThat(result.isOk()).isTrue();
+        assertThat(day.resolve(REQUEST_ID + ".response.body")).hasContent("ok");
+    }
+
+    @Test
     void refusesDayDirectoryOwnedBySomeoneElse() throws IOException
     {
         assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("posix"));
         capture(REQUEST, RESPONSE);
-        final UserPrincipal me = FileLogger.currentUser();
+        final UserPrincipal me = Files.getOwner(storageDirectory);
         final UserPrincipal someoneElse = FileSystems.getDefault().getUserPrincipalLookupService().lookupPrincipalByName("65534");
         assumeTrue(!someoneElse.equals(me));
 

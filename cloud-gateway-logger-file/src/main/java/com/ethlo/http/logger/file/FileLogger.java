@@ -7,11 +7,9 @@ import static com.ethlo.http.netty.ServerDirection.RESPONSE;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.UncheckedIOException;
 import java.nio.channels.Channels;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
-import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileAttribute;
 import java.nio.file.attribute.PosixFilePermissions;
@@ -46,7 +44,7 @@ public class FileLogger implements HttpLogger
 
     private final AccessLogTemplateRenderer accessLogTemplateRenderer;
     private final Path storageDirectory;
-    private final UserPrincipal owner;
+    private volatile UserPrincipal owner;
 
     public FileLogger(final AccessLogTemplateRenderer accessLogTemplateRenderer)
     {
@@ -59,40 +57,18 @@ public class FileLogger implements HttpLogger
      */
     public FileLogger(final AccessLogTemplateRenderer accessLogTemplateRenderer, final Path storageDirectory)
     {
-        this(accessLogTemplateRenderer, storageDirectory, storageDirectory != null && POSIX ? currentUser() : null);
+        this(accessLogTemplateRenderer, storageDirectory, null);
     }
 
     /**
-     * @param owner The user that day directories must belong to before payloads are written into them
+     * @param owner The user that day directories must belong to, or <code>null</code> to use the owner of a file the
+     *              gateway creates in the storage directory
      */
     FileLogger(final AccessLogTemplateRenderer accessLogTemplateRenderer, final Path storageDirectory, final UserPrincipal owner)
     {
         this.accessLogTemplateRenderer = accessLogTemplateRenderer;
         this.storageDirectory = storageDirectory;
         this.owner = owner;
-    }
-
-    /**
-     * The owner of a file this process creates, which is reliable even when the user has no name, as is common in containers.
-     */
-    static UserPrincipal currentUser()
-    {
-        try
-        {
-            final Path probe = Files.createTempFile("cloud-gateway-owner", ".tmp");
-            try
-            {
-                return Files.getOwner(probe, LinkOption.NOFOLLOW_LINKS);
-            }
-            finally
-            {
-                Files.delete(probe);
-            }
-        }
-        catch (IOException e)
-        {
-            throw new UncheckedIOException("Unable to determine the user running the gateway", e);
-        }
     }
 
     @Override
@@ -148,7 +124,7 @@ public class FileLogger implements HttpLogger
             try (InputStream in = source.get())
             {
                 Files.createDirectories(target.getParent(), ownerOnly("rwx------"));
-                try (PayloadDirectory directory = PayloadDirectory.open(target.getParent(), owner))
+                try (PayloadDirectory directory = PayloadDirectory.open(target.getParent(), getOwner()))
                 {
                     write(directory, target.getFileName().toString(), in, writer);
                 }
@@ -164,6 +140,25 @@ public class FileLogger implements HttpLogger
         {
             return Optional.of(new IOException("Unable to write " + target + ": " + e.getMessage(), e));
         }
+    }
+
+    /**
+     * Probed on the storage file system itself, as mounts that map or squash ids (NFS, CIFS, rootless containers)
+     * make the gateway's files owned by someone other than the user running it.
+     */
+    private UserPrincipal getOwner() throws IOException
+    {
+        if (!POSIX)
+        {
+            return null;
+        }
+        UserPrincipal result = owner;
+        if (result == null)
+        {
+            result = PayloadDirectory.probeOwner(storageDirectory, ownerOnly("rw-------"));
+            owner = result;
+        }
+        return result;
     }
 
     /**

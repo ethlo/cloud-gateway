@@ -19,6 +19,7 @@ import java.nio.file.attribute.PosixFilePermissions;
 import java.nio.file.attribute.UserPrincipal;
 import java.util.EnumSet;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * A day directory that payloads are written into. Where the file system supports it, the directory is opened once
@@ -88,6 +89,41 @@ final class PayloadDirectory implements Closeable
             requireSafe(directory, view.readAttributes(), expectedOwner);
         }
         return new PayloadDirectory(directory, null);
+    }
+
+    /**
+     * The owner of a file created in <code>root</code>, which is who the files the gateway creates there belong to.
+     * Created and inspected through a handle to <code>root</code> where supported.
+     */
+    static UserPrincipal probeOwner(final Path root, final FileAttribute<?>... attributes) throws IOException
+    {
+        Files.createDirectories(root);
+        final Path probe = Path.of(".owner-probe-" + UUID.randomUUID() + ".tmp");
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(root))
+        {
+            if (stream instanceof SecureDirectoryStream<Path> secure)
+            {
+                secure.newByteChannel(probe, EnumSet.of(StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE), attributes).close();
+                try
+                {
+                    return secure.getFileAttributeView(probe, PosixFileAttributeView.class, LinkOption.NOFOLLOW_LINKS).readAttributes().owner();
+                }
+                finally
+                {
+                    secure.deleteFile(probe);
+                }
+            }
+        }
+
+        final Path file = Files.createFile(root.resolve(probe), attributes);
+        try
+        {
+            return Files.getOwner(file, LinkOption.NOFOLLOW_LINKS);
+        }
+        finally
+        {
+            Files.delete(file);
+        }
     }
 
     private static void requireSafe(final Path directory, final PosixFileAttributes attributes, final UserPrincipal expectedOwner) throws IOException
