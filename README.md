@@ -134,8 +134,8 @@ To also keep the payloads as plain files, set `storage-directory`. For each logg
 matcher sets to `STORE` is written to `<storage-directory>/<yyyy-MM-dd>/<gateway_request_id>.<request|response>.<body|raw>`.
 `body` is the decoded body (empty bodies are skipped), `raw` the full message including headers. Use
 `{{gateway_request_id}}` in the pattern to find the files for an access log line. On POSIX systems the files and
-day directories are only accessible by the user running the gateway. A day directory that is a symbolic link or writable by other
-users is refused, and nothing is stored in it. The files are not cleaned up by the gateway.
+day directories are only accessible by the user running the gateway. A day directory that is a symbolic link, owned by another user
+or writable by other users is refused, and nothing is stored in it. The files are not cleaned up by the gateway.
 
 ```
 http-logging:
