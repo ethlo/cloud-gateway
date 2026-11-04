@@ -225,6 +225,8 @@ class FileLoggerPayloadStorageTest
         assumeTrue(me != 0 && me != (Integer) Files.getAttribute(Path.of("/"), "unix:uid"));
 
         assertThatThrownBy(() -> PayloadDirectory.prepareRoot(storageDirectory, Set.of())).hasMessageContaining(storageDirectory.toRealPath() + " is owned by uid " + me);
+        assertThatThrownBy(() -> PayloadDirectory.prepareRoot(storageDirectory.resolve("new"), Set.of())).hasMessageContaining(storageDirectory.toRealPath() + " is owned by uid " + me);
+        assertThat(storageDirectory.resolve("new")).doesNotExist();
         assertThat(PayloadDirectory.prepareRoot(storageDirectory, Set.of(me))).isEqualTo(storageDirectory.toRealPath());
     }
 

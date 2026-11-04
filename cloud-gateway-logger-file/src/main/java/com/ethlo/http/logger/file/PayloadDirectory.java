@@ -155,8 +155,8 @@ final class PayloadDirectory implements Closeable
             return absolute.toRealPath();
         }
 
-        // Permissions first, so nothing is created where the directories could be swapped
-        final Resolved existing = resolve(root, absolute, trustedUids, false);
+        // Before creating anything, so nothing is created where the directories could be swapped
+        final Resolved existing = resolve(root, absolute, trustedUids);
         Path created = existing.directory();
         for (String name : existing.missing())
         {
@@ -175,7 +175,7 @@ final class PayloadDirectory implements Closeable
             }
         }
 
-        final Resolved checked = resolve(root, absolute, trustedUids, true);
+        final Resolved checked = resolve(root, absolute, trustedUids);
         if (!checked.missing().isEmpty())
         {
             throw new IOException("Refusing to store payloads in " + root + ": " + checked.directory().resolve(checked.missing().getFirst()) + " was removed meanwhile");
@@ -198,14 +198,14 @@ final class PayloadDirectory implements Closeable
      * and every symbolic link on the way, as the directory holding a link decides where it can point, and a link's
      * owner can repoint it.
      */
-    private static Resolved resolve(final Path root, final Path path, final Set<Integer> trustedUids, final boolean checkOwners) throws IOException
+    private static Resolved resolve(final Path root, final Path path, final Set<Integer> trustedUids) throws IOException
     {
         final int systemUid = (Integer) Files.getAttribute(path.getRoot(), "unix:uid", LinkOption.NOFOLLOW_LINKS);
         final Deque<String> names = new ArrayDeque<>();
         path.forEach(name -> names.addLast(name.toString()));
 
         Path current = path.getRoot();
-        check(root, current, systemUid, trustedUids, checkOwners);
+        check(root, current, systemUid, trustedUids);
         int links = 0;
         while (!names.isEmpty())
         {
@@ -232,7 +232,7 @@ final class PayloadDirectory implements Closeable
                 return new Resolved(current, List.copyOf(names));
             }
 
-            if (check(root, next, systemUid, trustedUids, checkOwners))
+            if (check(root, next, systemUid, trustedUids))
             {
                 if (++links > MAX_LINKS)
                 {
@@ -242,7 +242,7 @@ final class PayloadDirectory implements Closeable
                 if (target.isAbsolute())
                 {
                     current = target.getRoot();
-                    check(root, current, systemUid, trustedUids, checkOwners);
+                    check(root, current, systemUid, trustedUids);
                 }
                 final List<String> targetNames = new ArrayList<>();
                 target.forEach(n -> targetNames.add(n.toString()));
@@ -260,12 +260,12 @@ final class PayloadDirectory implements Closeable
     /**
      * @return Whether <code>file</code> is a symbolic link
      */
-    private static boolean check(final Path root, final Path file, final int systemUid, final Set<Integer> trustedUids, final boolean checkOwners) throws IOException
+    private static boolean check(final Path root, final Path file, final int systemUid, final Set<Integer> trustedUids) throws IOException
     {
         final Map<String, Object> attributes = Files.readAttributes(file, "unix:uid,mode,isSymbolicLink,isDirectory", LinkOption.NOFOLLOW_LINKS);
         final int uid = (Integer) attributes.get("uid");
         // In a user namespace root's files show up under the overflow uid, so whoever owns / counts as root
-        if (checkOwners && uid != ROOT_UID && uid != systemUid && !trustedUids.contains(uid))
+        if (uid != ROOT_UID && uid != systemUid && !trustedUids.contains(uid))
         {
             throw new IOException("Refusing to store payloads in " + root + ": " + file + " is owned by uid " + uid + ", not by root or the user running the gateway");
         }
