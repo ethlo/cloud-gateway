@@ -1,6 +1,7 @@
 package com.ethlo.http.logger.file;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.io.IOException;
@@ -165,7 +166,8 @@ class FileLoggerPayloadStorageTest
 
         final LogOptions options = new LogOptions(null, ContentProcessing.STORE, ContentProcessing.NONE);
         final PredicateConfig predicateConfig = new PredicateConfig("test-matcher", AsyncPredicate.from(exchange -> true), options, options);
-        final FileLogger logger = new FileLogger(new PebbleAccessLogTemplateRenderer("{{status}}", false), storageDirectory, null, Set.of(65534));
+        final UserPrincipal someoneElse = FileSystems.getDefault().getUserPrincipalLookupService().lookupPrincipalByName("65534");
+        final FileLogger logger = new FileLogger(new PebbleAccessLogTemplateRenderer("{{status}}", false), storageDirectory, someoneElse, Set.of(65534));
         final AccessLogResult result = logger.accessLog(dataProvider(predicateConfig)).join();
 
         assertThat(result.isOk()).isFalse();
@@ -184,8 +186,54 @@ class FileLoggerPayloadStorageTest
         final AccessLogResult result = accessLog(payloads, ContentProcessing.NONE, ContentProcessing.STORE);
 
         assertThat(result.isOk()).isFalse();
-        assertThat(result.getProcessingErrors()).hasSize(2).allSatisfy(e -> assertThat(e.getMessage()).contains(storageDirectory.toRealPath() + " is writable by other users without the sticky bit"));
-        assertThat(payloads).isEmptyDirectory();
+        assertThat(result.getProcessingErrors()).hasSize(2).allSatisfy(e -> assertThat(e.getMessage()).contains(storageDirectory + " is writable by other users without the sticky bit"));
+        assertThat(payloads).doesNotExist();
+    }
+
+    @Test
+    void refusesSymlinkInStoragePathPlacedInDirectoryWritableByOthers(@TempDir final Path elsewhere) throws IOException
+    {
+        assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("unix"));
+        capture(REQUEST, RESPONSE);
+        final Path link = Files.createSymbolicLink(storageDirectory.resolve("payloads"), elsewhere);
+        Files.setAttribute(storageDirectory, "unix:mode", 0777);
+
+        final AccessLogResult result = accessLog(link, ContentProcessing.NONE, ContentProcessing.STORE);
+
+        assertThat(result.isOk()).isFalse();
+        assertThat(result.getProcessingErrors()).hasSize(2).allSatisfy(e -> assertThat(e.getMessage()).contains(storageDirectory + " is writable by other users without the sticky bit"));
+        assertThat(elsewhere).isEmptyDirectory();
+    }
+
+    @Test
+    void followsSymlinkInSafeStoragePath(@TempDir final Path elsewhere) throws IOException
+    {
+        capture(REQUEST, RESPONSE);
+        final Path link = Files.createSymbolicLink(storageDirectory.resolve("payloads"), elsewhere);
+
+        final AccessLogResult result = accessLog(link, ContentProcessing.NONE, ContentProcessing.STORE);
+
+        assertThat(result.isOk()).isTrue();
+        assertThat(elsewhere.resolve("2026-11-04").resolve(REQUEST_ID + ".request.body")).hasContent("{\"hello\":\"x\"}");
+    }
+
+    @Test
+    void onlyChecksPermissionsWhenTheGatewayUserIsUnknown() throws IOException
+    {
+        assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("unix"));
+        final int me = (Integer) Files.getAttribute(storageDirectory, "unix:uid");
+        assumeTrue(me != 0 && me != 65534 && me != (Integer) Files.getAttribute(Path.of("/"), "unix:uid"));
+        final UserPrincipal someoneElse = FileSystems.getDefault().getUserPrincipalLookupService().lookupPrincipalByName("65534");
+
+        assertThat(PayloadDirectory.prepareRoot(storageDirectory, null, directory -> someoneElse)).isEqualTo(storageDirectory.toRealPath());
+        assertThatThrownBy(() -> PayloadDirectory.prepareRoot(storageDirectory, Set.of(65534), directory -> someoneElse)).hasMessageContaining("is owned by uid " + me);
+    }
+
+    @Test
+    void processUidIsTheUserRunningTheTests() throws IOException
+    {
+        assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("unix"));
+        assertThat(PayloadDirectory.processUid()).contains((Integer) Files.getAttribute(storageDirectory, "unix:uid"));
     }
 
     @Test

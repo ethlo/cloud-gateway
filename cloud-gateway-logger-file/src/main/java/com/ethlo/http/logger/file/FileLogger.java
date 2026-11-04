@@ -47,6 +47,7 @@ public class FileLogger implements HttpLogger
     private final Path storageDirectory;
     private final Set<Integer> trustedUids;
     private volatile UserPrincipal owner;
+    private volatile Path root;
 
     public FileLogger(final AccessLogTemplateRenderer accessLogTemplateRenderer)
     {
@@ -135,10 +136,10 @@ public class FileLogger implements HttpLogger
 
             try (InputStream in = source.get())
             {
-                Files.createDirectories(storageDirectory, ownerOnly("rwx------"));
-                PayloadDirectory.requireSafeRoot(storageDirectory, trustedUids);
-                Files.createDirectories(target.getParent(), ownerOnly("rwx------"));
-                try (PayloadDirectory directory = PayloadDirectory.open(target.getParent(), getOwner()))
+                final Path realRoot = getRoot();
+                final Path day = realRoot.resolve(target.getParent().getFileName());
+                Files.createDirectories(day, ownerOnly("rwx------"));
+                try (PayloadDirectory directory = PayloadDirectory.open(day, getOwner(realRoot)))
                 {
                     write(directory, target.getFileName().toString(), in, writer);
                 }
@@ -157,10 +158,24 @@ public class FileLogger implements HttpLogger
     }
 
     /**
+     * The real path of the storage directory, checked once, as only trusted users can change it after that check.
+     */
+    private Path getRoot() throws IOException
+    {
+        Path result = root;
+        if (result == null)
+        {
+            result = PayloadDirectory.prepareRoot(storageDirectory, trustedUids, this::getOwner, ownerOnly("rwx------"));
+            root = result;
+        }
+        return result;
+    }
+
+    /**
      * Probed on the storage file system itself, as mounts that map or squash ids (NFS, CIFS, rootless containers)
      * make the gateway's files owned by someone other than the user running it.
      */
-    private UserPrincipal getOwner() throws IOException
+    private UserPrincipal getOwner(final Path realRoot) throws IOException
     {
         if (!POSIX)
         {
@@ -169,7 +184,7 @@ public class FileLogger implements HttpLogger
         UserPrincipal result = owner;
         if (result == null)
         {
-            result = PayloadDirectory.probeOwner(storageDirectory, ownerOnly("rw-------"));
+            result = PayloadDirectory.probeOwner(realRoot, ownerOnly("rw-------"));
             owner = result;
         }
         return result;

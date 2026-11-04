@@ -18,6 +18,7 @@ import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.nio.file.attribute.UserPrincipal;
 import java.util.EnumSet;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -132,33 +133,72 @@ final class PayloadDirectory implements Closeable
     private static final int ROOT_UID = 0;
 
     /**
-     * Refuse a storage directory that someone else could swap, or swap entries in, as they could then tamper with the
-     * owner probe or the day directories. The directory and every directory above it must belong to root or one of
-     * <code>trustedUids</code>, and must not be writable by other users unless the sticky bit is set (as for
-     * <code>/tmp</code>). Only checked where the unix attribute view is available (Linux, macOS).
+     * Create the storage directory if needed and return its real path, after making sure nobody but trusted users can
+     * swap it, or entries in it, as they could then tamper with the owner probe or the day directories. Every directory
+     * on the configured path and on the resolved path must not be writable by other users unless the sticky bit is set
+     * (as for <code>/tmp</code>), and must be owned by root, the owner of <code>/</code>, one of
+     * <code>trustedUids</code> or the owner of the files the gateway creates there. Only checked where the unix
+     * attribute view is available (Linux, macOS).
      *
      * @param trustedUids The users besides root that may own these directories, typically the user running the gateway,
      *                    or <code>null</code> to only check permissions
+     * @param ownerProbe  Finds who owns the files the gateway creates in the (real) storage directory
      */
-    static void requireSafeRoot(final Path root, final Set<Integer> trustedUids) throws IOException
+    static Path prepareRoot(final Path root, final Set<Integer> trustedUids, final OwnerProbe ownerProbe, final FileAttribute<?>... attributes) throws IOException
     {
-        if (!root.getFileSystem().supportedFileAttributeViews().contains("unix"))
+        final Path absolute = root.toAbsolutePath().normalize();
+        final boolean unix = root.getFileSystem().supportedFileAttributeViews().contains("unix");
+        if (unix)
         {
-            return;
+            Path existing = absolute;
+            while (!Files.exists(existing, LinkOption.NOFOLLOW_LINKS))
+            {
+                existing = existing.getParent();
+            }
+            // Permissions first, so nothing is created where the directories could be swapped
+            requireSafePath(root, existing, null, null, false);
         }
 
-        final Path realRoot = root.toRealPath();
-        // In a user namespace root's files show up under the overflow uid, so whoever owns / counts as root
-        final int systemUid = (Integer) Files.getAttribute(realRoot.getRoot(), "unix:uid", LinkOption.NOFOLLOW_LINKS);
-        for (Path directory = realRoot; directory != null; directory = directory.getParent())
+        Files.createDirectories(absolute, attributes);
+        final Path real = absolute.toRealPath();
+        if (unix)
         {
-            final int uid = (Integer) Files.getAttribute(directory, "unix:uid", LinkOption.NOFOLLOW_LINKS);
-            if (trustedUids != null && uid != ROOT_UID && uid != systemUid && !trustedUids.contains(uid))
+            requireSafePath(root, absolute, trustedUids, ownerProbe.probe(real), true);
+        }
+        return real;
+    }
+
+    @FunctionalInterface
+    interface OwnerProbe
+    {
+        UserPrincipal probe(Path directory) throws IOException;
+    }
+
+    /**
+     * Checks <code>path</code> and every directory above it, plus the real path of any symbolic link on the way, as the
+     * directory holding a link decides where it can point.
+     */
+    private static void requireSafePath(final Path root, final Path path, final Set<Integer> trustedUids, final UserPrincipal trustedOwner, final boolean checkOwners) throws IOException
+    {
+        final int systemUid = (Integer) Files.getAttribute(path.getRoot(), "unix:uid", LinkOption.NOFOLLOW_LINKS);
+        for (Path directory = path; directory != null; directory = directory.getParent())
+        {
+            final Map<String, Object> attributes = Files.readAttributes(directory, "unix:uid,owner,mode,isSymbolicLink", LinkOption.NOFOLLOW_LINKS);
+            if ((Boolean) attributes.get("isSymbolicLink"))
+            {
+                // The link itself has no meaningful permissions; its parent is checked next, and its target here
+                requireSafePath(root, directory.toRealPath(), trustedUids, trustedOwner, checkOwners);
+                continue;
+            }
+
+            final int uid = (Integer) attributes.get("uid");
+            // In a user namespace root's files show up under the overflow uid, so whoever owns / counts as root
+            if (checkOwners && trustedUids != null && uid != ROOT_UID && uid != systemUid && !trustedUids.contains(uid) && !attributes.get("owner").equals(trustedOwner))
             {
                 throw new IOException("Refusing to store payloads in " + root + ": " + directory + " is owned by uid " + uid + ", not by root or the user running the gateway");
             }
 
-            final int mode = (Integer) Files.getAttribute(directory, "unix:mode", LinkOption.NOFOLLOW_LINKS);
+            final int mode = (Integer) attributes.get("mode");
             if ((mode & GROUP_OR_OTHERS_WRITE) != 0 && (mode & STICKY) == 0)
             {
                 throw new IOException("Refusing to store payloads in " + root + ": " + directory + " is writable by other users without the sticky bit (" + String.format("%04o", mode & 07777) + ")");
