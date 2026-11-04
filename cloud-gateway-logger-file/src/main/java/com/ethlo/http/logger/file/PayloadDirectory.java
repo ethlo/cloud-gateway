@@ -4,6 +4,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.file.DirectoryStream;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.FileSystemException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
@@ -17,7 +18,11 @@ import java.nio.file.attribute.PosixFileAttributes;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.nio.file.attribute.UserPrincipal;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -135,7 +140,7 @@ final class PayloadDirectory implements Closeable
     /**
      * Create the storage directory if needed and return its real path, after making sure nobody but trusted users can
      * swap it, or entries in it, as they could then tamper with the owner probe or the day directories. Every directory
-     * on the configured path and on the resolved path must not be writable by other users unless the sticky bit is set
+     * and symbolic link that resolving the path passes through must not be writable by other users unless the sticky bit is set
      * (as for <code>/tmp</code>), and must be owned by root, the owner of <code>/</code>, one of
      * <code>trustedUids</code> or the owner of the files the gateway creates there. Only checked where the unix
      * attribute view is available (Linux, macOS).
@@ -145,30 +150,34 @@ final class PayloadDirectory implements Closeable
      */
     static Path prepareRoot(final Path root, final Set<Integer> trustedUids, final OwnerProbe ownerProbe, final FileAttribute<?>... attributes) throws IOException
     {
-        final Path absolute = root.toAbsolutePath().normalize();
-        final boolean unix = root.getFileSystem().supportedFileAttributeViews().contains("unix");
-        if (unix)
+        final Path absolute = root.toAbsolutePath();
+        if (!root.getFileSystem().supportedFileAttributeViews().contains("unix"))
         {
-            Path existing = absolute;
-            while (!Files.exists(existing, LinkOption.NOFOLLOW_LINKS))
-            {
-                existing = existing.getParent();
-            }
-            // Permissions first, so nothing is created where the directories could be swapped
-            requireSafePath(root, existing, null, null, false);
+            Files.createDirectories(absolute, attributes);
+            return absolute.toRealPath();
         }
 
-        Files.createDirectories(absolute, attributes);
-        final Path real = absolute.toRealPath();
-        if (unix)
+        // Permissions first, so nothing is created where the directories could be swapped
+        final Resolved existing = resolve(root, absolute, null, null, false);
+        Path real = existing.directory();
+        for (String name : existing.missing())
         {
-            final UserPrincipal owner = ownerProbe.probe(real);
-            requireSafePath(root, absolute, trustedUids, owner, true);
-            requireSafePath(root, real, trustedUids, owner, true);
-            if (!absolute.toRealPath().equals(real))
+            real = real.resolve(name);
+            try
             {
-                throw new IOException("Refusing to store payloads in " + root + ": it no longer resolves to " + real);
+                Files.createDirectory(real, attributes);
             }
+            catch (FileAlreadyExistsException ignored)
+            {
+                // Created meanwhile; whatever it is gets checked below
+            }
+        }
+
+        final UserPrincipal owner = ownerProbe.probe(real);
+        final Resolved checked = resolve(root, absolute, trustedUids, owner, true);
+        if (!checked.missing().isEmpty() || !checked.directory().equals(real))
+        {
+            throw new IOException("Refusing to store payloads in " + root + ": it no longer resolves to " + real);
         }
         return real;
     }
@@ -180,35 +189,108 @@ final class PayloadDirectory implements Closeable
     }
 
     /**
-     * Checks <code>path</code> and every directory above it, plus the real path of any symbolic link on the way, as the
-     * directory holding a link decides where it can point.
+     * @param directory The real path of the part of the path that exists
+     * @param missing   The names below it that do not exist yet
      */
-    private static void requireSafePath(final Path root, final Path path, final Set<Integer> trustedUids, final UserPrincipal trustedOwner, final boolean checkOwners) throws IOException
+    private record Resolved(Path directory, List<String> missing)
+    {
+    }
+
+    private static final int MAX_LINKS = 40;
+
+    /**
+     * Resolves <code>path</code> one name at a time, like the kernel does, checking every directory it passes through
+     * and every symbolic link on the way, as the directory holding a link decides where it can point, and a link's
+     * owner can repoint it.
+     */
+    private static Resolved resolve(final Path root, final Path path, final Set<Integer> trustedUids, final UserPrincipal trustedOwner, final boolean checkOwners) throws IOException
     {
         final int systemUid = (Integer) Files.getAttribute(path.getRoot(), "unix:uid", LinkOption.NOFOLLOW_LINKS);
-        for (Path directory = path; directory != null; directory = directory.getParent())
-        {
-            final Map<String, Object> attributes = Files.readAttributes(directory, "unix:uid,owner,mode,isSymbolicLink", LinkOption.NOFOLLOW_LINKS);
-            final int uid = (Integer) attributes.get("uid");
-            // In a user namespace root's files show up under the overflow uid, so whoever owns / counts as root
-            if (checkOwners && uid != ROOT_UID && uid != systemUid && !trustedUids.contains(uid) && !attributes.get("owner").equals(trustedOwner))
-            {
-                throw new IOException("Refusing to store payloads in " + root + ": " + directory + " is owned by uid " + uid + ", not by root or the user running the gateway");
-            }
+        final Deque<String> names = new ArrayDeque<>();
+        path.forEach(name -> names.addLast(name.toString()));
 
-            if ((Boolean) attributes.get("isSymbolicLink"))
+        Path current = path.getRoot();
+        check(root, current, systemUid, trustedUids, trustedOwner, checkOwners);
+        int links = 0;
+        while (!names.isEmpty())
+        {
+            final String name = names.removeFirst();
+            if (name.equals("."))
             {
-                // A link's own permissions mean nothing; its parent is checked next, and its target here
-                requireSafePath(root, directory.toRealPath(), trustedUids, trustedOwner, checkOwners);
+                continue;
+            }
+            if (name.equals(".."))
+            {
+                // current holds no links, so its parent is where .. leads
+                current = current.getParent() != null ? current.getParent() : current;
                 continue;
             }
 
-            final int mode = (Integer) attributes.get("mode");
-            if ((mode & GROUP_OR_OTHERS_WRITE) != 0 && (mode & STICKY) == 0)
+            final Path next = current.resolve(name);
+            if (!Files.exists(next, LinkOption.NOFOLLOW_LINKS))
             {
-                throw new IOException("Refusing to store payloads in " + root + ": " + directory + " is writable by other users without the sticky bit (" + String.format("%04o", mode & 07777) + ")");
+                names.addFirst(name);
+                if (names.contains(".."))
+                {
+                    throw new IOException("Refusing to store payloads in " + root + ": it goes through " + next + ", which does not exist");
+                }
+                return new Resolved(current, List.copyOf(names));
             }
+
+            if (check(root, next, systemUid, trustedUids, trustedOwner, checkOwners))
+            {
+                if (++links > MAX_LINKS)
+                {
+                    throw new IOException("Refusing to store payloads in " + root + ": too many symbolic links");
+                }
+                final Path target = Files.readSymbolicLink(next);
+                if (target.isAbsolute())
+                {
+                    current = target.getRoot();
+                    check(root, current, systemUid, trustedUids, trustedOwner, checkOwners);
+                }
+                final List<String> targetNames = new ArrayList<>();
+                target.forEach(n -> targetNames.add(n.toString()));
+                for (int i = targetNames.size() - 1; i >= 0; i--)
+                {
+                    names.addFirst(targetNames.get(i));
+                }
+                continue;
+            }
+            current = next;
         }
+        return new Resolved(current, List.of());
+    }
+
+    /**
+     * @return Whether <code>file</code> is a symbolic link
+     */
+    private static boolean check(final Path root, final Path file, final int systemUid, final Set<Integer> trustedUids, final UserPrincipal trustedOwner, final boolean checkOwners) throws IOException
+    {
+        final Map<String, Object> attributes = Files.readAttributes(file, "unix:uid,owner,mode,isSymbolicLink,isDirectory", LinkOption.NOFOLLOW_LINKS);
+        final int uid = (Integer) attributes.get("uid");
+        // In a user namespace root's files show up under the overflow uid, so whoever owns / counts as root
+        if (checkOwners && uid != ROOT_UID && uid != systemUid && !trustedUids.contains(uid) && !attributes.get("owner").equals(trustedOwner))
+        {
+            throw new IOException("Refusing to store payloads in " + root + ": " + file + " is owned by uid " + uid + ", not by root or the user running the gateway");
+        }
+
+        if ((Boolean) attributes.get("isSymbolicLink"))
+        {
+            // A link's own permissions mean nothing, what matters is the directory holding it
+            return true;
+        }
+        if (!(Boolean) attributes.get("isDirectory"))
+        {
+            throw new IOException("Refusing to store payloads in " + root + ": " + file + " is not a directory");
+        }
+
+        final int mode = (Integer) attributes.get("mode");
+        if ((mode & GROUP_OR_OTHERS_WRITE) != 0 && (mode & STICKY) == 0)
+        {
+            throw new IOException("Refusing to store payloads in " + root + ": " + file + " is writable by other users without the sticky bit (" + String.format("%04o", mode & 07777) + ")");
+        }
+        return false;
     }
 
     /**

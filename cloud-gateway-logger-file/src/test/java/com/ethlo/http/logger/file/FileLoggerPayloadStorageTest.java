@@ -231,17 +231,38 @@ class FileLoggerPayloadStorageTest
     }
 
     @Test
-    void refusesSymlinkOwnedBySomeoneElse(@TempDir final Path elsewhere) throws IOException
+    void refusesSymlinkChainHoppingThroughDirectoryWritableByOthers(@TempDir final Path elsewhere, @TempDir final Path target) throws IOException
     {
         assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("unix"));
-        final int me = (Integer) Files.getAttribute(storageDirectory, "unix:uid");
-        assumeTrue(me != 0 && me != 65534 && me != (Integer) Files.getAttribute(Path.of("/"), "unix:uid"));
-        final UserPrincipal someoneElse = FileSystems.getDefault().getUserPrincipalLookupService().lookupPrincipalByName("65534");
-        final Path link = Files.createSymbolicLink(storageDirectory.resolve("payloads"), elsewhere);
-        Files.setAttribute(storageDirectory, "unix:mode", 01777);
+        capture(REQUEST, RESPONSE);
+        final Path unsafe = Files.createDirectory(elsewhere.resolve("unsafe"));
+        Files.createSymbolicLink(unsafe.resolve("hop"), target);
+        Files.setAttribute(unsafe, "unix:mode", 0777);
+        final Path link = Files.createSymbolicLink(storageDirectory.resolve("payloads"), unsafe.resolve("hop"));
 
-        // Only the link and its directory are trusted here, the link must still be refused
-        assertThatThrownBy(() -> PayloadDirectory.prepareRoot(link, Set.of(65534), directory -> someoneElse)).hasMessageContaining(link + " is owned by uid " + me);
+        final AccessLogResult result = accessLog(link, ContentProcessing.NONE, ContentProcessing.STORE);
+
+        assertThat(result.isOk()).isFalse();
+        assertThat(result.getProcessingErrors()).hasSize(2).allSatisfy(e -> assertThat(e.getMessage()).contains(unsafe.toRealPath() + " is writable by other users without the sticky bit"));
+        assertThat(target).isEmptyDirectory();
+    }
+
+    @Test
+    void resolvesDotDotAfterSymlinkLikeTheKernel(@TempDir final Path elsewhere) throws IOException
+    {
+        capture(REQUEST, RESPONSE);
+        final Path child = Files.createDirectory(elsewhere.resolve("child"));
+        if (FileSystems.getDefault().supportedFileAttributeViews().contains("posix"))
+        {
+            Files.setPosixFilePermissions(child, PosixFilePermissions.fromString("rwx------"));
+        }
+        Files.createSymbolicLink(storageDirectory.resolve("link"), child);
+
+        final AccessLogResult result = accessLog(storageDirectory.resolve("link/../payloads"), ContentProcessing.NONE, ContentProcessing.STORE);
+
+        assertThat(result.getProcessingErrors()).isEmpty();
+        assertThat(elsewhere.resolve("payloads/2026-11-04").resolve(REQUEST_ID + ".request.body")).hasContent("{\"hello\":\"x\"}");
+        assertThat(storageDirectory.resolve("payloads")).doesNotExist();
     }
 
     @Test
