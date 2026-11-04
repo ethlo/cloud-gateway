@@ -11,6 +11,7 @@ import java.io.UncheckedIOException;
 import java.nio.channels.Channels;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileAttribute;
 import java.nio.file.attribute.PosixFilePermissions;
@@ -36,7 +37,6 @@ import com.ethlo.http.model.WebExchangeDataProvider;
 import com.ethlo.http.netty.PredicateConfig;
 import com.ethlo.http.netty.ServerDirection;
 import com.ethlo.http.util.HttpBodyUtil;
-import com.sun.security.auth.module.UnixSystem;
 
 public class FileLogger implements HttpLogger
 {
@@ -72,17 +72,26 @@ public class FileLogger implements HttpLogger
         this.owner = owner;
     }
 
+    /**
+     * The owner of a file this process creates, which is reliable even when the user has no name, as is common in containers.
+     */
     static UserPrincipal currentUser()
     {
-        // Looked up by numeric uid, as the user running the gateway in a container often has no name
-        final long uid = new UnixSystem().getUid();
         try
         {
-            return FileSystems.getDefault().getUserPrincipalLookupService().lookupPrincipalByName(Long.toString(uid));
+            final Path probe = Files.createTempFile("cloud-gateway-owner", ".tmp");
+            try
+            {
+                return Files.getOwner(probe, LinkOption.NOFOLLOW_LINKS);
+            }
+            finally
+            {
+                Files.delete(probe);
+            }
         }
         catch (IOException e)
         {
-            throw new UncheckedIOException("Unable to look up the user with uid " + uid, e);
+            throw new UncheckedIOException("Unable to determine the user running the gateway", e);
         }
     }
 
@@ -136,10 +145,13 @@ public class FileLogger implements HttpLogger
                 return Optional.empty();
             }
 
-            Files.createDirectories(target.getParent(), ownerOnly("rwx------"));
-            try (InputStream in = source.get(); PayloadDirectory directory = PayloadDirectory.open(target.getParent(), owner))
+            try (InputStream in = source.get())
             {
-                write(directory, target.getFileName().toString(), in, writer);
+                Files.createDirectories(target.getParent(), ownerOnly("rwx------"));
+                try (PayloadDirectory directory = PayloadDirectory.open(target.getParent(), owner))
+                {
+                    write(directory, target.getFileName().toString(), in, writer);
+                }
             }
             logger.debug("Stored {} {} for request {} in {}", direction.name().toLowerCase(), kind, dataProvider.getRequestId(), target);
             return Optional.empty();

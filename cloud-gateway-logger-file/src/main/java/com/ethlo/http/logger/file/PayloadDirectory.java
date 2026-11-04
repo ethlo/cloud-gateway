@@ -4,7 +4,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.file.DirectoryStream;
-import java.nio.file.FileSystemLoopException;
+import java.nio.file.FileSystemException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
@@ -50,9 +50,14 @@ final class PayloadDirectory implements Closeable
                 {
                     stream = secureParent.newDirectoryStream(directory.getFileName(), LinkOption.NOFOLLOW_LINKS);
                 }
-                catch (FileSystemLoopException e)
+                catch (FileSystemException e)
                 {
-                    throw new IOException("Refusing to store payloads in " + directory + ": it is a symbolic link", e);
+                    // Opening a symbolic link without following it fails with ELOOP, reported differently across JDKs
+                    if (Files.isSymbolicLink(directory))
+                    {
+                        throw new IOException("Refusing to store payloads in " + directory + ": it is a symbolic link", e);
+                    }
+                    throw e;
                 }
 
                 try

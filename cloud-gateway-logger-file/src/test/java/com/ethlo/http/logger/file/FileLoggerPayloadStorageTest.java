@@ -147,13 +147,14 @@ class FileLoggerPayloadStorageTest
     @Test
     void refusesSymlinkedDayDirectory(@TempDir final Path elsewhere) throws IOException
     {
+        assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("posix"));
         capture(REQUEST, RESPONSE);
         Files.createSymbolicLink(storageDirectory.resolve("2026-11-04"), elsewhere);
 
         final AccessLogResult result = accessLog(storageDirectory, ContentProcessing.STORE, ContentProcessing.NONE);
 
         assertThat(result.isOk()).isFalse();
-        assertThat(result.getProcessingErrors()).hasSize(2).allSatisfy(e -> assertThat(e.getMessage()).contains("symbolic link"));
+        assertThat(result.getProcessingErrors()).hasSize(2).allSatisfy(e -> assertThat(e.getMessage()).contains("Refusing to store payloads").contains("symbolic link"));
         assertThat(elsewhere).isEmptyDirectory();
     }
 
