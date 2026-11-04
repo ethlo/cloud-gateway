@@ -165,8 +165,16 @@ public class FileLogger implements HttpLogger
         Path result = root;
         if (result == null)
         {
-            result = PayloadDirectory.prepareRoot(storageDirectory, trustedUids, ownerOnly("rwx------"));
-            root = result;
+            // Concurrent first payloads would otherwise race to create the same directories, and the loser is refused
+            synchronized (this)
+            {
+                result = root;
+                if (result == null)
+                {
+                    result = PayloadDirectory.prepareRoot(storageDirectory, trustedUids, ownerOnly("rwx------"));
+                    root = result;
+                }
+            }
         }
         return result;
     }
