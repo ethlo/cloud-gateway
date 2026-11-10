@@ -7,7 +7,7 @@ on:
     tags:
       - 'v*.*.*'
     branches:
-      - 'flux'
+      - 'mvc'
 
 env:
   IMAGE_NAME: ethlocom/cloud-gateway
@@ -42,8 +42,8 @@ jobs:
             VERSION=${VERSION#v}
             DOCKER_TAG=${VERSION}
           else
-            VERSION="flux-SNAPSHOT"
-            DOCKER_TAG="flux-SNAPSHOT"
+            VERSION="mvc-SNAPSHOT"
+            DOCKER_TAG="mvc-SNAPSHOT"
           fi
           echo "MAVEN_VERSION=${VERSION}" >> $GITHUB_ENV
           echo "DOCKER_ARCH_TAG=${DOCKER_TAG}-${{ matrix.arch }}" >> $GITHUB_ENV
@@ -89,7 +89,7 @@ jobs:
             FINAL_TAG="${{ github.ref_name }}"
             FINAL_TAG="${FINAL_TAG#v}"
           else
-            FINAL_TAG="flux-SNAPSHOT"
+            FINAL_TAG="mvc-SNAPSHOT"
           fi
 
           AMD64_TAG="${{ env.IMAGE_NAME }}:${FINAL_TAG}-amd64"
