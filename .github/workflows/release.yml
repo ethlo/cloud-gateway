@@ -9,8 +9,12 @@ on:
     branches:
       - 'main'
 
+permissions:
+  contents: read
+  packages: write
+
 env:
-  IMAGE_NAME: ethlocom/cloud-gateway
+  IMAGE_NAME: ghcr.io/ethlo/cloud-gateway
 
 jobs:
   build:
@@ -60,11 +64,12 @@ jobs:
             -DskipTests \
             -Dimage.tag=${DOCKER_ARCH_TAG}
 
-      - name: Log in to Docker Hub
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Push Docker Image
         run: |
@@ -74,11 +79,12 @@ jobs:
     needs: [build]
     runs-on: ubuntu-latest
     steps:
-      - name: Log in to Docker Hub
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create and Push Multi-Arch Manifest
         run: |
